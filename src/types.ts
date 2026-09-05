@@ -1,6 +1,3 @@
-// ============================================================================
-// DOMAIN MODELS & ENTITIES
-// ============================================================================
 
 export type ItemSize = 'SMALL' | 'MEDIUM' | 'LARGE';
 export type ItemWeight = 'LIGHT' | 'MEDIUM' | 'HEAVY';
@@ -33,9 +30,6 @@ export interface Movement {
   timestamp: number;
 }
 
-// ============================================================================
-// SYSTEM CONFIGURATION CONSTANTS
-// ============================================================================
 
 export const CONFIG = {
   LOW_STOCK_THRESHOLD: 5,

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Movement, Item, UserRole } from '../types';
 
 // ============================================================================
-// COMPONENT CONTRACT & PROPS
 // ============================================================================
 interface UserProfileProps {
   user: string;
@@ -13,10 +12,10 @@ interface UserProfileProps {
   onGoToDashboard: () => void;
   onUndoMovement?: (id: string) => void;
   onSwitchRole?: (role: UserRole, name: string) => void;
+  onChangePassword?: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 // ============================================================================
-// USER PROFILE & AUDIT TRAIL VIEW
 // ============================================================================
 export const UserProfile: React.FC<UserProfileProps> = ({ 
   user, 
@@ -26,17 +25,21 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   onLogout, 
   onGoToDashboard,
   onUndoMovement,
-  onSwitchRole
+  onSwitchRole,
+  onChangePassword
 }) => {
   // ==========================================================================
-  // 1. FILTER & CONFIRMATION STATE
   // ==========================================================================
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   // ==========================================================================
-  // 2. COMPUTED METRICS & AUDIT LOGS
   // ==========================================================================
   const displayName = (role === 'staff' && user.toLowerCase().includes('admin')) ? 'Warehouse Staff' : user;
   const userRole = (role === 'admin' || (role !== 'staff' && user.toLowerCase().includes('admin'))) 
@@ -62,7 +65,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     .sort((a, b) => b.timestamp - a.timestamp);
 
   // ==========================================================================
-  // 3. ACTION HANDLERS
   // ==========================================================================
   const handleUndo = (id: string) => {
     if (onUndoMovement) {
@@ -71,11 +73,52 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }
   };
 
+  const clearPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordFeedback(null);
+  };
+
+  const handlePasswordSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!onChangePassword) {
+      setPasswordFeedback({ type: 'error', message: 'Password change is unavailable.' });
+      return;
+    }
+
+    if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      setPasswordFeedback({ type: 'error', message: 'Please fill in all password fields.' });
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      setPasswordFeedback({ type: 'error', message: 'New password must be at least 4 characters long.' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordFeedback({ type: 'error', message: 'New passwords do not match.' });
+      return;
+    }
+
+    try {
+      await onChangePassword(currentPassword, newPassword);
+      setPasswordFeedback({ type: 'success', message: 'Password updated successfully.' });
+      clearPasswordForm();
+      setTimeout(() => setIsPasswordModalOpen(false), 500);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update password.';
+      setPasswordFeedback({ type: 'error', message: message });
+    }
+  };
+
   return (
-    <div className="content-section flex-col-gap">
+    <>
+      <div className="content-section flex-col-gap">
       <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--gap)', alignItems: 'stretch' }}>
         
-        {/* Left Column: Profile Card & Session Diagnostics */}
         <div className="flex-col-gap" style={{ height: '100%' }}>
           <div className="dash-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '480px' }}>
             <div>
@@ -107,6 +150,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             </div>
 
             <div className="flex-col-gap" style={{ gap: '0.5rem', marginTop: 'auto' }}>
+              <button className="olive-button btn-outline w-full" onClick={() => {
+                clearPasswordForm();
+                setIsPasswordModalOpen(true);
+              }}>
+                <i className="bx bx-lock-alt" style={{ marginRight: '6px' }}></i> Change Password
+              </button>
               <button className="olive-button btn-danger w-full" onClick={onLogout}>
                 <i className="bx bx-log-out" style={{ marginRight: '6px' }}></i> Log Out Operator
               </button>
@@ -114,10 +163,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Audit History Ledger */}
         <div className="flex-col-gap" style={{ height: '100%' }}>
           <div className="dash-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: '480px' }}>
-            {/* Audit History Header */}
             <div className="flex-row-between mb-3" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
               <div className="flex-row-center" style={{ gap: '0.5rem' }}>
                 <i className="bx bx-history" style={{ fontSize: '1.25rem' }}></i>
@@ -126,7 +173,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 </span>
               </div>
               
-              {/* Filter Tabs */}
               <div className="flex-row-gap" style={{ gap: '4px' }}>
                 <button 
                   className={`olive-button btn-outline label-micro ${filterType === 'ALL' ? 'active' : ''}`}
@@ -152,7 +198,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               </div>
             </div>
 
-            {/* Search Input for Audit History */}
             <div className="form-group mb-3">
               <input 
                 type="text" 
@@ -164,7 +209,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               />
             </div>
 
-            {/* Audit Log Entries List */}
             <div className="flex-col-gap dash-card-list" style={{ flex: 1, maxHeight: '420px', overflowY: 'auto', gap: '0.5rem' }}>
               {filteredMovements.length > 0 ? (
                 filteredMovements.map(m => {
@@ -291,6 +335,41 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
       </div>
     </div>
+
+    <div className={`modal-overlay ${isPasswordModalOpen ? 'active' : ''}`}>
+      <div className="modal-content mini">
+        <div className="modal-header">
+          <span className="label-micro">Change Password</span>
+          <button className="close-modal" onClick={() => { clearPasswordForm(); setIsPasswordModalOpen(false); }}><i className="bx bx-x"></i></button>
+        </div>
+        <form onSubmit={handlePasswordSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="currentPassword">Current Password</label>
+            <input id="currentPassword" className="form-input" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter current password" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="newPassword">New Password</label>
+            <input id="newPassword" className="form-input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <input id="confirmPassword" className="form-input" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" />
+          </div>
+
+          {passwordFeedback && (
+            <p className={`label-micro ${passwordFeedback.type === 'error' ? 'text-accent' : 'text-success'}`} style={{ margin: 0 }}>
+              {passwordFeedback.message}
+            </p>
+          )}
+
+          <div className="flex-row-gap" style={{ width: '100%' }}>
+            <button type="button" className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => { clearPasswordForm(); setIsPasswordModalOpen(false); }}>Cancel</button>
+            <button type="submit" className="olive-button" style={{ flex: 1 }}>Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    </>
   );
 };
 

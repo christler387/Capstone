@@ -13,15 +13,8 @@ import { WarehouseMap } from './components/WarehouseMap';
 import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
 
-/**
- * ==========================================================================
- * ORCHESTRATOR COMPONENT: APP ROOT
- * Handles application state, global modal visibility, and section routing.
- * ==========================================================================
- */
 const App: React.FC = () => {
   // ==========================================================================
-  // 1. CORE REPOSITORY & SESSION STATE
   // ==========================================================================
   const [inventory, setInventory] = useState<Item[]>(SEED_DATA);
   const [movements, setMovements] = useState<Movement[]>(SEED_MOVEMENTS);
@@ -29,7 +22,6 @@ const App: React.FC = () => {
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
   const [databaseError, setDatabaseError] = useState<string | null>(null);
-
   useEffect(() => {
     let active = true;
     Promise.all([api.getInventory(), api.getMovements()])
@@ -44,9 +36,6 @@ const App: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  // ==========================================================================
-  // 2. AUTHENTICATION & ROLE MANAGEMENT
-  // ==========================================================================
   const handleLoginSuccess = (username: string, role: UserRole) => {
     localStorage.setItem('skyrun_session_user', username);
     localStorage.setItem('skyrun_session_role', role);
@@ -68,10 +57,15 @@ const App: React.FC = () => {
     setUserRole('staff');
     setCurrentSection('dashboard');
   };
+
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    const activeUsername = localStorage.getItem('skyrun_session_user') || user;
+    if (!activeUsername) {
+      throw new Error('No active user is logged in.');
+    }
+    await api.changePassword(activeUsername, currentPassword, newPassword);
+  };
   
-  // ==========================================================================
-  // 3. MODAL & FOCUS STATE
-  // ==========================================================================
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | undefined>(undefined);
   const [zoomImage, setZoomImage] = useState<{ url: string, name: string } | null>(null);
@@ -79,9 +73,6 @@ const App: React.FC = () => {
   const [stockToItem, setStockToItem] = useState<string | undefined>(undefined);
   const [locateRack, setLocateRack] = useState<string | null>(null);
 
-  // ==========================================================================
-  // 4. INVENTORY & TRANSACTION HANDLERS
-  // ==========================================================================
   const handleGoToStock = (id: string) => {
     setStockToItem(id);
     setCurrentSection('stock');
@@ -180,9 +171,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ==========================================================================
-  // 5. VIEW ROUTER
-  // ==========================================================================
   const renderComponentRouter = () => {
     switch (currentSection) {
       case 'dashboard': 
@@ -246,6 +234,7 @@ const App: React.FC = () => {
             onGoToDashboard={() => setCurrentSection('dashboard')} 
             onUndoMovement={undoMovement}
             onSwitchRole={handleSwitchRole}
+            onChangePassword={handleChangePassword}
           />
         );
       default: 
@@ -254,11 +243,9 @@ const App: React.FC = () => {
   };
 
   // ==========================================================================
-  // 6. GLOBAL DIALOGS & OVERLAYS
   // ==========================================================================
   const renderGlobalModals = () => (
     <>
-      {/* 1. Item Creator / Editor / Details Modal */}
       <Modal 
         isOpen={isItemModalOpen} 
         onClose={() => setIsItemModalOpen(false)} 
@@ -272,7 +259,6 @@ const App: React.FC = () => {
         />
       </Modal>
   
-      {/* 2. Deletion Confirmation Modal */}
       <Modal 
         isOpen={!!confirmDelete} 
         onClose={() => setConfirmDelete(null)} 
@@ -290,7 +276,6 @@ const App: React.FC = () => {
         </div>
       </Modal>
   
-      {/* 3. Image Zoom Modal */}
       <Modal
         isOpen={!!zoomImage}
         onClose={() => setZoomImage(null)}
@@ -309,9 +294,6 @@ const App: React.FC = () => {
     </>
   );
 
-  // ==========================================================================
-  // 7. PRIMARY LAYOUT SHELL
-  // ==========================================================================
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }

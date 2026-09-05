@@ -10,7 +10,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   useEffect(() => {
-    // delay a bit to ensure the element is in the DOM
     const timer = setTimeout(() => {
       const scanner = new Html5QrcodeScanner(
         "reader",
@@ -19,7 +18,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
           qrbox: { width: 260, height: 120 },
           aspectRatio: 1.777778
         },
-        /* verbose= */ false
+        false
       );
 
       scanner.render((decodedText) => {

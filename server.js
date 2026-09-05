@@ -156,6 +156,34 @@ app.get('/api/users', async (_req, res) => {
   res.json(rows);
 });
 
+app.put('/api/users/change-password', async (req, res) => {
+  const { username, currentPassword, newPassword } = req.body || {};
+
+  if (!username || !currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Username, current password, and new password are required.' });
+  }
+
+  const normalizedUsername = String(username).trim();
+  const newPasswordString = String(newPassword).trim();
+
+  if (newPasswordString.length < 4) {
+    return res.status(400).json({ error: 'New password must be at least 4 characters long.' });
+  }
+
+  const [rows] = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedUsername]);
+  if (rows.length === 0) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const user = rows[0];
+  if (user.password_hash !== hashPassword(String(currentPassword))) {
+    return res.status(401).json({ error: 'Current password is incorrect.' });
+  }
+
+  await pool.query('UPDATE users SET password_hash=? WHERE id=?', [hashPassword(newPasswordString), user.id]);
+  res.json({ ok: true, username: user.username });
+});
+
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {

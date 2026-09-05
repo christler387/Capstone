@@ -9,7 +9,6 @@
  * ==========================================================================
  */
 :root {
-  /* Colors */
   --bg: #C5C4BF;
   --ink: #141414;
   --accent: #FF4444;
@@ -19,12 +18,10 @@
   --overlay: rgba(20, 20, 20, 0.8);
   --item-bg: rgba(20, 20, 20, 0.03);
   
-  /* Fonts */
   --f-sans: 'Inter', sans-serif;
   --f-mono: 'JetBrains Mono', monospace;
   --f-serif: 'Playfair Display', serif;
   
-  /* Layout */
   --gap: 1.5rem;
   --radius: 12px;
   --ease: 0.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -129,10 +126,8 @@ main { padding: var(--gap); flex: 1; }
   }
 }
 
-/* Custom Scrollbar for Dashboard Lists */
 .dash-card-list::-webkit-scrollbar { display: none; width: 0; }
 
-/* Top Navigation */
 .top-nav {
   display: flex;
   gap: 0.5rem;
@@ -164,7 +159,6 @@ main { padding: var(--gap); flex: 1; }
  * 4. UI COMPONENTS (BUTTONS & CARDS)
  * ==========================================================================
  */
-/* Buttons */
 .olive-button {
   background: var(--ink); 
   color: var(--bg); 
@@ -192,7 +186,6 @@ main { padding: var(--gap); flex: 1; }
 .receipt-btn i { font-size: 1.1rem; }
 .receipt-btn svg { width: 18px; height: 18px; }
 
-/* Category Filter Specifics */
 #category-filter-bar .nav-btn {
   white-space: nowrap;
   font-family: var(--f-mono);
@@ -217,7 +210,6 @@ main { padding: var(--gap); flex: 1; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Cards */
 .dash-card { 
   background: var(--bg); border: 1px solid var(--line); padding: var(--gap); 
   display: flex; flex-direction: column; gap: 1rem; 
@@ -232,7 +224,6 @@ main { padding: var(--gap); flex: 1; }
   margin-top: 0.5rem;
 }
 
-/* Modals */
 .modal-overlay { 
   position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(4px); 
   display: none; align-items: center; justify-content: center; z-index: 2000; padding: 2rem; 
@@ -259,7 +250,6 @@ main { padding: var(--gap); flex: 1; }
   white-space: pre-wrap; background: var(--bg); color: var(--ink); line-height: 1.4; 
 }
 
-/* Tabs */
 .tab-btn { 
   background: none; border: none; padding: 0.5rem 0; cursor: pointer; 
   font-family: var(--f-mono); font-size: 0.75rem; text-transform: uppercase; 
@@ -267,7 +257,6 @@ main { padding: var(--gap); flex: 1; }
 }
 .tab-btn.active { opacity: 1; border-bottom: 1px solid var(--ink); }
 
-/* Close Buttons */
 .close-modal, .close-scanner-icon-btn {
   background: none;
   border: none;
@@ -329,7 +318,6 @@ main { padding: var(--gap); flex: 1; }
 .qty-cell, .price-cell { font-size: 0.875rem; font-family: var(--f-mono); text-align: right; }
 .actions-cell { font-size: 10px; text-transform: uppercase; font-family: var(--f-mono); text-align: right; opacity: 0.8; }
 
-/* Location Badge Styles */
 .location-cell-flex {
   display: flex;
   align-items: center;
@@ -835,7 +823,6 @@ main { padding: var(--gap); flex: 1; }
   box-shadow: 0 0 0 2px var(--ink);
 }
 
-/* Location Analytics */
 #ai-slotting-results {
   max-height: 480px;
   overflow-y: auto;
@@ -1166,7 +1153,6 @@ main { padding: var(--gap); flex: 1; }
 
 .slot.empty i { font-size: 14px; }
 
-/* Velocity Badges */
 .velocity-badge {
   display: inline-block;
   padding: 2px 6px;
@@ -1238,7 +1224,6 @@ footer p {
  * 13. UTILITY CLASSES
  * ==========================================================================
  */
-/* Flex & Grid Layout Helpers */
 .flex-col { display: flex; flex-direction: column; gap: 0.125rem; }
 .flex-col-start { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
 .flex-col-end { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; text-align: right; }
@@ -1250,13 +1235,11 @@ footer p {
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 
-/* Text Alignment & Color Helpers */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-accent { color: var(--accent) !important; }
 .text-success { color: var(--success) !important; }
 
-/* Opacity & Hover States */
 .opacity-30 { opacity: 0.3; }
 .opacity-50 { opacity: 0.5; }
 .opacity-80 { opacity: 0.8; }
@@ -1274,7 +1257,6 @@ footer p {
   border-radius: 8px !important;
 }
 
-/* Margins & Paddings */
 .mt-2 { margin-top: 0.5rem; }
 .mt-4 { margin-top: 1rem; }
 .mb-4 { margin-bottom: 1rem; }
@@ -1284,12 +1266,10 @@ footer p {
 .pl-2 { padding-left: 0.5rem; }
 .pr-2 { padding-right: 0.5rem; }
 
-/* Border Helpers */
 .border-soft { padding: 0.5rem 0; display: flex; align-items: center; margin: 0.25rem 0; }
 .border-soft:first-child { padding-top: 0; }
 .border-soft-no-pad { padding-bottom: 0; }
 
-/* Demand & Weight Badges (Text Only) */
 .badge-demand-high {
   background: transparent;
   color: #dc2626;
