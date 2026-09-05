@@ -3,7 +3,6 @@ import { Item, Movement, CONFIG } from '../types';
 import { Modal } from './Modal';
 
 // ============================================================================
-// CONFIGURATION & STATIC SCHEMAS
 // ============================================================================
 const ZONES = [
   { id: 'A', name: 'AISLE A: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 8, color: '#3B82F6' },
@@ -34,7 +33,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   userRole = 'staff'
 }) => {
   // ============================================================================
-  // STATE MANAGEMENT
   // ============================================================================
   const [selectedRack, setSelectedRack] = useState<{ zoneId: string, rackId: string } | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -50,7 +48,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // ============================================================================
-  // UTILITY & HELPERS
   // ============================================================================
   const normalizeRack = (r: string | undefined) => r ? r.replace(/-/g, '').toUpperCase() : '';
 
@@ -69,13 +66,11 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   };
 
   // ============================================================================
-  // LAYOUT OPTIMIZATION ENGINE (PURELY DEMAND-BASED VIA STOCK OUT)
   // ============================================================================
   const runOptimization = async () => {
     setIsOptimizing(true);
     setError(null);
     try {
-      // Analytical computation latency
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const proposals = inventory.map(item => {
@@ -83,18 +78,15 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
         const stockOutQty = getStockOutQty(item);
         const itemSeed = item.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
-        // 1. Determine Target Zone and Rack purely by Demand (Stock-Out Velocity)
         let targetZone = 'B';
         let targetRackNum = 1;
         let demandReason = '';
 
         if (demand === 'HIGH') {
-          // Dedicated Aisle A for all high-demand / fast-picking items
           targetZone = 'A';
           targetRackNum = 1 + (itemSeed % 8);
           demandReason = `High Demand (${stockOutQty} units stocked out) → Aisle A (R0${targetRackNum}) dedicated fast-pick slot`;
         } else if (demand === 'LOW') {
-          // Low demand items routed to deep buffer racks (R05-R08) in secondary aisles
           const cat = item.category.toUpperCase();
           if (cat.includes('ELECTRICAL') || cat.includes('BODY')) {
             targetZone = 'C';
@@ -106,7 +98,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           targetRackNum = 5 + (itemSeed % 4);
           demandReason = `Low Demand (${stockOutQty} units stocked out) → Aisle ${targetZone} (R0${targetRackNum}) deep buffer storage`;
         } else {
-          // Medium demand items placed in standard picking racks (R01-R04) in secondary aisles
           const cat = item.category.toUpperCase();
           if (cat.includes('ELECTRICAL') || cat.includes('BODY')) {
             targetZone = 'C';
@@ -132,7 +123,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
         };
       });
 
-      // Filter only items that need rack relocation
       const relocationsNeeded = proposals.filter(p => 
         normalizeRack(p.oldRack) !== normalizeRack(p.newRack)
       );
@@ -163,7 +153,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   };
 
   // ============================================================================
-  // LIFECYCLES & SIDE EFFECTS
   // ============================================================================
   useEffect(() => {
     if (initialRack) {
@@ -174,7 +163,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   }, [initialRack, onClearInitialRack]);
 
   // ============================================================================
-  // COMPUTED ANALYTICS DATA
   // ============================================================================
   const aisleData = ['A', 'B', 'C', 'D'].map(id => {
     const aisleItems = inventory.filter(i => (i.rack || '').toUpperCase().startsWith(id));
@@ -196,7 +184,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   });
 
   // ============================================================================
-  // INSIGHT / INSPECTION MODAL SUB-COMPONENTS
   // ============================================================================
   const InspectionModal = () => {
     if (!selectedRack) return null;
@@ -254,14 +241,12 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   };
 
   // ============================================================================
-  // MAIN VIEWPORT RENDER
   // ============================================================================
   return (
     <div className="content-section">
       {error && <div className="dash-card mb-4 border-accent p-3 text-accent label-micro text-center">{error}</div>}
 
       <div className="warehouse-layout-container">
-        {/* Rack Maps Visualizer */}
         <div className="warehouse-map-grid">
           {ZONES.map(zone => {
              const zoneItems = inventory.filter(i => normalizeRack(i.rack).startsWith(zone.id));
@@ -301,7 +286,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           })}
         </div>
 
-        {/* Right Panel: Density & AI Optimize Action */}
         <div className="location-analytics-container">
           <div className="dash-card">
             <div className="flex-row-between mb-2"><span className="label-micro">Aisle Density Analytics</span></div>
@@ -338,7 +322,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       
       <InspectionModal />
       
-      {/* Optimization Proposals Modal */}
       {optimizationResult && (
         <Modal 
           isOpen={true} 

@@ -9,7 +9,6 @@ interface ItemFormProps {
 }
 
 export const ItemForm: React.FC<ItemFormProps> = ({ item, onSave, onCancel, readOnly = false }) => {
-  // --- STATE MANAGEMENT ---
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Item>>(item || {
     id: '',
@@ -27,7 +26,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSave, onCancel, read
     compatibleVehicles: ''
   });
 
-  // --- HANDLERS ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     const field = id.replace('edit-', '');
@@ -66,7 +64,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSave, onCancel, read
         </div>
       )}
 
-      {/* Validation Message */}
       {error && (
         <div 
           className="font-mono alert-text" 

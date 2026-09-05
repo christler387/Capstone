@@ -3,7 +3,6 @@ import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 
 // ============================================================================
-// COMPONENT CONTRACT & PROPS
 // ============================================================================
 interface StockProps {
   inventory: Item[];
@@ -14,7 +13,6 @@ interface StockProps {
 }
 
 // ============================================================================
-// STOCK TRANSACTION CONTROLLER
 // ============================================================================
 export const Stock: React.FC<StockProps> = ({ 
   inventory, 
@@ -24,7 +22,6 @@ export const Stock: React.FC<StockProps> = ({
   userRole = 'staff' 
 }) => {
   // ==========================================================================
-  // 1. TRANSACTION STATE
   // ==========================================================================
   const [tab, setTab] = useState<'in' | 'out'>('in');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -40,7 +37,6 @@ export const Stock: React.FC<StockProps> = ({
   });
 
   // ==========================================================================
-  // 2. SELECTION SYNCHRONIZATION
   // ==========================================================================
   useEffect(() => {
     setError(null);
@@ -61,7 +57,6 @@ export const Stock: React.FC<StockProps> = ({
   }, [selectedItemId, inventory]);
 
   // ==========================================================================
-  // 3. ACTION & SUBMISSION HANDLERS
   // ==========================================================================
   const handleItemSelect = (id: string, type: 'in' | 'out') => {
     setError(null);
@@ -109,11 +104,9 @@ export const Stock: React.FC<StockProps> = ({
   };
 
   // ==========================================================================
-  // 4. FORM FIELD BUILDER
   // ==========================================================================
   const renderFormFields = (type: 'in' | 'out') => (
     <div className="flex-col-gap">
-      {/* Validation Alert */}
       {error && (
         <div 
           className="font-mono alert-text" 
@@ -130,7 +123,6 @@ export const Stock: React.FC<StockProps> = ({
         </div>
       )}
 
-      {/* Overdraw Confirmation Overlay */}
       {showConfirmOverdraw && (
         <div 
           className="font-mono alert-text" 
@@ -242,7 +234,6 @@ export const Stock: React.FC<StockProps> = ({
   );
 
   // ==========================================================================
-  // 5. MAIN RENDER
   // ==========================================================================
   return (
     <div className="content-section">

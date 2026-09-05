@@ -23,4 +23,8 @@ export const api = {
   getMovements: () => request<Movement[]>('/movements'),
   createMovement: (movement: Movement) => request<Movement>('/movements', { method: 'POST', body: JSON.stringify(movement) }),
   deleteMovement: (id: string) => request<void>(`/movements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  changePassword: (username: string, currentPassword: string, newPassword: string) => request<{ ok: boolean; username: string }>('/users/change-password', {
+    method: 'PUT',
+    body: JSON.stringify({ username, currentPassword, newPassword }),
+  }),
 };

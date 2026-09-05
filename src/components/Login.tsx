@@ -37,7 +37,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         throw new Error(data?.error || 'Invalid login details. Try admin/admin123 or staff/staff123');
       }
 
-      onLoginSuccess(data.displayName || (data.role === 'admin' ? 'Administrator' : 'Warehouse Staff'), data.role);
+      onLoginSuccess(data.username || inputUser, data.role);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Unable to log in right now.');
     } finally {
@@ -59,12 +59,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.05)'
         }}
       >
-        {/* Brand Header */}
         <div className="flex-col" style={{ gap: '0.5rem', marginBottom: '2rem', textAlign: 'center' }}>
           <h1 className="title-main" style={{ fontSize: '2rem', marginTop: '0.5rem' }}>Skyrun Auto</h1>
         </div>
 
-        {/* Error Notification */}
         {error && (
           <div 
             className="font-mono alert-text" 
@@ -82,7 +80,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
         )}
 
-        {/* Login Form */}
         <form onSubmit={handleLogin} className="flex-col-gap" style={{ gap: '1.25rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="label-micro" htmlFor="username">Username</label>

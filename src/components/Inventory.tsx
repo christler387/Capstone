@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import { Item, Movement, UserRole, CONFIG } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 
-// ============================================================================
-// COMPONENT CONTRACT & PROPS
-// ============================================================================
 interface InventoryProps {
   inventory: Item[];
   movements?: Movement[];
@@ -16,9 +13,6 @@ interface InventoryProps {
   userRole?: UserRole;
 }
 
-// ============================================================================
-// INVENTORY LEDGER COMPONENT
-// ============================================================================
 export const Inventory: React.FC<InventoryProps> = ({ 
   inventory, 
   movements = [], 
@@ -30,7 +24,6 @@ export const Inventory: React.FC<InventoryProps> = ({
   userRole = 'staff' 
 }) => {
   // ==========================================================================
-  // 1. LOCAL STATE (SEARCH, FILTERS, SORTING)
   // ==========================================================================
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -39,7 +32,6 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // ==========================================================================
-  // 2. UTILITY & FORMATTING HELPERS
   // ==========================================================================
   const handleToggleSort = (field: keyof Item) => {
     if (sortField === field) {
@@ -63,7 +55,6 @@ export const Inventory: React.FC<InventoryProps> = ({
   };
 
   // ==========================================================================
-  // 3. COMPUTED STATES & SORTED/FILTERED ITEMS
   // ==========================================================================
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
@@ -82,7 +73,6 @@ export const Inventory: React.FC<InventoryProps> = ({
     });
 
   // ==========================================================================
-  // 4. SUB-SECTION RENDERERS
   // ==========================================================================
   const renderInventoryStats = () => (
     <div className="stats-bar">
@@ -131,7 +121,6 @@ export const Inventory: React.FC<InventoryProps> = ({
   );
 
   // ==========================================================================
-  // 5. PRIMARY LEDGER TABLE
   // ==========================================================================
   return (
     <div className="content-section">
