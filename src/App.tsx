@@ -1,0 +1,342 @@
+import React, { useEffect, useState } from 'react';
+import { Item, Movement, UserRole } from './types';
+import { SEED_DATA, SEED_MOVEMENTS } from './data';
+import { api } from './api';
+import { Modal } from './components/Modal';
+import { ItemForm } from './components/ItemForm';
+import { Navigation } from './components/Navigation';
+import { Dashboard } from './components/Dashboard';
+import { StaffDashboard } from './components/StaffDashboard';
+import { Inventory } from './components/Inventory';
+import { Stock } from './components/Stock';
+import { WarehouseMap } from './components/WarehouseMap';
+import { Login } from './components/Login';
+import { UserProfile } from './components/UserProfile';
+
+/**
+ * ==========================================================================
+ * ORCHESTRATOR COMPONENT: APP ROOT
+ * Handles application state, global modal visibility, and section routing.
+ * ==========================================================================
+ */
+const App: React.FC = () => {
+  // ==========================================================================
+  // 1. CORE REPOSITORY & SESSION STATE
+  // ==========================================================================
+  const [inventory, setInventory] = useState<Item[]>(SEED_DATA);
+  const [movements, setMovements] = useState<Movement[]>(SEED_MOVEMENTS);
+  const [currentSection, setCurrentSection] = useState('dashboard');
+  const [user, setUser] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('staff');
+  const [databaseError, setDatabaseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.getInventory(), api.getMovements()])
+      .then(([loadedInventory, loadedMovements]) => {
+        if (!active) return;
+        setInventory(loadedInventory);
+        setMovements(loadedMovements);
+      })
+      .catch((error: Error) => {
+        if (active) setDatabaseError(`Database unavailable: ${error.message}`);
+      });
+    return () => { active = false; };
+  }, []);
+
+  // ==========================================================================
+  // 2. AUTHENTICATION & ROLE MANAGEMENT
+  // ==========================================================================
+  const handleLoginSuccess = (username: string, role: UserRole) => {
+    localStorage.setItem('skyrun_session_user', username);
+    localStorage.setItem('skyrun_session_role', role);
+    setUser(username);
+    setUserRole(role);
+  };
+
+  const handleSwitchRole = (newRole: UserRole, newName: string) => {
+    localStorage.setItem('skyrun_session_user', newName);
+    localStorage.setItem('skyrun_session_role', newRole);
+    setUser(newName);
+    setUserRole(newRole);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('skyrun_session_user');
+    localStorage.removeItem('skyrun_session_role');
+    setUser(null);
+    setUserRole('staff');
+    setCurrentSection('dashboard');
+  };
+  
+  // ==========================================================================
+  // 3. MODAL & FOCUS STATE
+  // ==========================================================================
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Item | undefined>(undefined);
+  const [zoomImage, setZoomImage] = useState<{ url: string, name: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [stockToItem, setStockToItem] = useState<string | undefined>(undefined);
+  const [locateRack, setLocateRack] = useState<string | null>(null);
+
+  // ==========================================================================
+  // 4. INVENTORY & TRANSACTION HANDLERS
+  // ==========================================================================
+  const handleGoToStock = (id: string) => {
+    setStockToItem(id);
+    setCurrentSection('stock');
+  };
+
+  const handleLocateOnMap = (rack: string) => {
+    setLocateRack(rack);
+    setCurrentSection('warehouse');
+  };
+
+  const handleEditItem = (id: string) => {
+    const item = inventory.find(i => i.id === id);
+    setEditingItem(item);
+    setIsItemModalOpen(true);
+  };
+
+  const addItem = async (item: Item) => {
+    await api.createInventory(item);
+    setInventory(prev => [...prev, item]);
+  };
+
+  const updateItem = async (id: string, data: Item) => {
+    await api.updateInventory(id, data);
+    setInventory(prev => prev.map(i => i.id === id ? data : i));
+  };
+
+  const deleteItem = async (id: string) => {
+    await api.deleteInventory(id);
+    setInventory(prev => prev.filter(i => i.id !== id));
+  };
+
+  const addMovement = async (movement: Movement) => {
+    const savedMovement = await api.createMovement(movement);
+    setMovements(prev => [...prev, savedMovement]);
+    setInventory(prev => prev.map(i => i.id === movement.itemId
+      ? { ...i, quantity: i.quantity + (movement.type === 'IN' ? movement.qty : -movement.qty) }
+      : i));
+  };
+
+  const undoMovement = async (movementId: string) => {
+    const movementToUndo = movements.find(m => m.id === movementId);
+    if (!movementToUndo) return;
+
+    await api.deleteMovement(movementId);
+    setMovements(prev => prev.filter(m => m.id !== movementId));
+    setInventory(prev => prev.map(i => {
+      if (i.id === movementToUndo.itemId) {
+        return {
+          ...i,
+          quantity: Math.max(0, i.quantity + (movementToUndo.type === 'IN' ? -movementToUndo.qty : movementToUndo.qty))
+        };
+      }
+      return i;
+    }));
+  };
+
+  const bulkUpdateInventory = async (newInventory: Item[]) => {
+    await Promise.all(newInventory.map(item => api.updateInventory(item.id, item)));
+    setInventory([...newInventory]);
+  };
+
+  const handleAddItem = (rackStr?: string) => {
+    if (userRole === 'staff') return;
+    let rack = rackStr || '';
+    let level = 'L1';
+    
+    if (rackStr && rackStr.includes('-L')) {
+      const parts = rackStr.split('-L');
+      rack = parts[0];
+      level = `L${parts[1]}`;
+    }
+
+    const nextId = `STK-${String(Math.max(0, ...inventory.map(i => parseInt(i.id.split('-')[1]) || 0)) + 1).padStart(3, '0')}`;
+    setEditingItem({ id: nextId, name: '', category: '', rack, level, quantity: 0, price: 0 } as Item);
+    setIsItemModalOpen(true);
+  };
+
+    const handleSaveItem = async (data: Item) => {
+    const exists = inventory.find(i => i.id === data.id || (editingItem && i.id === editingItem.id));
+    if (exists && (!editingItem || editingItem.id === data.id)) {
+      await updateItem(data.id, data);
+    } else if (exists && editingItem && editingItem.id !== data.id) {
+      await deleteItem(editingItem.id);
+      await addItem(data);
+    } else {
+      await addItem(data);
+    }
+    setIsItemModalOpen(false);
+    setEditingItem(undefined);
+  };
+
+  const confirmDeletion = async () => {
+    if (confirmDelete) {
+      await deleteItem(confirmDelete);
+      setConfirmDelete(null);
+    }
+  };
+
+  // ==========================================================================
+  // 5. VIEW ROUTER
+  // ==========================================================================
+  const renderComponentRouter = () => {
+    switch (currentSection) {
+      case 'dashboard': 
+        if (userRole === 'staff') {
+          return (
+            <StaffDashboard 
+              inventory={inventory} 
+              movements={movements} 
+              onGoToStock={handleGoToStock} 
+              onGoToWarehouse={handleLocateOnMap}
+              onGoToInventory={() => setCurrentSection('inventory')}
+              userName={user || 'Warehouse Staff'}
+            />
+          );
+        }
+        return <Dashboard inventory={inventory} movements={movements} onGoToStock={handleGoToStock} />;
+      case 'inventory': 
+        return (
+          <Inventory 
+            inventory={inventory} 
+            movements={movements}
+            onEditItem={handleEditItem} 
+            onDeleteItem={setConfirmDelete} 
+            onAddItem={() => handleAddItem()}
+            onZoomImage={(url, name) => setZoomImage({ url, name })}
+            onLocateOnMap={handleLocateOnMap}
+            userRole={userRole}
+          />
+        );
+      case 'stock': 
+        return (
+          <Stock 
+            inventory={inventory} 
+            onAddMovement={addMovement} 
+            onAddItem={handleAddItem}
+            selectedItemId={stockToItem}
+            userRole={userRole}
+          />
+        );
+      case 'warehouse': 
+        return (
+          <WarehouseMap 
+            inventory={inventory} 
+            movements={movements} 
+            onEditItem={handleEditItem} 
+            onAddItem={handleAddItem}
+            onBulkUpdate={bulkUpdateInventory}
+            initialRack={locateRack}
+            onClearInitialRack={() => setLocateRack(null)}
+            userRole={userRole}
+          />
+        );
+      case 'user': 
+        return (
+          <UserProfile 
+            user={user || (userRole === 'staff' ? 'Warehouse Staff' : 'Administrator')} 
+            role={userRole}
+            movements={movements} 
+            inventory={inventory} 
+            onLogout={handleLogout} 
+            onGoToDashboard={() => setCurrentSection('dashboard')} 
+            onUndoMovement={undoMovement}
+            onSwitchRole={handleSwitchRole}
+          />
+        );
+      default: 
+        return null;
+    }
+  };
+
+  // ==========================================================================
+  // 6. GLOBAL DIALOGS & OVERLAYS
+  // ==========================================================================
+  const renderGlobalModals = () => (
+    <>
+      {/* 1. Item Creator / Editor / Details Modal */}
+      <Modal 
+        isOpen={isItemModalOpen} 
+        onClose={() => setIsItemModalOpen(false)} 
+        title={userRole === 'staff' ? `Item Details: ${editingItem?.id || ''}` : (editingItem?.name ? `Edit Item: ${editingItem.id}` : 'Add New Item')}
+      >
+        <ItemForm 
+          item={editingItem} 
+          onSave={handleSaveItem} 
+          onCancel={() => setIsItemModalOpen(false)} 
+          readOnly={userRole === 'staff'} 
+        />
+      </Modal>
+  
+      {/* 2. Deletion Confirmation Modal */}
+      <Modal 
+        isOpen={!!confirmDelete} 
+        onClose={() => setConfirmDelete(null)} 
+        title="Confirm Deletion"
+        footer={
+          <div className="flex-row-gap" style={{ width: '100%' }}>
+            <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => setConfirmDelete(null)}>Cancel</button>
+            <button className="olive-button btn-danger" style={{ flex: 1 }} onClick={confirmDeletion}>Delete</button>
+          </div>
+        }
+      >
+        <div className="text-center">
+            <p className="label-micro text-lg mb-4">Are you sure you want to delete this item?</p>
+            <p className="label-micro opacity-50">This action cannot be undone.</p>
+        </div>
+      </Modal>
+  
+      {/* 3. Image Zoom Modal */}
+      <Modal
+        isOpen={!!zoomImage}
+        onClose={() => setZoomImage(null)}
+        title={zoomImage?.name || 'Image Preview'}
+        type="clean"
+      >
+        <div className="img-zoom-container">
+            <img 
+                src={zoomImage?.url.includes('picsum.photos') ? zoomImage.url.replace(/\/\d+\/\d+$/, '/600/600') : zoomImage?.url} 
+                className="img-zoom-img" 
+                referrerPolicy="no-referrer"
+                alt="Zoomed"
+            />
+        </div>
+      </Modal>
+    </>
+  );
+
+  // ==========================================================================
+  // 7. PRIMARY LAYOUT SHELL
+  // ==========================================================================
+  if (!user) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  return (
+    <div className="app-container">
+      <div className="content-wrapper">
+        {databaseError && <div className="alert-text mb-4">{databaseError}</div>}
+        <header>
+          <div className="header-info" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h1 className="title-main" style={{ margin: 0 }}>
+              {currentSection === 'dashboard' 
+                ? 'Dashboard' 
+                : (currentSection === 'warehouse' ? 'Warehouse Map' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1))}
+            </h1>
+          </div>
+          <Navigation currentSection={currentSection} onSectionChange={setCurrentSection} />
+        </header>
+
+        {renderComponentRouter()}
+      </div>
+
+      {renderGlobalModals()}
+    </div>
+  );
+};
+
+export default App;
