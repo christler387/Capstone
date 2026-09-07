@@ -65,7 +65,6 @@ const App: React.FC = () => {
     }
     await api.changePassword(activeUsername, currentPassword, newPassword);
   };
-
   const handleChangeUsername = async (currentPassword: string, newUsername: string) => {
     const activeUsername = localStorage.getItem('skyrun_session_user') || user;
     if (!activeUsername) {
