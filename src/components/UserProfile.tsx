@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Movement, Item, UserRole } from '../types';
 
-// ============================================================================
-// ============================================================================
 interface UserProfileProps {
   user: string;
   role?: UserRole;
@@ -17,8 +15,6 @@ interface UserProfileProps {
   onCreateUser?: (username: string, password: string, role: UserRole, displayName?: string) => Promise<void>;
 }
 
-// ============================================================================
-// ============================================================================
 export const UserProfile: React.FC<UserProfileProps> = ({ 
   user, 
   role = 'staff',
@@ -32,8 +28,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   onChangeUsername,
   onCreateUser
 }) => {
-  // ==========================================================================
-  // ==========================================================================
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
@@ -53,8 +47,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [usernameFeedback, setUsernameFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [createUserFeedback, setCreateUserFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
-  // ==========================================================================
-  // ==========================================================================
   const displayName = (role === 'staff' && user.toLowerCase().includes('admin')) ? 'Warehouse Staff' : user;
   const userRole = (role === 'admin' || (role !== 'staff' && user.toLowerCase().includes('admin'))) 
     ? 'SYSTEM ROOT (ADMIN)' 
@@ -78,8 +70,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // ==========================================================================
-  // ==========================================================================
   const handleUndo = (id: string) => {
     if (onUndoMovement) {
       onUndoMovement(id);

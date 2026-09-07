@@ -14,7 +14,7 @@
     "@vitejs/plugin-react": "latest",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "express": "^4.22.2",
     "html5-qrcode": "^2.3.8",
     "mysql2": "^3.14.1",
     "react": "latest",
@@ -22,7 +22,12 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "concurrently": "^9.1.2",
     "typescript": "latest"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }

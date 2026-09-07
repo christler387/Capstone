@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 
-// ============================================================================
-// ============================================================================
 interface StockProps {
   inventory: Item[];
   onAddMovement: (movement: Movement) => void;
@@ -12,8 +10,7 @@ interface StockProps {
   userRole?: UserRole;
 }
 
-// ============================================================================
-// ============================================================================
+
 export const Stock: React.FC<StockProps> = ({ 
   inventory, 
   onAddMovement, 
@@ -21,8 +18,8 @@ export const Stock: React.FC<StockProps> = ({
   selectedItemId, 
   userRole = 'staff' 
 }) => {
-  // ==========================================================================
-  // ==========================================================================
+
+
   const [tab, setTab] = useState<'in' | 'out'>('in');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +33,7 @@ export const Stock: React.FC<StockProps> = ({
     qty: 0
   });
 
-  // ==========================================================================
-  // ==========================================================================
+
   useEffect(() => {
     setError(null);
     setShowConfirmOverdraw(false);
@@ -56,8 +52,7 @@ export const Stock: React.FC<StockProps> = ({
     }
   }, [selectedItemId, inventory]);
 
-  // ==========================================================================
-  // ==========================================================================
+
   const handleItemSelect = (id: string, type: 'in' | 'out') => {
     setError(null);
     setShowConfirmOverdraw(false);
@@ -75,6 +70,7 @@ export const Stock: React.FC<StockProps> = ({
       qty: 0
     });
   };
+
 
   const handleRecord = (type: 'in' | 'out', force: boolean = false) => {
     setError(null);
@@ -103,8 +99,7 @@ export const Stock: React.FC<StockProps> = ({
     setShowConfirmOverdraw(false);
   };
 
-  // ==========================================================================
-  // ==========================================================================
+
   const renderFormFields = (type: 'in' | 'out') => (
     <div className="flex-col-gap">
       {error && (
@@ -233,8 +228,7 @@ export const Stock: React.FC<StockProps> = ({
     </div>
   );
 
-  // ==========================================================================
-  // ==========================================================================
+  
   return (
     <div className="content-section">
       <div className="actions-bar border-soft-no-pad">

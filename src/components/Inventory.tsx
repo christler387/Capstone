@@ -23,16 +23,14 @@ export const Inventory: React.FC<InventoryProps> = ({
   onLocateOnMap, 
   userRole = 'staff' 
 }) => {
-  // ==========================================================================
-  // ==========================================================================
+
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [sortField, setSortField] = useState<keyof Item>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  // ==========================================================================
-  // ==========================================================================
+
   const handleToggleSort = (field: keyof Item) => {
     if (sortField === field) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -54,8 +52,7 @@ export const Inventory: React.FC<InventoryProps> = ({
     return rack;
   };
 
-  // ==========================================================================
-  // ==========================================================================
+
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
   const lowCount = inventory.filter(i => i.quantity < CONFIG.LOW_STOCK_THRESHOLD && i.quantity > 0).length;
@@ -72,8 +69,7 @@ export const Inventory: React.FC<InventoryProps> = ({
       return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
 
-  // ==========================================================================
-  // ==========================================================================
+
   const renderInventoryStats = () => (
     <div className="stats-bar">
       <div className="stat-box">
@@ -120,8 +116,7 @@ export const Inventory: React.FC<InventoryProps> = ({
     </div>
   );
 
-  // ==========================================================================
-  // ==========================================================================
+  
   return (
     <div className="content-section">
       {renderInventoryStats()}
