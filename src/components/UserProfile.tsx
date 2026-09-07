@@ -13,6 +13,8 @@ interface UserProfileProps {
   onUndoMovement?: (id: string) => void;
   onSwitchRole?: (role: UserRole, name: string) => void;
   onChangePassword?: (currentPassword: string, newPassword: string) => Promise<void>;
+  onChangeUsername?: (currentPassword: string, newUsername: string) => Promise<void>;
+  onCreateUser?: (username: string, password: string, role: UserRole, displayName?: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -26,7 +28,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   onGoToDashboard,
   onUndoMovement,
   onSwitchRole,
-  onChangePassword
+  onChangePassword,
+  onChangeUsername,
+  onCreateUser
 }) => {
   // ==========================================================================
   // ==========================================================================
@@ -34,10 +38,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [newUsername, setNewUsername] = useState(user);
+  const [usernamePassword, setUsernamePassword] = useState('');
+  const [createUserName, setCreateUserName] = useState('');
+  const [createUserPassword, setCreateUserPassword] = useState('');
+  const [createUserDisplayName, setCreateUserDisplayName] = useState('');
+  const [createUserRole, setCreateUserRole] = useState<UserRole>('staff');
   const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [usernameFeedback, setUsernameFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [createUserFeedback, setCreateUserFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   // ==========================================================================
   // ==========================================================================
@@ -80,6 +94,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setPasswordFeedback(null);
   };
 
+  const clearUsernameForm = () => {
+    setNewUsername(user);
+    setUsernamePassword('');
+    setUsernameFeedback(null);
+  };
+
+  const clearCreateUserForm = () => {
+    setCreateUserName('');
+    setCreateUserPassword('');
+    setCreateUserDisplayName('');
+    setCreateUserRole('staff');
+    setCreateUserFeedback(null);
+  };
+
   const handlePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -111,6 +139,79 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update password.';
       setPasswordFeedback({ type: 'error', message: message });
+    }
+  };
+
+  const handleUsernameSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!onChangeUsername) {
+      setUsernameFeedback({ type: 'error', message: 'Username change is unavailable.' });
+      return;
+    }
+
+    const normalizedUsername = newUsername.trim();
+    if (!normalizedUsername) {
+      setUsernameFeedback({ type: 'error', message: 'Please enter a username.' });
+      return;
+    }
+
+    if (normalizedUsername.length < 3) {
+      setUsernameFeedback({ type: 'error', message: 'Username must be at least 3 characters long.' });
+      return;
+    }
+
+    if (!usernamePassword.trim()) {
+      setUsernameFeedback({ type: 'error', message: 'Please enter your current password.' });
+      return;
+    }
+
+    try {
+      await onChangeUsername(usernamePassword, normalizedUsername);
+      setUsernameFeedback({ type: 'success', message: 'Username updated successfully.' });
+      clearUsernameForm();
+      setTimeout(() => setIsUsernameModalOpen(false), 500);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update username.';
+      setUsernameFeedback({ type: 'error', message: message });
+    }
+  };
+
+  const handleCreateUserSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!onCreateUser) {
+      setCreateUserFeedback({ type: 'error', message: 'User creation is unavailable.' });
+      return;
+    }
+
+    const username = createUserName.trim();
+    const password = createUserPassword.trim();
+    const displayName = createUserDisplayName.trim() || username;
+
+    if (!username || !password) {
+      setCreateUserFeedback({ type: 'error', message: 'Username and password are required.' });
+      return;
+    }
+
+    if (username.length < 3) {
+      setCreateUserFeedback({ type: 'error', message: 'Username must be at least 3 characters long.' });
+      return;
+    }
+
+    if (password.length < 4) {
+      setCreateUserFeedback({ type: 'error', message: 'Password must be at least 4 characters long.' });
+      return;
+    }
+
+    try {
+      await onCreateUser(username, password, createUserRole, displayName);
+      setCreateUserFeedback({ type: 'success', message: 'User created successfully.' });
+      clearCreateUserForm();
+      setTimeout(() => setIsCreateUserModalOpen(false), 500);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create user.';
+      setCreateUserFeedback({ type: 'error', message: message });
     }
   };
 
@@ -150,12 +251,28 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             </div>
 
             <div className="flex-col-gap" style={{ gap: '0.5rem', marginTop: 'auto' }}>
-              <button className="olive-button btn-outline w-full" onClick={() => {
-                clearPasswordForm();
-                setIsPasswordModalOpen(true);
-              }}>
-                <i className="bx bx-lock-alt" style={{ marginRight: '6px' }}></i> Change Password
-              </button>
+              <div className="flex-row-gap" style={{ width: '100%', gap: '0.5rem' }}>
+                <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => {
+                  clearUsernameForm();
+                  setIsUsernameModalOpen(true);
+                }}>
+                  <i className="bx bx-user-circle" style={{ marginRight: '6px' }}></i> Change Username
+                </button>
+                <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => {
+                  clearPasswordForm();
+                  setIsPasswordModalOpen(true);
+                }}>
+                  <i className="bx bx-lock-alt" style={{ marginRight: '6px' }}></i> Change Password
+                </button>
+              </div>
+              {role === 'admin' && (
+                <button className="olive-button btn-outline w-full" onClick={() => {
+                  clearCreateUserForm();
+                  setIsCreateUserModalOpen(true);
+                }}>
+                  <i className="bx bx-user-plus" style={{ marginRight: '6px' }}></i> Add New User
+                </button>
+              )}
               <button className="olive-button btn-danger w-full" onClick={onLogout}>
                 <i className="bx bx-log-out" style={{ marginRight: '6px' }}></i> Log Out Operator
               </button>
@@ -333,6 +450,77 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <div className={`modal-overlay ${isUsernameModalOpen ? 'active' : ''}`}>
+      <div className="modal-content mini">
+        <div className="modal-header">
+          <span className="label-micro">Change Username</span>
+          <button className="close-modal" onClick={() => { clearUsernameForm(); setIsUsernameModalOpen(false); }}><i className="bx bx-x"></i></button>
+        </div>
+        <form onSubmit={handleUsernameSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="newUsername">New Username</label>
+            <input id="newUsername" className="form-input" type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="Enter new username" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="usernameCurrentPassword">Current Password</label>
+            <input id="usernameCurrentPassword" className="form-input" type="password" value={usernamePassword} onChange={(e) => setUsernamePassword(e.target.value)} placeholder="Enter current password" />
+          </div>
+
+          {usernameFeedback && (
+            <p className={`label-micro ${usernameFeedback.type === 'error' ? 'text-accent' : 'text-success'}`} style={{ margin: 0 }}>
+              {usernameFeedback.message}
+            </p>
+          )}
+
+          <div className="flex-row-gap" style={{ width: '100%' }}>
+            <button type="button" className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => { clearUsernameForm(); setIsUsernameModalOpen(false); }}>Cancel</button>
+            <button type="submit" className="olive-button" style={{ flex: 1 }}>Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div className={`modal-overlay ${isCreateUserModalOpen ? 'active' : ''}`}>
+      <div className="modal-content mini">
+        <div className="modal-header">
+          <span className="label-micro">Add New User</span>
+          <button className="close-modal" onClick={() => { clearCreateUserForm(); setIsCreateUserModalOpen(false); }}><i className="bx bx-x"></i></button>
+        </div>
+        <form onSubmit={handleCreateUserSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="createUserName">Username</label>
+            <input id="createUserName" className="form-input" type="text" value={createUserName} onChange={(e) => setCreateUserName(e.target.value)} placeholder="Enter username" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="createUserDisplayName">Display Name</label>
+            <input id="createUserDisplayName" className="form-input" type="text" value={createUserDisplayName} onChange={(e) => setCreateUserDisplayName(e.target.value)} placeholder="Optional display name" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="createUserPassword">Password</label>
+            <input id="createUserPassword" className="form-input" type="password" value={createUserPassword} onChange={(e) => setCreateUserPassword(e.target.value)} placeholder="Create password" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="createUserRole">Role</label>
+            <select id="createUserRole" className="form-input" value={createUserRole} onChange={(e) => setCreateUserRole(e.target.value as UserRole)}>
+              <option value="staff">Staff</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          {createUserFeedback && (
+            <p className={`label-micro ${createUserFeedback.type === 'error' ? 'text-accent' : 'text-success'}`} style={{ margin: 0 }}>
+              {createUserFeedback.message}
+            </p>
+          )}
+
+          <div className="flex-row-gap" style={{ width: '100%' }}>
+            <button type="button" className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => { clearCreateUserForm(); setIsCreateUserModalOpen(false); }}>Cancel</button>
+            <button type="submit" className="olive-button" style={{ flex: 1 }}>Create</button>
+          </div>
+        </form>
       </div>
     </div>
 

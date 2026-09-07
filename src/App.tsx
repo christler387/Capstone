@@ -65,6 +65,21 @@ const App: React.FC = () => {
     }
     await api.changePassword(activeUsername, currentPassword, newPassword);
   };
+
+  const handleChangeUsername = async (currentPassword: string, newUsername: string) => {
+    const activeUsername = localStorage.getItem('skyrun_session_user') || user;
+    if (!activeUsername) {
+      throw new Error('No active user is logged in.');
+    }
+
+    const updatedUser = await api.changeUsername(activeUsername, currentPassword, newUsername);
+    localStorage.setItem('skyrun_session_user', updatedUser.username);
+    setUser(updatedUser.username);
+  };
+
+  const handleCreateUser = async (username: string, password: string, role: UserRole, displayName?: string) => {
+    await api.createUser({ username, password, role, displayName });
+  };
   
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | undefined>(undefined);
@@ -235,6 +250,8 @@ const App: React.FC = () => {
             onUndoMovement={undoMovement}
             onSwitchRole={handleSwitchRole}
             onChangePassword={handleChangePassword}
+            onChangeUsername={handleChangeUsername}
+            onCreateUser={handleCreateUser}
           />
         );
       default: 

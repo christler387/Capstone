@@ -156,6 +156,41 @@ app.get('/api/users', async (_req, res) => {
   res.json(rows);
 });
 
+app.post('/api/users', async (req, res) => {
+  const { username, password, role, displayName } = req.body || {};
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  const normalizedUsername = String(username).trim();
+  const normalizedPassword = String(password).trim();
+  const safeRole = (role === 'admin' ? 'admin' : 'staff');
+  const displayNameValue = String(displayName || normalizedUsername).trim() || normalizedUsername;
+
+  if (normalizedUsername.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+  }
+
+  if (normalizedPassword.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+  }
+
+  const [[existing]] = await pool.query('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedUsername]);
+  if (existing.count > 0) {
+    return res.status(409).json({ error: 'That username already exists.' });
+  }
+
+  await pool.query('INSERT INTO users (username, password_hash, role, display_name) VALUES (?, ?, ?, ?)', [
+    normalizedUsername,
+    hashPassword(normalizedPassword),
+    safeRole,
+    displayNameValue,
+  ]);
+
+  res.status(201).json({ ok: true, username: normalizedUsername });
+});
+
 app.put('/api/users/change-password', async (req, res) => {
   const { username, currentPassword, newPassword } = req.body || {};
 
@@ -182,6 +217,39 @@ app.put('/api/users/change-password', async (req, res) => {
 
   await pool.query('UPDATE users SET password_hash=? WHERE id=?', [hashPassword(newPasswordString), user.id]);
   res.json({ ok: true, username: user.username });
+});
+
+app.put('/api/users/change-username', async (req, res) => {
+  const { currentUsername, currentPassword, newUsername } = req.body || {};
+
+  if (!currentUsername || !currentPassword || !newUsername) {
+    return res.status(400).json({ error: 'Current username, current password, and new username are required.' });
+  }
+
+  const normalizedCurrentUsername = String(currentUsername).trim();
+  const normalizedNewUsername = String(newUsername).trim();
+
+  if (normalizedNewUsername.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+  }
+
+  const [existingRows] = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedCurrentUsername]);
+  if (existingRows.length === 0) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const user = existingRows[0];
+  if (user.password_hash !== hashPassword(String(currentPassword))) {
+    return res.status(401).json({ error: 'Current password is incorrect.' });
+  }
+
+  const [[duplicate]] = await pool.query('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) AND id != ?', [normalizedNewUsername, user.id]);
+  if (duplicate.count > 0) {
+    return res.status(409).json({ error: 'That username is already in use.' });
+  }
+
+  await pool.query('UPDATE users SET username=? WHERE id=?', [normalizedNewUsername, user.id]);
+  res.json({ ok: true, username: normalizedNewUsername });
 });
 
 app.post('/api/login', async (req, res) => {

@@ -23,8 +23,16 @@ export const api = {
   getMovements: () => request<Movement[]>('/movements'),
   createMovement: (movement: Movement) => request<Movement>('/movements', { method: 'POST', body: JSON.stringify(movement) }),
   deleteMovement: (id: string) => request<void>(`/movements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createUser: (user: { username: string; password: string; role: 'admin' | 'staff'; displayName?: string }) => request<{ ok: boolean; username: string }>('/users', {
+    method: 'POST',
+    body: JSON.stringify(user),
+  }),
   changePassword: (username: string, currentPassword: string, newPassword: string) => request<{ ok: boolean; username: string }>('/users/change-password', {
     method: 'PUT',
     body: JSON.stringify({ username, currentPassword, newPassword }),
+  }),
+  changeUsername: (currentUsername: string, currentPassword: string, newUsername: string) => request<{ ok: boolean; username: string }>('/users/change-username', {
+    method: 'PUT',
+    body: JSON.stringify({ currentUsername, currentPassword, newUsername }),
   }),
 };
