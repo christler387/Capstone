@@ -6,9 +6,6 @@ import crypto from 'node:crypto';
 
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
-const apiKey = process.env.API_KEY;
-const geminiApiKey = process.env.GEMINI_API_KEY;
-const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 3306),
@@ -22,84 +19,6 @@ const pool = mysql.createPool({
 
 app.use(cors());
 app.use(express.json());
-
-app.use('/api', (req, res, next) => {
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API_KEY is not configured.' });
-  }
-
-  if (req.get('x-api-key') !== apiKey) {
-    return res.status(401).json({ error: 'Invalid API key.' });
-  }
-
-  next();
-});
-
-app.post('/api/insights', async (req, res, next) => {
-  try {
-    if (!geminiApiKey) {
-      return res.status(503).json({ error: 'GEMINI_API_KEY is not configured.' });
-    }
-
-    const { inventory, movements } = req.body || {};
-    if (!Array.isArray(inventory) || !Array.isArray(movements)) {
-      return res.status(400).json({ error: 'Inventory and movements arrays are required.' });
-    }
-
-    const inventorySnapshot = inventory.map(item => ({
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      quantity: item.quantity,
-      price: item.price,
-      demand: item.demand,
-      reorderPoint: item.safetyStock,
-      leadTimeDays: item.leadTimeDays,
-      rack: item.rack,
-    }));
-    const movementSnapshot = movements.map(movement => ({
-      itemId: movement.itemId,
-      type: movement.type,
-      quantity: movement.qty,
-      date: movement.date,
-    }));
-
-    const prompt = [
-      'You are an inventory operations analyst for an automotive parts warehouse.',
-      'Analyze the supplied inventory and stock movement data.',
-      'Return concise, practical insights for a warehouse manager.',
-      'Use these exact headings: Priority Actions, Demand Signals, Risk Watchlist.',
-      'Mention specific item names and quantities when relevant. Do not invent data.',
-      'Keep the response under 350 words and use plain text bullets.',
-      `Inventory: ${JSON.stringify(inventorySnapshot)}`,
-      `Movements: ${JSON.stringify(movementSnapshot)}`,
-    ].join('\n');
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      },
-    );
-
-    if (!response.ok) {
-      const message = await response.text();
-      return res.status(502).json({ error: `Gemini request failed: ${message}` });
-    }
-
-    const result = await response.json();
-    const insight = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!insight) {
-      return res.status(502).json({ error: 'Gemini returned no insight text.' });
-    }
-
-    res.json({ insight, model: geminiModel });
-  } catch (error) {
-    next(error);
-  }
-});
 
 const inventorySeed = [
   ['001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
@@ -464,13 +383,9 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Database request failed' });
 });
 
-export default app;
-
-if (!process.env.VERCEL) {
-  initializeDatabase()
-    .then(() => app.listen(port, () => console.log(`API listening on http://localhost:${port}`)))
-    .catch(error => {
-      console.error('Database initialization failed:', error);
-      process.exit(1);
-    });
-}
+initializeDatabase()
+  .then(() => app.listen(port, () => console.log(`API listening on http://localhost:${port}`)))
+  .catch((error) => {
+    console.error('Database initialization failed:', error.message);
+    process.exit(1);
+  });

@@ -1,7 +1,25 @@
 import React, { useState } from 'react';
 import { Item, Movement } from '../types';
 import { isAtReorderPoint } from '../inventoryMetrics';
-import { api } from '../api';
+
+const API_BASE = '/api';
+
+async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers || {}),
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `API request failed with ${response.status}`);
+  }
+
+  return response.status === 204 ? (undefined as T) : response.json();
+}
 
 interface DashboardProps {
   inventory: Item[];
@@ -40,7 +58,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
     setIsLoadingInsight(true);
     setInsightError(null);
     try {
-      const result = await api.getInventoryInsights(inventory, movements);
+      const result = await requestJson<{ insight: string; model: string }>('/insights', {
+        method: 'POST',
+        body: JSON.stringify({ inventory, movements }),
+      });
       setInsight(result.insight);
     } catch (error) {
       setInsightError(error instanceof Error ? error.message : 'Unable to generate inventory insights.');
@@ -69,25 +90,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   return (
     <div className="content-section">
       {renderSummaryStats()}
-      <section className="dash-card" style={{ marginBottom: 'var(--gap)' }}>
-        <div className="flex-row-between" style={{ gap: '1rem', alignItems: 'flex-start' }}>
-          <div>
-            <span className="label-micro">Gemini Inventory Insights</span>
-            <p className="opacity-80" style={{ margin: '0.45rem 0 0', maxWidth: '48rem' }}>
-              Generate practical actions from current stock levels and movement history.
-            </p>
-          </div>
-          <button className="olive-button" onClick={generateInsights} disabled={isLoadingInsight}>
-            {isLoadingInsight ? 'Analyzing...' : insight ? 'Refresh Insights' : 'Analyze Inventory'}
-          </button>
-        </div>
-        {insightError && <p className="alert-text" style={{ marginBottom: 0 }}>{insightError}</p>}
-        {insight && (
-          <div className="border-soft" style={{ marginTop: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-            {insight}
-          </div>
-        )}
-      </section>
       <div className="dashboard-grid">
         <SectionCard title="Category Prices">
           {Object.entries(catData).length > 0 ? (

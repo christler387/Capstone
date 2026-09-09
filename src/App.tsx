@@ -1,8 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { InventoryAuditEntry, Item, Movement, UserRole } from './types';
 import { SEED_DATA, SEED_MOVEMENTS } from './data';
-import { api } from './api';
 import { Modal } from './components/Modal';
+
+const API_BASE = '/api';
+
+async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers || {}),
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `API request failed with ${response.status}`);
+  }
+
+  return response.status === 204 ? (undefined as T) : response.json();
+}
 import { ItemForm } from './components/ItemForm';
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
@@ -23,7 +41,10 @@ const App: React.FC = () => {
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    Promise.all([api.getInventory(), api.getMovements()])
+    Promise.all([
+      requestJson<Item[]>('/inventory'),
+      requestJson<Movement[]>('/movements'),
+    ])
       .then(([loadedInventory, loadedMovements]) => {
         if (!active) return;
         setInventory(loadedInventory);
@@ -62,7 +83,10 @@ const App: React.FC = () => {
     if (!activeUsername) {
       throw new Error('No active user is logged in.');
     }
-    await api.changePassword(activeUsername, currentPassword, newPassword);
+    await requestJson<{ ok: boolean; username: string }>('/users/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ username: activeUsername, currentPassword, newPassword }),
+    });
   };
   const handleChangeUsername = async (currentPassword: string, newUsername: string) => {
     const activeUsername = localStorage.getItem('skyrun_session_user') || user;
@@ -70,13 +94,19 @@ const App: React.FC = () => {
       throw new Error('No active user is logged in.');
     }
 
-    const updatedUser = await api.changeUsername(activeUsername, currentPassword, newUsername);
+    const updatedUser = await requestJson<{ ok: boolean; username: string }>('/users/change-username', {
+      method: 'PUT',
+      body: JSON.stringify({ currentUsername: activeUsername, currentPassword, newUsername }),
+    });
     localStorage.setItem('skyrun_session_user', updatedUser.username);
     setUser(updatedUser.username);
   };
 
   const handleCreateUser = async (username: string, password: string, role: UserRole, displayName?: string) => {
-    await api.createUser({ username, password, role, displayName });
+    await requestJson<{ ok: boolean; username: string }>('/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, password, role, displayName }),
+    });
   };
   
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -103,7 +133,10 @@ const App: React.FC = () => {
   };
 
   const addItem = async (item: Item) => {
-    const savedItem = await api.createInventory(item);
+    const savedItem = await requestJson<Item>('/inventory', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    });
     setInventory(prev => [...prev, savedItem]);
     setInventoryAudit(prev => [...prev, {
       id: `AUDIT-ADD-${Date.now()}`,
@@ -116,13 +149,16 @@ const App: React.FC = () => {
   };
 
   const updateItem = async (id: string, data: Item) => {
-    const savedItem = await api.updateInventory(id, data);
+    const savedItem = await requestJson<Item>(`/inventory/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
     setInventory(prev => prev.map(i => i.id === id ? savedItem : i));
   };
 
   const deleteItem = async (id: string) => {
     const deletedItem = inventory.find(item => item.id === id);
-    await api.deleteInventory(id);
+    await requestJson<void>(`/inventory/${encodeURIComponent(id)}`, { method: 'DELETE' });
     setInventory(prev => prev.filter(i => i.id !== id));
     if (deletedItem) {
       setInventoryAudit(prev => [...prev, {
@@ -137,7 +173,10 @@ const App: React.FC = () => {
   };
 
   const addMovement = async (movement: Movement) => {
-    const savedMovement = await api.createMovement(movement);
+    const savedMovement = await requestJson<Movement>('/movements', {
+      method: 'POST',
+      body: JSON.stringify(movement),
+    });
     setMovements(prev => [...prev, savedMovement]);
     setInventory(prev => prev.map(i => i.id === movement.itemId
       ? { ...i, quantity: i.quantity + (movement.type === 'IN' ? movement.qty : -movement.qty) }
@@ -148,7 +187,7 @@ const App: React.FC = () => {
     const movementToUndo = movements.find(m => m.id === movementId);
     if (!movementToUndo) return;
 
-    await api.deleteMovement(movementId);
+    await requestJson<void>(`/movements/${encodeURIComponent(movementId)}`, { method: 'DELETE' });
     setMovements(prev => prev.filter(m => m.id !== movementId));
     setInventory(prev => prev.map(i => {
       if (i.id === movementToUndo.itemId) {
@@ -162,7 +201,10 @@ const App: React.FC = () => {
   };
 
   const bulkUpdateInventory = async (newInventory: Item[]) => {
-    await Promise.all(newInventory.map(item => api.updateInventory(item.id, item)));
+    await Promise.all(newInventory.map(item => requestJson<Item>(`/inventory/${encodeURIComponent(item.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(item),
+    })));
     setInventory([...newInventory]);
   };
 
