@@ -16,6 +16,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ ok: boolean }>('/health'),
+  getInventoryInsights: (inventory: Item[], movements: Movement[]) => request<{ insight: string; model: string }>('/insights', {
+    method: 'POST',
+    body: JSON.stringify({ inventory, movements }),
+  }),
   getInventory: () => request<Item[]>('/inventory'),
   createInventory: (item: Item) => request<Item>('/inventory', { method: 'POST', body: JSON.stringify(item) }),
   updateInventory: (id: string, item: Item) => request<Item>(`/inventory/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(item) }),

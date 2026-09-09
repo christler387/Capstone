@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Item, Movement } from '../types';
 import { isAtReorderPoint } from '../inventoryMetrics';
+import { api } from '../api';
 
 interface DashboardProps {
   inventory: Item[];
@@ -18,6 +19,9 @@ const SectionCard: React.FC<{ title: string, children: React.ReactNode }> = ({ t
 );
 
 export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGoToStock }) => {
+  const [insight, setInsight] = useState<string | null>(null);
+  const [insightError, setInsightError] = useState<string | null>(null);
+  const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
   const lowStock = inventory.filter(i => isAtReorderPoint(i, movements));
@@ -31,6 +35,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   }, {} as Record<string, { qty: number, val: number }>);
 
   const recentMovements = [...movements].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+
+  const generateInsights = async () => {
+    setIsLoadingInsight(true);
+    setInsightError(null);
+    try {
+      const result = await api.getInventoryInsights(inventory, movements);
+      setInsight(result.insight);
+    } catch (error) {
+      setInsightError(error instanceof Error ? error.message : 'Unable to generate inventory insights.');
+    } finally {
+      setIsLoadingInsight(false);
+    }
+  };
 
   const renderSummaryStats = () => (
     <div className="stats-bar">
@@ -52,6 +69,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   return (
     <div className="content-section">
       {renderSummaryStats()}
+      <section className="dash-card" style={{ marginBottom: 'var(--gap)' }}>
+        <div className="flex-row-between" style={{ gap: '1rem', alignItems: 'flex-start' }}>
+          <div>
+            <span className="label-micro">Gemini Inventory Insights</span>
+            <p className="opacity-80" style={{ margin: '0.45rem 0 0', maxWidth: '48rem' }}>
+              Generate practical actions from current stock levels and movement history.
+            </p>
+          </div>
+          <button className="olive-button" onClick={generateInsights} disabled={isLoadingInsight}>
+            {isLoadingInsight ? 'Analyzing...' : insight ? 'Refresh Insights' : 'Analyze Inventory'}
+          </button>
+        </div>
+        {insightError && <p className="alert-text" style={{ marginBottom: 0 }}>{insightError}</p>}
+        {insight && (
+          <div className="border-soft" style={{ marginTop: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+            {insight}
+          </div>
+        )}
+      </section>
       <div className="dashboard-grid">
         <SectionCard title="Category Prices">
           {Object.entries(catData).length > 0 ? (
