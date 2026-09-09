@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Movement, Item, UserRole } from '../types';
+import { InventoryAuditEntry, Movement, Item, UserRole } from '../types';
 
 interface UserProfileProps {
   user: string;
   role?: UserRole;
   movements: Movement[];
   inventory: Item[];
+  inventoryAudit: InventoryAuditEntry[];
   onLogout: () => void;
   onGoToDashboard: () => void;
   onUndoMovement?: (id: string) => void;
@@ -20,6 +21,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   role = 'staff',
   movements, 
   inventory, 
+  inventoryAudit,
   onLogout, 
   onGoToDashboard,
   onUndoMovement,
@@ -51,18 +53,22 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     ? 'SYSTEM ROOT (ADMIN)' 
     : 'OPERATIONAL STAFF';
 
-  const totalActions = movements.length;
+  const auditEntries = [
+    ...movements.map(movement => ({ ...movement, auditType: movement.type as 'IN' | 'OUT' })),
+    ...inventoryAudit.map(entry => ({ ...entry, auditType: entry.action })),
+  ].sort((a, b) => b.timestamp - a.timestamp);
+  const totalActions = auditEntries.length;
   const inCount = movements.filter(m => m.type === 'IN').length;
   const outCount = movements.filter(m => m.type === 'OUT').length;
   const totalQtyMoved = movements.reduce((sum, m) => sum + m.qty, 0);
 
-  const filteredMovements = movements
+  const filteredMovements = auditEntries
     .filter(m => {
-      if (filterType !== 'ALL' && m.type !== filterType) return false;
+      if (filterType !== 'ALL' && m.auditType !== filterType) return false;
       if (!searchQuery.trim()) return true;
       const query = searchQuery.toLowerCase();
       const item = inventory.find(i => i.id === m.itemId);
-      const itemName = item?.name.toLowerCase() || '';
+      const itemName = ('itemName' in m ? m.itemName : item?.name || '').toLowerCase();
       const itemId = m.itemId.toLowerCase();
       const movementId = m.id.toLowerCase();
       return itemName.includes(query) || itemId.includes(query) || movementId.includes(query);
@@ -317,7 +323,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               {filteredMovements.length > 0 ? (
                 filteredMovements.map(m => {
                   const item = inventory.find(i => i.id === m.itemId);
-                  const isIn = m.type === 'IN';
+                  const isMovement = 'qty' in m;
+                  const isIn = isMovement && m.type === 'IN';
+                  const actionLabel = isMovement ? m.type : m.action;
                   const localDateTimestamp = new Date(`${m.date}T00:00:00`).getTime();
                   const legacyUtcDateTimestamp = new Date(`${m.date}T00:00:00Z`).getTime();
                   const movementTimestamp = m.timestamp === legacyUtcDateTimestamp
@@ -353,10 +361,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                               opacity: 1
                             }}
                           >
-                            {item?.name || m.itemId}
+                            {'itemName' in m ? m.itemName : item?.name || m.itemId}
                           </span>
-                          <span className={`status-chip ${isIn ? 'status-optimal' : 'status-critical'}`} style={{ padding: '1px 6px', fontSize: '8px' }}>
-                            {m.type}
+                          <span className={`status-chip ${actionLabel === 'IN' || actionLabel === 'ADD' ? 'status-optimal' : 'status-critical'}`} style={{ padding: '1px 6px', fontSize: '8px' }}>
+                            {actionLabel}
                           </span>
                         </div>
                         
@@ -369,14 +377,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       <div className="flex-row-center" style={{ gap: '0.75rem', flexShrink: 0 }}>
                         <div className="flex-col-end" style={{ textAlign: 'right' }}>
                           <span className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                            {isIn ? '+' : '-'}{m.qty}
+                            {isMovement ? `${isIn ? '+' : '-'}${m.qty}` : actionLabel}
                           </span>
                           <span className="label-micro font-mono text-micro opacity-50" style={{ fontSize: '9px' }}>
                             {dateFormatted}
                           </span>
                         </div>
 
-                        {onUndoMovement && (
+                        {isMovement && onUndoMovement && (
                           isConfirmingThis ? (
                             <div className="flex-row-center" style={{ gap: '4px' }}>
                               <button 

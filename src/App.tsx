@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Item, Movement, UserRole } from './types';
+import { InventoryAuditEntry, Item, Movement, UserRole } from './types';
 import { SEED_DATA, SEED_MOVEMENTS } from './data';
 import { api } from './api';
 import { Modal } from './components/Modal';
@@ -16,6 +16,7 @@ import { UserProfile } from './components/UserProfile';
 const App: React.FC = () => {
   const [inventory, setInventory] = useState<Item[]>(SEED_DATA);
   const [movements, setMovements] = useState<Movement[]>(SEED_MOVEMENTS);
+  const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
@@ -104,6 +105,14 @@ const App: React.FC = () => {
   const addItem = async (item: Item) => {
     const savedItem = await api.createInventory(item);
     setInventory(prev => [...prev, savedItem]);
+    setInventoryAudit(prev => [...prev, {
+      id: `AUDIT-ADD-${Date.now()}`,
+      itemId: savedItem.id,
+      itemName: savedItem.name,
+      action: 'ADD',
+      date: new Date().toISOString().slice(0, 10),
+      timestamp: Date.now(),
+    }]);
   };
 
   const updateItem = async (id: string, data: Item) => {
@@ -112,8 +121,19 @@ const App: React.FC = () => {
   };
 
   const deleteItem = async (id: string) => {
+    const deletedItem = inventory.find(item => item.id === id);
     await api.deleteInventory(id);
     setInventory(prev => prev.filter(i => i.id !== id));
+    if (deletedItem) {
+      setInventoryAudit(prev => [...prev, {
+        id: `AUDIT-DELETE-${Date.now()}`,
+        itemId: deletedItem.id,
+        itemName: deletedItem.name,
+        action: 'DELETE',
+        date: new Date().toISOString().slice(0, 10),
+        timestamp: Date.now(),
+      }]);
+    }
   };
 
   const addMovement = async (movement: Movement) => {
@@ -243,6 +263,7 @@ const App: React.FC = () => {
             role={userRole}
             movements={movements} 
             inventory={inventory} 
+            inventoryAudit={inventoryAudit}
             onLogout={handleLogout} 
             onGoToDashboard={() => setCurrentSection('dashboard')} 
             onUndoMovement={undoMovement}

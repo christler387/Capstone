@@ -13,9 +13,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
   if (!isOpen) return null;
 
   return (
-    <div className={`modal-overlay active ${type === 'clean' ? 'clean-modal' : ''}`} onClick={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
+    <div className={`modal-overlay active ${type === 'clean' ? 'clean-modal' : ''}`}>
       <div className={`modal-content ${type === 'mini' ? 'mini' : ''} ${type === 'clean' ? 'clean' : ''}`}>
         {type === 'clean' && (
           <button className="close-modal clean-modal-close" onClick={onClose} aria-label="Close image preview">

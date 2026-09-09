@@ -34,6 +34,17 @@ export interface Movement {
   timestamp: number;
 }
 
+export type InventoryAuditAction = 'ADD' | 'DELETE';
+
+export interface InventoryAuditEntry {
+  id: string;
+  itemId: string;
+  itemName: string;
+  action: InventoryAuditAction;
+  date: string;
+  timestamp: number;
+}
+
 
 export const CONFIG = {
   LOW_STOCK_THRESHOLD: 5,
