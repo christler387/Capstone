@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
+const apiKey = process.env.API_KEY;
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 3306),
@@ -19,6 +20,18 @@ const pool = mysql.createPool({
 
 app.use(cors());
 app.use(express.json());
+
+app.use('/api', (req, res, next) => {
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API_KEY is not configured.' });
+  }
+
+  if (req.get('x-api-key') !== apiKey) {
+    return res.status(401).json({ error: 'Invalid API key.' });
+  }
+
+  next();
+});
 
 const inventorySeed = [
   ['001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
