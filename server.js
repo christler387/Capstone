@@ -464,9 +464,13 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Database request failed' });
 });
 
-initializeDatabase()
-  .then(() => app.listen(port, () => console.log(`API listening on http://localhost:${port}`)))
-  .catch((error) => {
-    console.error('Database initialization failed:', error.message);
-    process.exit(1);
-  });
+export default app;
+
+if (!process.env.VERCEL) {
+  initializeDatabase()
+    .then(() => app.listen(port, () => console.log(`API listening on http://localhost:${port}`)))
+    .catch(error => {
+      console.error('Database initialization failed:', error);
+      process.exit(1);
+    });
+}

@@ -1,10 +1,15 @@
 import { Item, Movement } from './types';
 
 const API_BASE = '/api';
+const clientApiKey = import.meta.env.VITE_API_KEY;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(clientApiKey ? { 'X-API-Key': clientApiKey } : {}),
+      ...(options?.headers || {}),
+    },
     ...options,
   });
   if (!response.ok) {
