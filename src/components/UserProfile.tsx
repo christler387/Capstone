@@ -41,7 +41,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [usernamePassword, setUsernamePassword] = useState('');
   const [createUserName, setCreateUserName] = useState('');
   const [createUserPassword, setCreateUserPassword] = useState('');
-  const [createUserDisplayName, setCreateUserDisplayName] = useState('');
   const [createUserRole, setCreateUserRole] = useState<UserRole>('staff');
   const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [usernameFeedback, setUsernameFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
@@ -93,7 +92,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const clearCreateUserForm = () => {
     setCreateUserName('');
     setCreateUserPassword('');
-    setCreateUserDisplayName('');
     setCreateUserRole('staff');
     setCreateUserFeedback(null);
   };
@@ -177,7 +175,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     const username = createUserName.trim();
     const password = createUserPassword.trim();
-    const displayName = createUserDisplayName.trim() || username;
 
     if (!username || !password) {
       setCreateUserFeedback({ type: 'error', message: 'Username and password are required.' });
@@ -195,7 +192,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }
 
     try {
-      await onCreateUser(username, password, createUserRole, displayName);
+      await onCreateUser(username, password, createUserRole);
       setCreateUserFeedback({ type: 'success', message: 'User created successfully.' });
       clearCreateUserForm();
       setTimeout(() => setIsCreateUserModalOpen(false), 500);
@@ -321,7 +318,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 filteredMovements.map(m => {
                   const item = inventory.find(i => i.id === m.itemId);
                   const isIn = m.type === 'IN';
-                  const dateFormatted = new Date(m.timestamp || m.date)
+                  const localDateTimestamp = new Date(`${m.date}T00:00:00`).getTime();
+                  const legacyUtcDateTimestamp = new Date(`${m.date}T00:00:00Z`).getTime();
+                  const movementTimestamp = m.timestamp === legacyUtcDateTimestamp
+                    ? localDateTimestamp
+                    : (m.timestamp || localDateTimestamp);
+                  const dateFormatted = new Date(movementTimestamp)
                     .toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                     .toUpperCase();
                   const isConfirmingThis = confirmUndoId === m.id;
@@ -332,12 +334,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       className="flex-row-between border-soft p-3 hover-bg" 
                       style={{ 
                         gap: '0.75rem', 
+                        padding: '0.5rem 0.75rem',
                         borderRadius: 'var(--radius)',
                         background: 'var(--item-bg)'
                       }}
                     >
-                      <div className="flex-col-start" style={{ flex: 1, minWidth: 0 }}>
-                        <div className="flex-row-center" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div className="flex-col-start" style={{ flex: 1, minWidth: 0, gap: '0.25rem' }}>
+                        <div className="flex-row-center" style={{ gap: '0.5rem', flexWrap: 'wrap', lineHeight: 1.2 }}>
                           <span 
                             className="label-micro font-mono" 
                             style={{ 
@@ -357,7 +360,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                           </span>
                         </div>
                         
-                        <div className="flex-row-center mt-1" style={{ gap: '0.75rem', fontSize: '10px' }}>
+                        <div className="flex-row-center" style={{ gap: '0.75rem', fontSize: '10px', lineHeight: 1.2 }}>
                           <span className="font-mono opacity-50">ID: {m.itemId}</span>
                           <span className="font-mono opacity-40">Ref: {m.id}</span>
                         </div>
@@ -483,10 +486,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="createUserName">Username</label>
             <input id="createUserName" className="form-input" type="text" value={createUserName} onChange={(e) => setCreateUserName(e.target.value)} placeholder="Enter username" />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="createUserDisplayName">Display Name</label>
-            <input id="createUserDisplayName" className="form-input" type="text" value={createUserDisplayName} onChange={(e) => setCreateUserDisplayName(e.target.value)} placeholder="Optional display name" />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="createUserPassword">Password</label>

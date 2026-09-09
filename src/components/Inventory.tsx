@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Item, Movement, UserRole, CONFIG } from '../types';
+import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
+import { getReorderQuantity, isAtReorderPoint } from '../inventoryMetrics';
 
 interface InventoryProps {
   inventory: Item[];
   movements?: Movement[];
   onEditItem: (id: string) => void;
   onDeleteItem: (id: string) => void;
+  onGoToStock: (id: string) => void;
   onAddItem: () => void;
   onZoomImage: (url: string, name: string) => void;
   onLocateOnMap: (rack: string) => void;
@@ -18,6 +20,7 @@ export const Inventory: React.FC<InventoryProps> = ({
   movements = [], 
   onEditItem, 
   onDeleteItem, 
+  onGoToStock,
   onAddItem, 
   onZoomImage, 
   onLocateOnMap, 
@@ -55,7 +58,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-  const lowCount = inventory.filter(i => i.quantity < CONFIG.LOW_STOCK_THRESHOLD && i.quantity > 0).length;
+  const lowCount = inventory.filter(i => isAtReorderPoint(i, movements)).length;
 
   const filteredInventory = inventory
     .filter(i => {
@@ -166,13 +169,16 @@ export const Inventory: React.FC<InventoryProps> = ({
             <span className="label-table">Category</span>
             <span className="label-table">Location</span>
             <span className="label-table text-right">Qty</span>
+            <span className="label-table text-right">Reorder Qty</span>
             <span className="label-table text-right">Price</span>
             <span className="label-table text-right">{userRole === 'admin' ? 'Actions' : 'Locate'}</span>
           </div>
 
           <div className="table-body">
             {filteredInventory.map(i => {
-              const isLow = i.quantity < CONFIG.LOW_STOCK_THRESHOLD;
+              const isLow = isAtReorderPoint(i, movements);
+              const reorderQuantity = getReorderQuantity(i, movements);
+              const needsReorder = isAtReorderPoint(i, movements);
               return (
                 <div 
                   key={i.id} 
@@ -216,6 +222,14 @@ export const Inventory: React.FC<InventoryProps> = ({
                   </div>
 
                   <span className={`qty-cell ${isLow ? 'alert-text' : ''}`}>{String(i.quantity).padStart(3, '0')}</span>
+                  <span
+                    className={`price-cell ${needsReorder ? 'alert-text' : ''}`}
+                    title="Open stock-in for this item"
+                    onClick={(event) => { event.stopPropagation(); onGoToStock(i.id); }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {String(reorderQuantity).padStart(2, '0')}
+                  </span>
                   <span className="price-cell">₱{i.price.toFixed(2)}</span>
                   
                   <span className="actions-cell text-right">

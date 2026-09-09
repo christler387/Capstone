@@ -1,13 +1,3 @@
-/* 
-   ==========================================================================
-   SKYRUN AUTO SUPPLY - SYSTEM STYLESHEET
-   ========================================================================== */
-
-/**
- * ==========================================================================
- * 1. VARIABLES & THEME CONFIG
- * ==========================================================================
- */
 :root {
   --bg: #C5C4BF;
   --ink: #141414;
@@ -27,11 +17,7 @@
   --ease: 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/**
- * ==========================================================================
- * 2. CORE TYPOGRAPHY & TAGS
- * ==========================================================================
- */
+
 * { 
   margin: 0; 
   padding: 0; 
@@ -84,11 +70,6 @@ body {
   font-style: italic; 
 }
 
-/**
- * ==========================================================================
- * 3. LAYOUT STRUCTURE (CONTAINERS & HEADER)
- * ==========================================================================
- */
 .app-container { display: flex; min-height: 100vh; }
 .content-wrapper { flex: 1; display: flex; flex-direction: column; overflow-x: hidden; }
 
@@ -154,11 +135,6 @@ main { padding: var(--gap); flex: 1; }
   border-color: var(--ink);
 }
 
-/**
- * ==========================================================================
- * 4. UI COMPONENTS (BUTTONS & CARDS)
- * ==========================================================================
- */
 .olive-button {
   background: var(--ink); 
   color: var(--bg); 
@@ -279,11 +255,6 @@ main { padding: var(--gap); flex: 1; }
 .sortable:hover { opacity: 0.8 !important; }
 .sort-icon-inner { font-size: 1rem; vertical-align: middle; margin-left: 4px; }
 
-/**
- * ==========================================================================
- * 5. DASHBOARD & STATS DISPLAY
- * ==========================================================================
- */
 .stats-bar { display: grid; grid-template-columns: 1fr; border-bottom: 1px solid var(--line); background: var(--bg); }
 .stat-box { padding: 1.5rem var(--gap); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; justify-content: center; }
 
@@ -299,13 +270,8 @@ main { padding: var(--gap); flex: 1; }
 
 .stat-value { font-size: 1.875rem; font-family: var(--f-mono); letter-spacing: -0.05em; margin-top: 0.5rem; }
 
-/**
- * ==========================================================================
- * 6. DATA DISPLAY (TABLES & LISTS)
- * ==========================================================================
- */
 .table-grid { display: grid; align-items: center; gap: 1rem; }
-.inventory-grid { grid-template-columns: 60px 2.5fr 1fr 140px 60px 90px 80px; }
+.inventory-grid { grid-template-columns: 60px 2.5fr 1fr 140px 60px 90px 90px 80px; }
 .orders-grid { grid-template-columns: 80px 2fr 2fr 1fr 120px; }
 
 .table-header { border-bottom: 1px solid var(--line); padding: 0 1rem 0.5rem 1rem; }
@@ -359,11 +325,6 @@ main { padding: var(--gap); flex: 1; }
 .inventory-image:hover { transform: scale(1.1); }
 .placeholder-img { display: inline-block; background: var(--line-soft); width: 40px; height: 40px; }
 
-/**
- * ==========================================================================
- * 7. FORMS & INPUT CONTROLS
- * ==========================================================================
- */
 .form-group { margin-bottom: 1.5rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; }
 
@@ -395,6 +356,7 @@ main { padding: var(--gap); flex: 1; }
   transition: 0.2s;
   z-index: 5;
 }
+
 
 .barcode-scan-toggle:hover, .barcode-scan-toggle.active {
   opacity: 1;
@@ -465,11 +427,7 @@ main { padding: var(--gap); flex: 1; }
   color: var(--ink);
 }
 
-/**
- * ==========================================================================
- * 8. BARCODE SCANNER INTERFACE
- * ==========================================================================
- */
+
 #reader video { 
   border-radius: 8px; 
   object-fit: cover !important; 
@@ -514,11 +472,7 @@ main { padding: var(--gap); flex: 1; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/**
- * ==========================================================================
- * 9. WAREHOUSE MAP & RACK VISUALS
- * ==========================================================================
- */
+
 .warehouse-layout-container {
   display: flex;
   flex-direction: column;
@@ -877,12 +831,9 @@ main { padding: var(--gap); flex: 1; }
   font-size: 11px;
 }
 
-/**
- * ==========================================================================
- * 10. RACK INSPECTION (MODERNIZED)
- * ==========================================================================
- */
+
 .clean-modal .modal-content {
+  position: relative;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg);
@@ -891,6 +842,13 @@ main { padding: var(--gap); flex: 1; }
   width: 95%;
   max-width: 900px;
   max-height: 90vh;
+}
+
+.clean-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
 }
 
 .rack-inspection-header {
@@ -981,6 +939,7 @@ main { padding: var(--gap); flex: 1; }
 
 .reason-text {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -1164,11 +1123,7 @@ main { padding: var(--gap); flex: 1; }
   width: fit-content;
 }
 
-/**
- * ==========================================================================
- * 11. FOOTER
- * ==========================================================================
- */
+
 footer {
   padding: 2rem var(--gap);
   border-top: 1px solid var(--line-soft);
@@ -1192,11 +1147,7 @@ footer p {
   box-shadow: 0 0 8px var(--success);
 }
 
-/**
- * ==========================================================================
- * 12. ANIMATIONS & RESPONSIVE REFINEMENTS
- * ==========================================================================
- */
+
 @keyframes modalIn { 
   from { opacity: 0; transform: scale(0.95) translateY(10px); } 
   to { opacity: 1; transform: scale(1) translateY(0); } 
@@ -1219,11 +1170,7 @@ footer p {
   .app-container { flex-direction: column; }
 }
 
-/**
- * ==========================================================================
- * 13. UTILITY CLASSES
- * ==========================================================================
- */
+
 .flex-col { display: flex; flex-direction: column; gap: 0.125rem; }
 .flex-col-start { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
 .flex-col-end { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; text-align: right; }

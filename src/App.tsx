@@ -14,8 +14,6 @@ import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
 
 const App: React.FC = () => {
-  // ==========================================================================
-  // ==========================================================================
   const [inventory, setInventory] = useState<Item[]>(SEED_DATA);
   const [movements, setMovements] = useState<Movement[]>(SEED_MOVEMENTS);
   const [currentSection, setCurrentSection] = useState('dashboard');
@@ -104,13 +102,13 @@ const App: React.FC = () => {
   };
 
   const addItem = async (item: Item) => {
-    await api.createInventory(item);
-    setInventory(prev => [...prev, item]);
+    const savedItem = await api.createInventory(item);
+    setInventory(prev => [...prev, savedItem]);
   };
 
   const updateItem = async (id: string, data: Item) => {
-    await api.updateInventory(id, data);
-    setInventory(prev => prev.map(i => i.id === id ? data : i));
+    const savedItem = await api.updateInventory(id, data);
+    setInventory(prev => prev.map(i => i.id === id ? savedItem : i));
   };
 
   const deleteItem = async (id: string) => {
@@ -159,7 +157,7 @@ const App: React.FC = () => {
       level = `L${parts[1]}`;
     }
 
-    const nextId = `STK-${String(Math.max(0, ...inventory.map(i => parseInt(i.id.split('-')[1]) || 0)) + 1).padStart(3, '0')}`;
+    const nextId = String(Math.max(0, ...inventory.map(i => parseInt(i.id, 10) || 0)) + 1).padStart(3, '0');
     setEditingItem({ id: nextId, name: '', category: '', rack, level, quantity: 0, price: 0 } as Item);
     setIsItemModalOpen(true);
   };
@@ -208,6 +206,7 @@ const App: React.FC = () => {
             movements={movements}
             onEditItem={handleEditItem} 
             onDeleteItem={setConfirmDelete} 
+            onGoToStock={handleGoToStock}
             onAddItem={() => handleAddItem()}
             onZoomImage={(url, name) => setZoomImage({ url, name })}
             onLocateOnMap={handleLocateOnMap}
@@ -258,8 +257,7 @@ const App: React.FC = () => {
     }
   };
 
-  // ==========================================================================
-  // ==========================================================================
+
   const renderGlobalModals = () => (
     <>
       <Modal 

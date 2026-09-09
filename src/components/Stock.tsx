@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
+import { Modal } from './Modal';
 
 interface StockProps {
   inventory: Item[];
-  onAddMovement: (movement: Movement) => void;
+  onAddMovement: (movement: Movement) => Promise<void> | void;
   onAddItem: (rack?: string) => void;
   selectedItemId?: string;
   userRole?: UserRole;
@@ -24,6 +25,7 @@ export const Stock: React.FC<StockProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirmOverdraw, setShowConfirmOverdraw] = useState<boolean>(false);
+  const [pendingMovement, setPendingMovement] = useState<Movement | null>(null);
   const [formData, setFormData] = useState({
     itemId: selectedItemId || '',
     name: '',
@@ -94,8 +96,14 @@ export const Stock: React.FC<StockProps> = ({
       date: new Date().toISOString().split('T')[0],
       timestamp: Date.now()
     };
-    onAddMovement(movement);
-    setFormData({ ...formData, qty: 0 });
+    setPendingMovement(movement);
+  };
+
+  const confirmMovement = async () => {
+    if (!pendingMovement) return;
+    await onAddMovement(pendingMovement);
+    setFormData(prev => ({ ...prev, qty: 0 }));
+    setPendingMovement(null);
     setShowConfirmOverdraw(false);
   };
 
@@ -249,6 +257,22 @@ export const Stock: React.FC<StockProps> = ({
           {renderFormFields(tab)}
         </div>
       </div>
+      <Modal
+        isOpen={!!pendingMovement}
+        onClose={() => setPendingMovement(null)}
+        title={`Confirm Stock ${pendingMovement?.type === 'IN' ? 'In' : 'Out'}`}
+        footer={
+          <div className="flex-row-gap" style={{ width: '100%' }}>
+            <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => setPendingMovement(null)}>Cancel</button>
+            <button className={`olive-button ${pendingMovement?.type === 'OUT' ? 'btn-danger' : ''}`} style={{ flex: 1 }} onClick={confirmMovement}>Confirm</button>
+          </div>
+        }
+      >
+        <div className="text-center">
+          <p className="label-micro text-lg mb-4">Record {pendingMovement?.qty || 0} unit{pendingMovement?.qty === 1 ? '' : 's'} {pendingMovement?.type === 'IN' ? 'into' : 'out of'} inventory?</p>
+          <p className="label-micro opacity-50">Item: {inventory.find(item => item.id === pendingMovement?.itemId)?.name || pendingMovement?.itemId}</p>
+        </div>
+      </Modal>
     </div>
   );
 };

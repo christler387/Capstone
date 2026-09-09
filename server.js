@@ -21,18 +21,18 @@ app.use(cors());
 app.use(express.json());
 
 const inventorySeed = [
-  ['STK-001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
-  ['STK-002', 'High Performance Rotors', 'BRAKES', '4801234567891', 12, 4200, 'B-04', 'L1', 'LARGE', 'HEAVY', 'MEDIUM', 'Mitsubishi Lancer EX, Subaru WRX'],
-  ['STK-003', 'Synthetic Oil Filter', 'ENGINE', '4801234567892', 85, 450, 'A-02', 'L4', 'SMALL', 'LIGHT', 'HIGH', 'Toyota Corolla Altis, Mitsubishi Mirage'],
-  ['STK-004', 'Iridium Spark Plugs', 'ENGINE', '4801234567893', 120, 350, 'A-03', 'L4', 'SMALL', 'LIGHT', 'HIGH', 'Honda Civic, Suzuki Swift'],
-  ['STK-005', 'Gas-Charged Shock Absorber', 'SUSPENSION', '4801234567894', 18, 3800, 'B-02', 'L2', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'Hyundai Accent, Kia Rio'],
-  ['STK-006', 'Front Control Arm Left', 'SUSPENSION', '4801234567895', 6, 5200, 'B-01', 'L1', 'MEDIUM', 'HEAVY', 'LOW', 'Nissan Almera, Mazda 3'],
-  ['STK-007', 'LED Headlight Bulb H4', 'ELECTRICAL', '4801234567896', 40, 1200, 'A-04', 'L3', 'SMALL', 'LIGHT', 'HIGH', 'Universal H4 Sockets (Vios, Mirage, Wigo)'],
-  ['STK-008', '120A High Output Alternator', 'ELECTRICAL', '4801234567897', 4, 9500, 'C-01', 'L1', 'MEDIUM', 'HEAVY', 'LOW', 'Toyota Fortuner, Hilux D-4D'],
-  ['STK-009', 'Front Fender Panel', 'BODY', '4801234567898', 5, 4500, 'C-02', 'L3', 'LARGE', 'MEDIUM', 'LOW', 'Honda Civic EF/EG/EK'],
-  ['STK-010', 'Rear Bumper Cover', 'BODY', '4801234567899', 3, 6800, 'D-03', 'L1', 'LARGE', 'HEAVY', 'LOW', 'Toyota Wigo 2017-2022'],
-  ['STK-011', 'ATF Transmission Fluid', 'TRANSMISSION', '4801234567900', 60, 850, 'A-05', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota, Honda, Mitsubishi Automatic Transmissions'],
-  ['STK-012', 'Heavy Duty Clutch Kit', 'TRANSMISSION', '4801234567901', 8, 12500, 'D-01', 'L1', 'LARGE', 'HEAVY', 'MEDIUM', 'Mitsubishi Triton/L200, Isuzu D-Max'],
+  ['001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
+  ['002', 'High Performance Rotors', 'BRAKES', '4801234567891', 12, 4200, 'B-04', 'L1', 'LARGE', 'HEAVY', 'MEDIUM', 'Mitsubishi Lancer EX, Subaru WRX'],
+  ['003', 'Synthetic Oil Filter', 'ENGINE', '4801234567892', 85, 450, 'A-02', 'L4', 'SMALL', 'LIGHT', 'HIGH', 'Toyota Corolla Altis, Mitsubishi Mirage'],
+  ['004', 'Iridium Spark Plugs', 'ENGINE', '4801234567893', 120, 350, 'A-03', 'L4', 'SMALL', 'LIGHT', 'HIGH', 'Honda Civic, Suzuki Swift'],
+  ['005', 'Gas-Charged Shock Absorber', 'SUSPENSION', '4801234567894', 18, 3800, 'B-02', 'L2', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'Hyundai Accent, Kia Rio'],
+  ['006', 'Front Control Arm Left', 'SUSPENSION', '4801234567895', 6, 5200, 'B-01', 'L1', 'MEDIUM', 'HEAVY', 'LOW', 'Nissan Almera, Mazda 3'],
+  ['007', 'LED Headlight Bulb H4', 'ELECTRICAL', '4801234567896', 40, 1200, 'A-04', 'L3', 'SMALL', 'LIGHT', 'HIGH', 'Universal H4 Sockets (Vios, Mirage, Wigo)'],
+  ['008', '120A High Output Alternator', 'ELECTRICAL', '4801234567897', 4, 9500, 'C-01', 'L1', 'MEDIUM', 'HEAVY', 'LOW', 'Toyota Fortuner, Hilux D-4D'],
+  ['009', 'Front Fender Panel', 'BODY', '4801234567898', 5, 4500, 'C-02', 'L3', 'LARGE', 'MEDIUM', 'LOW', 'Honda Civic EF/EG/EK'],
+  ['010', 'Rear Bumper Cover', 'BODY', '4801234567899', 3, 6800, 'D-03', 'L1', 'LARGE', 'HEAVY', 'LOW', 'Toyota Wigo 2017-2022'],
+  ['011', 'ATF Transmission Fluid', 'TRANSMISSION', '4801234567900', 60, 850, 'A-05', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota, Honda, Mitsubishi Automatic Transmissions'],
+  ['012', 'Heavy Duty Clutch Kit', 'TRANSMISSION', '4801234567901', 8, 12500, 'D-01', 'L1', 'LARGE', 'HEAVY', 'MEDIUM', 'Mitsubishi Triton/L200, Isuzu D-Max'],
 ];
 
 const defaultUsers = [
@@ -41,9 +41,9 @@ const defaultUsers = [
 ];
 
 const movementSeed = [
-  ['MOV-1001', 'STK-004', 'OUT', 45, '2026-08-10'],
-  ['MOV-1002', 'STK-003', 'OUT', 35, '2026-08-11'],
-  ['MOV-1003', 'STK-001', 'OUT', 28, '2026-08-12'],
+  ['MOV-1001', '004', 'OUT', 45, '2026-08-10'],
+  ['MOV-1002', '003', 'OUT', 35, '2026-08-11'],
+  ['MOV-1003', '001', 'OUT', 28, '2026-08-12'],
 ];
 
 async function initializeDatabase() {
@@ -72,9 +72,18 @@ async function initializeDatabase() {
     demand VARCHAR(16),
     compatible_vehicles TEXT,
     image TEXT,
+    ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100,
+    holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+    lead_time_days INT NOT NULL DEFAULT 7,
+    safety_stock INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100');
+  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0');
+  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS lead_time_days INT NOT NULL DEFAULT 7');
+  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INT NOT NULL DEFAULT 0');
+  await pool.query('UPDATE inventory SET holding_cost = price * 0.2 WHERE holding_cost = 0');
   await pool.query(`CREATE TABLE IF NOT EXISTS movements (
     id VARCHAR(64) PRIMARY KEY,
     item_id VARCHAR(32) NOT NULL,
@@ -93,6 +102,11 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
 
+  await pool.query('SET FOREIGN_KEY_CHECKS = 0');
+  await pool.query("UPDATE movements SET item_id = REPLACE(item_id, 'STK-', '') WHERE item_id LIKE 'STK-%'");
+  await pool.query("UPDATE inventory SET id = REPLACE(id, 'STK-', '') WHERE id LIKE 'STK-%'");
+  await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+
   const [[userCount]] = await pool.query('SELECT COUNT(*) AS count FROM users');
   if (userCount.count === 0) {
     const userEntries = defaultUsers.map(([username, password, role]) => [
@@ -107,8 +121,8 @@ async function initializeDatabase() {
   const [[inventoryCount]] = await pool.query('SELECT COUNT(*) AS count FROM inventory');
   if (inventoryCount.count === 0) {
     await pool.query(`INSERT INTO inventory
-      (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles)
-      VALUES ?`, [inventorySeed]);
+        (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles)
+        VALUES ?`, [inventorySeed]);
   }
   const [[movementCount]] = await pool.query('SELECT COUNT(*) AS count FROM movements');
   if (movementCount.count === 0) {
@@ -131,6 +145,10 @@ function toItem(row) {
     demand: row.demand || undefined,
     compatibleVehicles: row.compatible_vehicles || undefined,
     image: row.image || undefined,
+    orderingCost: Number(row.ordering_cost || 100),
+    holdingCost: Number(row.holding_cost || Number(row.price) * 0.2),
+    leadTimeDays: Number(row.lead_time_days || 7),
+    safetyStock: Number(row.safety_stock || 0),
   };
 }
 
@@ -138,11 +156,17 @@ function toMovement(row) {
   const date = row.movement_date instanceof Date
     ? row.movement_date.toISOString().slice(0, 10)
     : String(row.movement_date).slice(0, 10);
-  return { id: row.id, itemId: row.item_id, type: row.type, qty: Number(row.qty), date, timestamp: new Date(date).getTime() };
+  const timestamp = row.created_at ? new Date(row.created_at).getTime() : new Date(date).getTime();
+  return { id: row.id, itemId: row.item_id, type: row.type, qty: Number(row.qty), date, timestamp };
 }
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function normalizeItemId(value) {
+  const id = String(value ?? '').trim();
+  return /^\d+$/.test(id) ? String(Number(id)).padStart(3, '0') : id;
 }
 
 app.get('/api/health', async (_req, res) => {
@@ -280,28 +304,33 @@ app.get('/api/inventory', async (_req, res) => {
 
 app.post('/api/inventory', async (req, res) => {
   const item = req.body;
+  const itemId = normalizeItemId(item.id);
   await pool.query(`INSERT INTO inventory
-    (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    item.id, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
+    (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    itemId, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
     item.rack, item.level || null, item.size || null, item.weight || null, item.demand || null,
-    item.compatibleVehicles || null, item.image || null,
+    item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
+    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 0,
   ]);
-  res.status(201).json(item);
+  res.status(201).json({ ...item, id: itemId });
 });
 
 app.put('/api/inventory/:id', async (req, res) => {
   const item = req.body;
-  await pool.query(`UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=? WHERE id=?`, [
+  const itemId = normalizeItemId(req.params.id);
+  const submittedItemId = normalizeItemId(item.id || itemId);
+  await pool.query(`UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`, [
     item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0, item.rack,
     item.level || null, item.size || null, item.weight || null, item.demand || null,
-    item.compatibleVehicles || null, item.image || null, req.params.id,
+    item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
+    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 0, itemId,
   ]);
-  res.json({ ...item, id: req.params.id });
+  res.json({ ...item, id: submittedItemId });
 });
 
 app.delete('/api/inventory/:id', async (req, res) => {
-  await pool.query('DELETE FROM inventory WHERE id=?', [req.params.id]);
+  await pool.query('DELETE FROM inventory WHERE id=?', [normalizeItemId(req.params.id)]);
   res.status(204).end();
 });
 
@@ -321,7 +350,7 @@ app.post('/api/movements', async (req, res) => {
     await connection.query('INSERT INTO movements (id, item_id, type, qty, movement_date) VALUES (?, ?, ?, ?, ?)', [id, movement.itemId, movement.type, movement.qty, date]);
     await connection.query('UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?', [delta, movement.itemId]);
     await connection.commit();
-    res.status(201).json({ ...movement, id, date, timestamp: new Date(date).getTime() });
+    res.status(201).json({ ...movement, id, date, timestamp: Date.now() });
   } catch (error) {
     await connection.rollback();
     throw error;

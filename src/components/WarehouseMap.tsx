@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Item, Movement, CONFIG } from '../types';
+import { Item, Movement } from '../types';
 import { Modal } from './Modal';
+import { isAtReorderPoint } from '../inventoryMetrics';
 
 // ============================================================================
 // ============================================================================
@@ -166,9 +167,10 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   // ============================================================================
   const aisleData = ['A', 'B', 'C', 'D'].map(id => {
     const aisleItems = inventory.filter(i => (i.rack || '').toUpperCase().startsWith(id));
-    const totalQty = aisleItems.reduce((sum, item) => sum + item.quantity, 0);
+    const sizeCapacity = { SMALL: 0.25, MEDIUM: 1, LARGE: 2 } as const;
+    const totalQty = aisleItems.reduce((sum, item) => sum + item.quantity * (sizeCapacity[item.size || 'MEDIUM']), 0);
     const uniqueItems = aisleItems.length;
-    const maxCapacity = 500;
+    const maxCapacity = 250;
     const density = Math.min(100, Math.round((totalQty / maxCapacity) * 100));
     let statusClass = 'status-optimal';
     let statusText = 'Optimal';
@@ -214,7 +216,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                       {levelItems.map(i => (
                         <div 
                           key={i.id} 
-                          className={`item-token ${i.quantity < CONFIG.LOW_STOCK_THRESHOLD ? 'low-stock-alert' : ''}`} 
+                          className={`item-token ${isAtReorderPoint(i, movements) ? 'low-stock-alert' : ''}`}
                           style={{ cursor: 'pointer' }}
                           onClick={() => onEditItem(i.id)}
                         >
@@ -270,7 +272,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                      const rackId = `${zone.id}-${String(i + 1).padStart(2, '0')}`;
                      const rackSpecificItems = zoneItems.filter(item => normalizeRack(item.rack) === normalizeRack(rackId));
                      const isPrimary = zone.id !== 'A' && rackSpecificItems.some(item => getItemDemand(item) === 'HIGH');
-                     const hasLowStock = rackSpecificItems.some(item => item.quantity < CONFIG.LOW_STOCK_THRESHOLD);
+                     const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item, movements));
                      return (
                        <div key={rackId} className={`rack ${isPrimary ? 'primary' : ''} ${hasLowStock ? 'low-stock-alert' : ''}`} onClick={() => setSelectedRack({ zoneId: zone.id, rackId })}>
                          <div className="rack-icon">

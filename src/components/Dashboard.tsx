@@ -1,5 +1,6 @@
 import React from 'react';
-import { Item, Movement, CONFIG } from '../types';
+import { Item, Movement } from '../types';
+import { isAtReorderPoint } from '../inventoryMetrics';
 
 interface DashboardProps {
   inventory: Item[];
@@ -19,7 +20,7 @@ const SectionCard: React.FC<{ title: string, children: React.ReactNode }> = ({ t
 export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGoToStock }) => {
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-  const lowStock = inventory.filter(i => i.quantity < CONFIG.LOW_STOCK_THRESHOLD && i.quantity > 0);
+  const lowStock = inventory.filter(i => isAtReorderPoint(i, movements));
   const lowCount = lowStock.length;
 
   const catData = inventory.reduce((acc, i) => {
@@ -81,7 +82,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
             lowStock.sort((a, b) => a.name.localeCompare(b.name)).map(i => (
               <div key={i.id} className="flex-row-between border-soft low-stock-item cursor-pointer" onClick={() => onGoToStock(i.id)}>
                 <span className="label-micro opacity-80" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '70%' }}>{i.name}</span>
-                <span className="label-micro alert-text font-mono text-xs" style={{ color: 'var(--accent)', fontWeight: 'bold' }}>{String(i.quantity).padStart(3, '0')}</span>
+                <span className="label-micro alert-text font-mono text-xs" style={{ fontWeight: 'bold' }}>
+                  {i.quantity}
+                </span>
               </div>
             ))
           ) : (

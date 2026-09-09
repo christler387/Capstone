@@ -23,7 +23,11 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSave, onCancel, read
     size: 'MEDIUM',
     weight: 'MEDIUM',
     demand: 'MEDIUM',
-    compatibleVehicles: ''
+    compatibleVehicles: '',
+    orderingCost: 100,
+    holdingCost: 0,
+    leadTimeDays: 7,
+    safetyStock: 0
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -32,7 +36,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSave, onCancel, read
     setError(null);
     setFormData(prev => ({
       ...prev,
-      [field]: (field === 'quantity' || field === 'price') ? parseFloat(value) : value
+      [field]: ['quantity', 'price', 'orderingCost', 'holdingCost', 'leadTimeDays', 'safetyStock'].includes(field) ? parseFloat(value) : value
     }));
   };
 
@@ -98,6 +102,29 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSave, onCancel, read
           <input type="text" id="edit-category" className="form-input" value={formData.category} onChange={handleChange} disabled={readOnly} required />
         </div>
       </div>
+      {!readOnly && (
+        <div className="form-group">
+          <label className="label-micro">Replenishment Settings</label>
+          <div className="grid-4 border-soft-no-pad p-0">
+            <div className="form-group">
+              <label className="label-micro">Ordering Cost (₱)</label>
+              <input type="number" id="edit-orderingCost" className="form-input font-mono" value={formData.orderingCost ?? 100} onChange={handleChange} min="0" step="0.01" />
+            </div>
+            <div className="form-group">
+              <label className="label-micro">Holding Cost / Year (₱)</label>
+              <input type="number" id="edit-holdingCost" className="form-input font-mono" value={formData.holdingCost ?? 0} onChange={handleChange} min="0" step="0.01" />
+            </div>
+            <div className="form-group">
+              <label className="label-micro">Lead Time (Days)</label>
+              <input type="number" id="edit-leadTimeDays" className="form-input font-mono" value={formData.leadTimeDays ?? 7} onChange={handleChange} min="0" step="1" />
+            </div>
+            <div className="form-group">
+              <label className="label-micro">Safety Stock</label>
+              <input type="number" id="edit-safetyStock" className="form-input font-mono" value={formData.safetyStock ?? 0} onChange={handleChange} min="0" step="1" />
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="grid-3 border-soft-no-pad p-0">
         <div className="form-group">

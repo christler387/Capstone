@@ -19,6 +19,10 @@ export interface Item {
   weight?: ItemWeight;
   demand?: DemandLevel;
   compatibleVehicles?: string;
+  orderingCost?: number;
+  holdingCost?: number;
+  leadTimeDays?: number;
+  safetyStock?: number;
 }
 
 export interface Movement {
