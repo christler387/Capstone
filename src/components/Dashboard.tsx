@@ -137,10 +137,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
               const isIn = m.type === 'IN';
               return (
                 <div key={m.id} className="flex-row-between border-soft cursor-pointer" onClick={() => onGoToStock(m.itemId)}>
-                  <span className="label-micro opacity-80" style={{ textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{item?.name || m.itemId}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="label-micro opacity-80" style={{ display: 'block', textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item?.name || m.itemId}</span>
+                    <span className="label-micro font-mono opacity-50" style={{ display: 'block', fontSize: '9px', marginTop: '2px' }}>By: {m.createdBy || 'Unknown'}</span>
+                  </div>
                   <div className="flex-row-gap" style={{ gap: '0.5rem', flexShrink: 0 }}>
                     <span className={`label-micro ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontSize: '10px', fontWeight: 'bold' }}>{m.type}</span>
-                    <span className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontWeight: 'bold' }}>{isIn ? '+' : '-'}{m.qty}</span>
+                    <span className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontWeight: 'bold', opacity: 1 }}>{isIn ? '+' : '-'}{m.qty}</span>
                     <span className="label-micro font-mono opacity-50" style={{ fontSize: '10px' }}>{date}</span>
                   </div>
                 </div>

@@ -38,6 +38,8 @@ const App: React.FC = () => {
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -56,11 +58,15 @@ const App: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const handleLoginSuccess = (username: string, role: UserRole) => {
+  const handleLoginSuccess = (username: string, role: UserRole, email?: string | null, phone?: string | null) => {
     localStorage.setItem('skyrun_session_user', username);
     localStorage.setItem('skyrun_session_role', role);
+    localStorage.setItem('skyrun_session_email', email || '');
+    localStorage.setItem('skyrun_session_phone', phone || '');
     setUser(username);
     setUserRole(role);
+    setUserEmail(email || null);
+    setUserPhone(phone || null);
   };
 
   const handleSwitchRole = (newRole: UserRole, newName: string) => {
@@ -73,8 +79,12 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('skyrun_session_user');
     localStorage.removeItem('skyrun_session_role');
+    localStorage.removeItem('skyrun_session_email');
+    localStorage.removeItem('skyrun_session_phone');
     setUser(null);
     setUserRole('staff');
+    setUserEmail(null);
+    setUserPhone(null);
     setCurrentSection('dashboard');
   };
 
@@ -102,10 +112,10 @@ const App: React.FC = () => {
     setUser(updatedUser.username);
   };
 
-  const handleCreateUser = async (username: string, password: string, role: UserRole, displayName?: string) => {
+  const handleCreateUser = async (username: string, password: string, role: UserRole, email?: string, phone?: string) => {
     await requestJson<{ ok: boolean; username: string }>('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, password, role, displayName }),
+      body: JSON.stringify({ username, password, role, email, phone }),
     });
   };
   
@@ -283,6 +293,7 @@ const App: React.FC = () => {
             onAddItem={handleAddItem}
             selectedItemId={stockToItem}
             userRole={userRole}
+            userName={user || undefined}
           />
         );
       case 'warehouse': 
@@ -303,6 +314,8 @@ const App: React.FC = () => {
           <UserProfile 
             user={user || (userRole === 'staff' ? 'Warehouse Staff' : 'Administrator')} 
             role={userRole}
+            email={userEmail || undefined}
+            phone={userPhone || undefined}
             movements={movements} 
             inventory={inventory} 
             inventoryAudit={inventoryAudit}
@@ -370,6 +383,28 @@ const App: React.FC = () => {
       </Modal>
     </>
   );
+
+  useEffect(() => {
+    const isDesktopLaunch = new URLSearchParams(window.location.search).has('desktop');
+    if (isDesktopLaunch) {
+      localStorage.removeItem('skyrun_session_user');
+      localStorage.removeItem('skyrun_session_role');
+      localStorage.removeItem('skyrun_session_email');
+      localStorage.removeItem('skyrun_session_phone');
+    }
+
+    const savedUser = localStorage.getItem('skyrun_session_user');
+    const savedRole = localStorage.getItem('skyrun_session_role') as UserRole | null;
+    const savedEmail = localStorage.getItem('skyrun_session_email');
+    const savedPhone = localStorage.getItem('skyrun_session_phone');
+
+    if (savedUser) {
+      setUser(savedUser);
+      setUserRole(savedRole === 'admin' || savedRole === 'staff' ? savedRole : 'staff');
+      setUserEmail(savedEmail || null);
+      setUserPhone(savedPhone || null);
+    }
+  }, []);
 
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;

@@ -9,6 +9,7 @@ interface StockProps {
   onAddItem: (rack?: string) => void;
   selectedItemId?: string;
   userRole?: UserRole;
+  userName?: string;
 }
 
 
@@ -17,7 +18,8 @@ export const Stock: React.FC<StockProps> = ({
   onAddMovement, 
   onAddItem, 
   selectedItemId, 
-  userRole = 'staff' 
+  userRole = 'staff',
+  userName
 }) => {
 
 
@@ -94,7 +96,8 @@ export const Stock: React.FC<StockProps> = ({
       type: type.toUpperCase() as 'IN' | 'OUT',
       qty: formData.qty,
       date: new Date().toISOString().split('T')[0],
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      createdBy: userName || undefined
     };
     setPendingMovement(movement);
   };

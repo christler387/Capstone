@@ -32,6 +32,7 @@ export interface Movement {
   qty: number;
   date: string;
   timestamp: number;
+  createdBy?: string;
 }
 
 export type InventoryAuditAction = 'ADD' | 'DELETE';

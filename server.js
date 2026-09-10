@@ -3,6 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
@@ -36,8 +40,20 @@ const inventorySeed = [
 ];
 
 const defaultUsers = [
-  ['admin', 'admin123', 'admin'],
-  ['staff', 'staff123', 'staff'],
+  {
+    username: 'admin',
+    password: 'admin123',
+    role: 'admin',
+    email: 'admin@autosupply.local',
+    phone: '+60123456789',
+  },
+  {
+    username: 'staff',
+    password: 'staff123',
+    role: 'staff',
+    email: 'staff@autosupply.local',
+    phone: '+60123456790',
+  },
 ];
 
 const movementSeed = [
@@ -93,14 +109,18 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT movements_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query('ALTER TABLE movements ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL AFTER movement_date');
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(128) NOT NULL,
     role ENUM('admin', 'staff') NOT NULL,
-    display_name VARCHAR(128) NOT NULL,
+    email VARCHAR(255) NULL,
+    phone VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) NULL');
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(64) NULL');
 
   await pool.query('SET FOREIGN_KEY_CHECKS = 0');
   await pool.query("UPDATE movements SET item_id = REPLACE(item_id, 'STK-', '') WHERE item_id LIKE 'STK-%'");
@@ -109,13 +129,14 @@ async function initializeDatabase() {
 
   const [[userCount]] = await pool.query('SELECT COUNT(*) AS count FROM users');
   if (userCount.count === 0) {
-    const userEntries = defaultUsers.map(([username, password, role]) => [
+    const userEntries = defaultUsers.map(({ username, password, role, email, phone }) => [
       username,
       crypto.createHash('sha256').update(password).digest('hex'),
       role,
-      role === 'admin' ? 'Administrator' : 'Warehouse Staff',
+      email,
+      phone,
     ]);
-    await pool.query('INSERT INTO users (username, password_hash, role, display_name) VALUES ?', [userEntries]);
+    await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES ?', [userEntries]);
   }
 
   const [[inventoryCount]] = await pool.query('SELECT COUNT(*) AS count FROM inventory');
@@ -157,7 +178,7 @@ function toMovement(row) {
     ? row.movement_date.toISOString().slice(0, 10)
     : String(row.movement_date).slice(0, 10);
   const timestamp = row.created_at ? new Date(row.created_at).getTime() : new Date(date).getTime();
-  return { id: row.id, itemId: row.item_id, type: row.type, qty: Number(row.qty), date, timestamp };
+  return { id: row.id, itemId: row.item_id, type: row.type, qty: Number(row.qty), date, timestamp, createdBy: row.created_by || undefined };
 }
 
 function hashPassword(password) {
@@ -169,6 +190,20 @@ function normalizeItemId(value) {
   return /^\d+$/.test(id) ? String(Number(id)).padStart(3, '0') : id;
 }
 
+function normalizeOptionalText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeEmail(value) {
+  const email = normalizeOptionalText(value);
+  return email ? email.toLowerCase() : null;
+}
+
+function normalizePhone(value) {
+  const phone = normalizeOptionalText(value);
+  return phone || null;
+}
+
 app.get('/api/health', async (_req, res) => {
   const connection = await pool.getConnection();
   connection.release();
@@ -176,12 +211,12 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.get('/api/users', async (_req, res) => {
-  const [rows] = await pool.query('SELECT id, username, role, display_name FROM users ORDER BY username');
+  const [rows] = await pool.query('SELECT id, username, role, email, phone FROM users ORDER BY username');
   res.json(rows);
 });
 
 app.post('/api/users', async (req, res) => {
-  const { username, password, role, displayName } = req.body || {};
+  const { username, password, role, email, phone } = req.body || {};
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required.' });
@@ -190,7 +225,8 @@ app.post('/api/users', async (req, res) => {
   const normalizedUsername = String(username).trim();
   const normalizedPassword = String(password).trim();
   const safeRole = (role === 'admin' ? 'admin' : 'staff');
-  const displayNameValue = String(displayName || normalizedUsername).trim() || normalizedUsername;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPhone = normalizePhone(phone);
 
   if (normalizedUsername.length < 3) {
     return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
@@ -200,19 +236,28 @@ app.post('/api/users', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
   }
 
+  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'Please provide a valid email address.' });
+  }
+
+  if (normalizedPhone && normalizedPhone.length < 7) {
+    return res.status(400).json({ error: 'Please provide a valid phone number.' });
+  }
+
   const [[existing]] = await pool.query('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedUsername]);
   if (existing.count > 0) {
     return res.status(409).json({ error: 'That username already exists.' });
   }
 
-  await pool.query('INSERT INTO users (username, password_hash, role, display_name) VALUES (?, ?, ?, ?)', [
+  await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES (?, ?, ?, ?, ?)', [
     normalizedUsername,
     hashPassword(normalizedPassword),
     safeRole,
-    displayNameValue,
+    normalizedEmail,
+    normalizedPhone,
   ]);
 
-  res.status(201).json({ ok: true, username: normalizedUsername });
+  res.status(201).json({ ok: true, username: normalizedUsername, email: normalizedEmail, phone: normalizedPhone });
 });
 
 app.put('/api/users/change-password', async (req, res) => {
@@ -283,7 +328,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   const normalizedUsername = String(username).trim();
-  const [rows] = await pool.query('SELECT username, role, display_name FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1', [normalizedUsername, hashPassword(String(password))]);
+  const [rows] = await pool.query('SELECT username, role, email, phone FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1', [normalizedUsername, hashPassword(String(password))]);
 
   if (rows.length === 0) {
     return res.status(401).json({ error: 'Invalid login details.' });
@@ -293,7 +338,8 @@ app.post('/api/login', async (req, res) => {
   res.json({
     username: user.username,
     role: user.role,
-    displayName: user.display_name,
+    email: user.email,
+    phone: user.phone,
   });
 });
 
@@ -347,7 +393,7 @@ app.post('/api/movements', async (req, res) => {
   try {
     await connection.beginTransaction();
     const delta = movement.type === 'IN' ? movement.qty : -movement.qty;
-    await connection.query('INSERT INTO movements (id, item_id, type, qty, movement_date) VALUES (?, ?, ?, ?, ?)', [id, movement.itemId, movement.type, movement.qty, date]);
+    await connection.query('INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, ?, ?, ?, ?)', [id, movement.itemId, movement.type, movement.qty, date, movement.createdBy || null]);
     await connection.query('UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?', [delta, movement.itemId]);
     await connection.commit();
     res.status(201).json({ ...movement, id, date, timestamp: Date.now() });
@@ -376,6 +422,11 @@ app.delete('/api/movements/:id', async (req, res) => {
   } finally {
     connection.release();
   }
+});
+
+app.use(express.static(path.join(__dirname, 'dist')));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.use((error, _req, res, _next) => {

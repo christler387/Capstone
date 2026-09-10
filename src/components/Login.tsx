@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface LoginProps {
-  onLoginSuccess: (username: string, role: 'admin' | 'staff') => void;
+  onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string | null, phone?: string | null) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -37,7 +37,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         throw new Error(data?.error || 'Invalid login details. Try admin/admin123 or staff/staff123');
       }
 
-      onLoginSuccess(data.username || inputUser, data.role);
+      onLoginSuccess(data.username || inputUser, data.role, data.email || null, data.phone || null);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Unable to log in right now.');
     } finally {
