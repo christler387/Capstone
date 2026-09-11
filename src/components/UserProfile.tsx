@@ -158,8 +158,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       return;
     }
 
-    if (normalizedUsername.length < 3) {
-      setUsernameFeedback({ type: 'error', message: 'Username must be at least 3 characters long.' });
+    if (normalizedUsername.length < 5) {
+      setUsernameFeedback({ type: 'error', message: 'Username must be at least 5 characters long.' });
       return;
     }
 

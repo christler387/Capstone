@@ -3,8 +3,7 @@ import { Item, Movement } from '../types';
 import { Modal } from './Modal';
 import { isAtReorderPoint } from '../inventoryMetrics';
 
-// ============================================================================
-// ============================================================================
+
 const ZONES = [
   { id: 'A', name: 'AISLE A: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 8, color: '#3B82F6' },
   { id: 'B', name: 'AISLE B: Mechanical & Brakes', desc: 'Engine, Brakes & Suspension', racks: 8, color: '#A855F7' },
@@ -33,8 +32,8 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   onClearInitialRack,
   userRole = 'staff'
 }) => {
-  // ============================================================================
-  // ============================================================================
+
+
   const [selectedRack, setSelectedRack] = useState<{ zoneId: string, rackId: string } | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizationResult, setOptimizationResult] = useState<{
@@ -48,8 +47,8 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ============================================================================
-  // ============================================================================
+
+
   const normalizeRack = (r: string | undefined) => r ? r.replace(/-/g, '').toUpperCase() : '';
 
   const getStockOutQty = (item: Item): number => {
@@ -66,8 +65,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     return item.demand || 'LOW';
   };
 
-  // ============================================================================
-  // ============================================================================
+
   const runOptimization = async () => {
     setIsOptimizing(true);
     setError(null);
@@ -153,8 +151,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     setOptimizationResult(null);
   };
 
-  // ============================================================================
-  // ============================================================================
+
   useEffect(() => {
     if (initialRack) {
       const zoneId = initialRack.charAt(0).toUpperCase();
@@ -163,8 +160,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     }
   }, [initialRack, onClearInitialRack]);
 
-  // ============================================================================
-  // ============================================================================
+
   const aisleData = ['A', 'B', 'C', 'D'].map(id => {
     const aisleItems = inventory.filter(i => (i.rack || '').toUpperCase().startsWith(id));
     const sizeCapacity = { SMALL: 0.25, MEDIUM: 1, LARGE: 2 } as const;
@@ -185,8 +181,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     return { id, totalQty, uniqueItems, density, statusClass, statusText };
   });
 
-  // ============================================================================
-  // ============================================================================
+
   const InspectionModal = () => {
     if (!selectedRack) return null;
     return (
@@ -242,8 +237,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     );
   };
 
-  // ============================================================================
-  // ============================================================================
+
   return (
     <div className="content-section">
       {error && <div className="dash-card mb-4 border-accent p-3 text-accent label-micro text-center">{error}</div>}
