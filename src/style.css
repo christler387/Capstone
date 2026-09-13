@@ -1204,6 +1204,18 @@ footer p {
   border-radius: 8px !important;
 }
 
+.reorder-report-row {
+  transition: background-color 0.2s ease, border-radius 0.2s ease;
+  border-radius: 8px;
+  padding: 0.5rem 0.875rem !important;
+  margin: 0 -0.875rem;
+  cursor: pointer;
+}
+
+.reorder-report-row:hover {
+  background-color: rgba(20, 20, 20, 0.05);
+}
+
 .mt-2 { margin-top: 0.5rem; }
 .mt-4 { margin-top: 1rem; }
 .mb-4 { margin-bottom: 1rem; }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Item, Movement } from '../types';
-import { isAtReorderPoint } from '../inventoryMetrics';
+import { getEoq, getReorderQuantity, getRop, isAtReorderPoint } from '../inventoryMetrics';
 
 const API_BASE = '/api';
 
@@ -53,6 +53,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   }, {} as Record<string, { qty: number, val: number }>);
 
   const recentMovements = [...movements].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+  const reorderReport = inventory
+    .map(item => ({
+      item,
+      eoq: getEoq(item, movements),
+      rop: getRop(item, movements),
+      reorderQty: getReorderQuantity(item, movements),
+    }))
+    .filter(({ eoq, rop, reorderQty }) => eoq > 0 || rop > 0 || reorderQty > 0)
+    .sort((a, b) => {
+      if (a.reorderQty !== b.reorderQty) return b.reorderQty - a.reorderQty;
+      return b.item.quantity - a.item.quantity;
+    })
+    .slice(0, 5);
 
   const generateInsights = async () => {
     setIsLoadingInsight(true);
@@ -129,28 +142,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
             <p className="label-micro opacity-30">All stock levels optimal.</p>
           )}
         </SectionCard>
-        <SectionCard title="Recent Movements">
-          {recentMovements.length > 0 ? (
-            recentMovements.map(m => {
-              const item = inventory.find(i => i.id === m.itemId);
-              const date = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
-              const isIn = m.type === 'IN';
-              return (
-                <div key={m.id} className="flex-row-between border-soft cursor-pointer" onClick={() => onGoToStock(m.itemId)}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span className="label-micro opacity-80" style={{ display: 'block', textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item?.name || m.itemId}</span>
-                    <span className="label-micro font-mono opacity-50" style={{ display: 'block', fontSize: '9px', marginTop: '2px' }}>By: {m.createdBy || 'Unknown'}</span>
-                  </div>
-                  <div className="flex-row-gap" style={{ gap: '0.5rem', flexShrink: 0 }}>
-                    <span className={`label-micro ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontSize: '10px', fontWeight: 'bold' }}>{m.type}</span>
-                    <span className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontWeight: 'bold', opacity: 1 }}>{isIn ? '+' : '-'}{m.qty}</span>
-                    <span className="label-micro font-mono opacity-50" style={{ fontSize: '10px' }}>{date}</span>
-                  </div>
+        <SectionCard title="EOQ & ROP Reorder Report">
+          {reorderReport.length > 0 ? (
+            reorderReport.map(({ item, eoq, rop, reorderQty }) => (
+              <div key={item.id} className="flex-row-between border-soft reorder-report-row" onClick={() => onGoToStock(item.id)}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="label-micro opacity-80" style={{ display: 'block', textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.name}</span>
+                  <span className="label-micro font-mono opacity-50" style={{ display: 'block', fontSize: '9px', marginTop: '2px' }}>
+                    EOQ {Math.ceil(eoq || 0)} • ROP {Math.ceil(rop || 0)}
+                  </span>
                 </div>
-              );
-            })
+                <div className="flex-col-end" style={{ flexShrink: 0 }}>
+                  <span className={`label-micro font-mono ${reorderQty > 0 ? 'text-accent' : 'text-success'}`} style={{ fontWeight: 'bold' }}>
+                    {reorderQty > 0 ? `BUY ${reorderQty}` : 'OK'}
+                  </span>
+                </div>
+              </div>
+            ))
           ) : (
-            <p className="label-micro opacity-30">No recent movements recorded.</p>
+            <p className="label-micro opacity-30">No reorder data available.</p>
           )}
         </SectionCard>
       </div>
