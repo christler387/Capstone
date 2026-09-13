@@ -8,9 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const app = express();
+/** @type {import('express').Express} */
+export const app = express();
 const port = Number(process.env.API_PORT || 3001);
-const pool = mysql.createPool({
+export const pool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER || 'root',
@@ -434,9 +435,16 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Database request failed' });
 });
 
-initializeDatabase()
-  .then(() => app.listen(port, () => console.log(`API listening on http://localhost:${port}`)))
-  .catch((error) => {
+export async function startServer() {
+  await initializeDatabase();
+  app.listen(port, () => console.log(`API listening on http://localhost:${port}`));
+}
+
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  startServer().catch((error) => {
     console.error('Database initialization failed:', error.message);
     process.exit(1);
   });
+}

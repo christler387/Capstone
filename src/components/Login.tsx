@@ -80,7 +80,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="flex-col-gap" style={{ gap: '1.25rem' }}>
+        <form noValidate onSubmit={handleLogin} className="flex-col-gap" style={{ gap: '1.25rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="label-micro" htmlFor="username">Username</label>
             <input 

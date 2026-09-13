@@ -11,7 +11,9 @@
     "build": "tsc -b && vite build",
     "desktop": "npm run build && electron .",
     "desktop:dist": "npm run build && electron-builder",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -26,12 +28,19 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@types/supertest": "^7.2.1",
+    "concurrently": "^9.1.2",
     "electron": "^38.0.0",
     "electron-builder": "^26.0.0",
-    "concurrently": "^9.1.2",
-    "typescript": "latest"
+    "jsdom": "^29.1.1",
+    "supertest": "^7.2.2",
+    "typescript": "latest",
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "qs": "6.16.0"
