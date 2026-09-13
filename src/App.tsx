@@ -36,10 +36,10 @@ const App: React.FC = () => {
   const [movements, setMovements] = useState<Movement[]>(SEED_MOVEMENTS);
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
-  const [user, setUser] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('staff');
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [user, setUser] = useState<string | null>(() => localStorage.getItem('skyrun_session_user'));
+  const [userRole, setUserRole] = useState<UserRole>(() => (localStorage.getItem('skyrun_session_role') as UserRole) || 'staff');
+  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('skyrun_session_email') || null);
+  const [userPhone, setUserPhone] = useState<string | null>(() => localStorage.getItem('skyrun_session_phone') || null);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -112,10 +112,10 @@ const App: React.FC = () => {
     setUser(updatedUser.username);
   };
 
-  const handleCreateUser = async (username: string, password: string, role: UserRole, email?: string, phone?: string) => {
+  const handleCreateUser = async (username: string, password: string, role: UserRole) => {
     await requestJson<{ ok: boolean; username: string }>('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, password, role, email, phone }),
+      body: JSON.stringify({ username, password, role }),
     });
   };
   

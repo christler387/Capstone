@@ -60,4 +60,21 @@ describe('API backend', () => {
 
     expect(response.body).toMatchObject({ error: 'Invalid login details.' });
   });
+
+  it('ignores legacy email validation when creating a user', async () => {
+    mockPool.query.mockImplementation(async (sql) => {
+      if (sql.includes('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1')) {
+        return [[{ count: 0 }]];
+      }
+
+      return [[]];
+    });
+
+    const response = await request(app)
+      .post('/api/users')
+      .send({ username: 'adada', password: '12345', role: 'staff', email: 'not-an-email', phone: '1234567' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({ ok: true, username: 'adada' });
+  });
 });

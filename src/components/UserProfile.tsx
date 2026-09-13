@@ -47,8 +47,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [usernamePassword, setUsernamePassword] = useState('');
   const [createUserName, setCreateUserName] = useState('');
   const [createUserPassword, setCreateUserPassword] = useState('');
-  const [createUserEmail, setCreateUserEmail] = useState('');
-  const [createUserPhone, setCreateUserPhone] = useState('');
   const [createUserRole, setCreateUserRole] = useState<UserRole>('staff');
   const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [usernameFeedback, setUsernameFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
@@ -104,8 +102,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const clearCreateUserForm = () => {
     setCreateUserName('');
     setCreateUserPassword('');
-    setCreateUserEmail('');
-    setCreateUserPhone('');
     setCreateUserRole('staff');
     setCreateUserFeedback(null);
   };
@@ -189,11 +185,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     const username = createUserName.trim();
     const password = createUserPassword.trim();
-    const resolvedEmail = createUserEmail.trim();
-    const resolvedPhone = createUserPhone.trim();
 
-    if (!username || !password || !resolvedEmail || !resolvedPhone) {
-      setCreateUserFeedback({ type: 'error', message: 'All fields are required' });
+    if (!username || !password) {
+      setCreateUserFeedback({ type: 'error', message: 'Username and password are required.' });
       return;
     }
 
@@ -207,18 +201,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resolvedEmail)) {
-      setCreateUserFeedback({ type: 'error', message: 'Please provide a valid email address.' });
-      return;
-    }
-
-    if (resolvedPhone.length < 7) {
-      setCreateUserFeedback({ type: 'error', message: 'Please provide a valid phone number.' });
-      return;
-    }
-
     try {
-      await onCreateUser(username, password, createUserRole, username, resolvedEmail, resolvedPhone);
+      await onCreateUser(username, password, createUserRole, username, undefined, undefined);
       setCreateUserFeedback({ type: 'success', message: 'User created successfully.' });
       clearCreateUserForm();
       setTimeout(() => setIsCreateUserModalOpen(false), 500);
@@ -258,12 +242,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 <span className={`velocity-badge ${role === 'staff' ? 'velocity-low' : 'velocity-medium'}`} style={{ marginTop: '0.75rem', letterSpacing: '0.05em' }}>
                   {userRole}
                 </span>
-                {(email || phone) && (
-                  <div className="flex-col-gap" style={{ marginTop: '1rem', width: '100%', gap: '0.35rem', color: 'var(--muted)', fontSize: '12px' }}>
-                    {email && <span><i className="bx bx-envelope" style={{ marginRight: '6px' }}></i>{email}</span>}
-                    {phone && <span><i className="bx bx-phone" style={{ marginRight: '6px' }}></i>{phone}</span>}
-                  </div>
-                )}
 
               </div>
             </div>
@@ -528,14 +506,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="createUserPassword">Password</label>
             <input id="createUserPassword" className="form-input" type="password" value={createUserPassword} onChange={(e) => setCreateUserPassword(e.target.value)} placeholder="Create password" />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="createUserEmail">Email</label>
-            <input id="createUserEmail" className="form-input" type="email" value={createUserEmail} onChange={(e) => setCreateUserEmail(e.target.value)} placeholder="name@example.com" />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="createUserPhone">Phone</label>
-            <input id="createUserPhone" className="form-input" type="tel" value={createUserPhone} onChange={(e) => setCreateUserPhone(e.target.value)} placeholder="+60123456789" />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="createUserRole">Role</label>

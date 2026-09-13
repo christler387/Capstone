@@ -90,6 +90,7 @@ export const Stock: React.FC<StockProps> = ({
       return;
     }
 
+    const activeUserName = userName || localStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
     const movement: Movement = {
       id: `MOV-${Date.now()}`,
       itemId: formData.itemId,
@@ -97,7 +98,7 @@ export const Stock: React.FC<StockProps> = ({
       qty: formData.qty,
       date: new Date().toISOString().split('T')[0],
       timestamp: Date.now(),
-      createdBy: userName || undefined
+      createdBy: activeUserName
     };
     setPendingMovement(movement);
   };

@@ -58,9 +58,9 @@ const defaultUsers = [
 ];
 
 const movementSeed = [
-  ['MOV-1001', '004', 'OUT', 45, '2026-08-10'],
-  ['MOV-1002', '003', 'OUT', 35, '2026-08-11'],
-  ['MOV-1003', '001', 'OUT', 28, '2026-08-12'],
+  ['MOV-1001', '004', 'OUT', 45, '2026-08-10', 'Warehouse Staff'],
+  ['MOV-1002', '003', 'OUT', 35, '2026-08-11', 'Warehouse Staff'],
+  ['MOV-1003', '001', 'OUT', 28, '2026-08-12', 'Warehouse Staff'],
 ];
 
 async function initializeDatabase() {
@@ -111,6 +111,7 @@ async function initializeDatabase() {
     CONSTRAINT movements_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   await pool.query('ALTER TABLE movements ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL AFTER movement_date');
+  await pool.query("UPDATE movements SET created_by = COALESCE(created_by, 'Warehouse Staff') WHERE created_by IS NULL");
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(64) NOT NULL UNIQUE,
@@ -148,7 +149,7 @@ async function initializeDatabase() {
   }
   const [[movementCount]] = await pool.query('SELECT COUNT(*) AS count FROM movements');
   if (movementCount.count === 0) {
-    await pool.query('INSERT INTO movements (id, item_id, type, qty, movement_date) VALUES ?', [movementSeed]);
+    await pool.query('INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES ?', [movementSeed]);
   }
 }
 
@@ -217,7 +218,7 @@ app.get('/api/users', async (_req, res) => {
 });
 
 app.post('/api/users', async (req, res) => {
-  const { username, password, role, email, phone } = req.body || {};
+  const { username, password, role } = req.body || {};
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required.' });
@@ -226,8 +227,6 @@ app.post('/api/users', async (req, res) => {
   const normalizedUsername = String(username).trim();
   const normalizedPassword = String(password).trim();
   const safeRole = (role === 'admin' ? 'admin' : 'staff');
-  const normalizedEmail = normalizeEmail(email);
-  const normalizedPhone = normalizePhone(phone);
 
   if (normalizedUsername.length < 3) {
     return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
@@ -237,28 +236,18 @@ app.post('/api/users', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
   }
 
-  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-    return res.status(400).json({ error: 'Please provide a valid email address.' });
-  }
-
-  if (normalizedPhone && normalizedPhone.length < 7) {
-    return res.status(400).json({ error: 'Please provide a valid phone number.' });
-  }
-
   const [[existing]] = await pool.query('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedUsername]);
   if (existing.count > 0) {
     return res.status(409).json({ error: 'That username already exists.' });
   }
 
-  await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES (?, ?, ?, ?, ?)', [
+  await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES (?, ?, ?, NULL, NULL)', [
     normalizedUsername,
     hashPassword(normalizedPassword),
     safeRole,
-    normalizedEmail,
-    normalizedPhone,
   ]);
 
-  res.status(201).json({ ok: true, username: normalizedUsername, email: normalizedEmail, phone: normalizedPhone });
+  res.status(201).json({ ok: true, username: normalizedUsername });
 });
 
 app.put('/api/users/change-password', async (req, res) => {
