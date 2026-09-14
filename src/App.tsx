@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { InventoryAuditEntry, Item, Movement, UserRole } from './types';
-import { SEED_DATA, SEED_MOVEMENTS } from './data';
 import { Modal } from './components/Modal';
 
 const API_BASE = '/api';
@@ -32,8 +31,8 @@ import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
 
 const App: React.FC = () => {
-  const [inventory, setInventory] = useState<Item[]>(SEED_DATA);
-  const [movements, setMovements] = useState<Movement[]>(SEED_MOVEMENTS);
+  const [inventory, setInventory] = useState<Item[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [user, setUser] = useState<string | null>(() => localStorage.getItem('skyrun_session_user'));

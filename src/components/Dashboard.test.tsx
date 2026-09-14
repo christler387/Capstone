@@ -31,4 +31,21 @@ describe('Dashboard', () => {
     expect(screen.getAllByText(/ROP/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/EOQ/i).length).toBeGreaterThan(0);
   });
+
+  it('excludes items that do not need reordering', () => {
+    const inventory = [
+      {
+        id: 'item-ok',
+        name: 'Healthy Stock Item',
+        category: 'ENGINE',
+        rack: 'A1',
+        quantity: 100,
+        price: 75,
+      },
+    ];
+
+    render(<Dashboard inventory={inventory} movements={[]} onGoToStock={vi.fn()} />);
+
+    expect(screen.queryByText('Healthy Stock Item')).not.toBeInTheDocument();
+  });
 });

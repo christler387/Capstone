@@ -60,7 +60,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
       rop: getRop(item, movements),
       reorderQty: getReorderQuantity(item, movements),
     }))
-    .filter(({ eoq, rop, reorderQty }) => eoq > 0 || rop > 0 || reorderQty > 0)
+    .filter(({ reorderQty }) => reorderQty > 0)
     .sort((a, b) => {
       if (a.reorderQty !== b.reorderQty) return b.reorderQty - a.reorderQty;
       return b.item.quantity - a.item.quantity;
@@ -153,8 +153,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
                   </span>
                 </div>
                 <div className="flex-col-end" style={{ flexShrink: 0 }}>
-                  <span className={`label-micro font-mono ${reorderQty > 0 ? 'text-accent' : 'text-success'}`} style={{ fontWeight: 'bold' }}>
-                    {reorderQty > 0 ? `BUY ${reorderQty}` : 'OK'}
+                  <span className="label-micro font-mono text-accent" style={{ fontWeight: 'bold' }}>
+                    BUY {reorderQty}
                   </span>
                 </div>
               </div>
