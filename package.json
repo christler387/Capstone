@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "server": "node server.js",
+    "start": "node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "build": "tsc -b && vite build",
     "desktop": "npm run build && electron .",
