@@ -1,78 +1,249 @@
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import mysql from 'mysql2/promise';
-import crypto from 'node:crypto';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import mysql from "mysql2/promise";
+import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('express').Express} */
 export const app = express();
-const port = Number(process.env.API_PORT || 3001);
+const port = Number(process.env.API_PORT || process.env.APP_PORT || 3001);
 export const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'skyrun',
+  host: process.env.MYSQLHOST || process.env.DB_HOST || "127.0.0.1",
+  port: Number(process.env.MYSQLPORT || process.env.DB_PORT || 3306),
+  user: process.env.MYSQLUSER || process.env.DB_USER || "root",
+  password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || "",
+  database: process.env.MYSQLDATABASE || process.env.DB_NAME || "skyrun",
   waitForConnections: true,
   connectionLimit: 10,
   decimalNumbers: true,
 });
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+
+// Health check
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "Skyrun API is running",
+  });
+});
+
+// Your other API routes below
+app.get("/api/...", (req, res) => {
+  // ...
+});
 
 const inventorySeed = [
-  ['001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
-  ['002', 'High Performance Rotors', 'BRAKES', '4801234567891', 12, 4200, 'B-04', 'L1', 'LARGE', 'HEAVY', 'MEDIUM', 'Mitsubishi Lancer EX, Subaru WRX'],
-  ['003', 'Synthetic Oil Filter', 'ENGINE', '4801234567892', 85, 450, 'A-02', 'L4', 'SMALL', 'LIGHT', 'HIGH', 'Toyota Corolla Altis, Mitsubishi Mirage'],
-  ['004', 'Iridium Spark Plugs', 'ENGINE', '4801234567893', 120, 350, 'A-03', 'L4', 'SMALL', 'LIGHT', 'HIGH', 'Honda Civic, Suzuki Swift'],
-  ['005', 'Gas-Charged Shock Absorber', 'SUSPENSION', '4801234567894', 18, 3800, 'B-02', 'L2', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'Hyundai Accent, Kia Rio'],
-  ['006', 'Front Control Arm Left', 'SUSPENSION', '4801234567895', 6, 5200, 'B-01', 'L1', 'MEDIUM', 'HEAVY', 'LOW', 'Nissan Almera, Mazda 3'],
-  ['007', 'LED Headlight Bulb H4', 'ELECTRICAL', '4801234567896', 40, 1200, 'A-04', 'L3', 'SMALL', 'LIGHT', 'HIGH', 'Universal H4 Sockets (Vios, Mirage, Wigo)'],
-  ['008', '120A High Output Alternator', 'ELECTRICAL', '4801234567897', 4, 9500, 'C-01', 'L1', 'MEDIUM', 'HEAVY', 'LOW', 'Toyota Fortuner, Hilux D-4D'],
-  ['009', 'Front Fender Panel', 'BODY', '4801234567898', 5, 4500, 'C-02', 'L3', 'LARGE', 'MEDIUM', 'LOW', 'Honda Civic EF/EG/EK'],
-  ['010', 'Rear Bumper Cover', 'BODY', '4801234567899', 3, 6800, 'D-03', 'L1', 'LARGE', 'HEAVY', 'LOW', 'Toyota Wigo 2017-2022'],
-  ['011', 'ATF Transmission Fluid', 'TRANSMISSION', '4801234567900', 60, 850, 'A-05', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota, Honda, Mitsubishi Automatic Transmissions'],
-  ['012', 'Heavy Duty Clutch Kit', 'TRANSMISSION', '4801234567901', 8, 12500, 'D-01', 'L1', 'LARGE', 'HEAVY', 'MEDIUM', 'Mitsubishi Triton/L200, Isuzu D-Max'],
+  [
+    "001",
+    "Ceramic Brake Pads (Set)",
+    "BRAKES",
+    "4801234567890",
+    25,
+    2450,
+    "A-01",
+    "L2",
+    "MEDIUM",
+    "MEDIUM",
+    "HIGH",
+    "Toyota Vios 2014-2020, Honda City 2012-2019",
+  ],
+  [
+    "002",
+    "High Performance Rotors",
+    "BRAKES",
+    "4801234567891",
+    12,
+    4200,
+    "B-04",
+    "L1",
+    "LARGE",
+    "HEAVY",
+    "MEDIUM",
+    "Mitsubishi Lancer EX, Subaru WRX",
+  ],
+  [
+    "003",
+    "Synthetic Oil Filter",
+    "ENGINE",
+    "4801234567892",
+    85,
+    450,
+    "A-02",
+    "L4",
+    "SMALL",
+    "LIGHT",
+    "HIGH",
+    "Toyota Corolla Altis, Mitsubishi Mirage",
+  ],
+  [
+    "004",
+    "Iridium Spark Plugs",
+    "ENGINE",
+    "4801234567893",
+    120,
+    350,
+    "A-03",
+    "L4",
+    "SMALL",
+    "LIGHT",
+    "HIGH",
+    "Honda Civic, Suzuki Swift",
+  ],
+  [
+    "005",
+    "Gas-Charged Shock Absorber",
+    "SUSPENSION",
+    "4801234567894",
+    18,
+    3800,
+    "B-02",
+    "L2",
+    "MEDIUM",
+    "MEDIUM",
+    "MEDIUM",
+    "Hyundai Accent, Kia Rio",
+  ],
+  [
+    "006",
+    "Front Control Arm Left",
+    "SUSPENSION",
+    "4801234567895",
+    6,
+    5200,
+    "B-01",
+    "L1",
+    "MEDIUM",
+    "HEAVY",
+    "LOW",
+    "Nissan Almera, Mazda 3",
+  ],
+  [
+    "007",
+    "LED Headlight Bulb H4",
+    "ELECTRICAL",
+    "4801234567896",
+    40,
+    1200,
+    "A-04",
+    "L3",
+    "SMALL",
+    "LIGHT",
+    "HIGH",
+    "Universal H4 Sockets (Vios, Mirage, Wigo)",
+  ],
+  [
+    "008",
+    "120A High Output Alternator",
+    "ELECTRICAL",
+    "4801234567897",
+    4,
+    9500,
+    "C-01",
+    "L1",
+    "MEDIUM",
+    "HEAVY",
+    "LOW",
+    "Toyota Fortuner, Hilux D-4D",
+  ],
+  [
+    "009",
+    "Front Fender Panel",
+    "BODY",
+    "4801234567898",
+    5,
+    4500,
+    "C-02",
+    "L3",
+    "LARGE",
+    "MEDIUM",
+    "LOW",
+    "Honda Civic EF/EG/EK",
+  ],
+  [
+    "010",
+    "Rear Bumper Cover",
+    "BODY",
+    "4801234567899",
+    3,
+    6800,
+    "D-03",
+    "L1",
+    "LARGE",
+    "HEAVY",
+    "LOW",
+    "Toyota Wigo 2017-2022",
+  ],
+  [
+    "011",
+    "ATF Transmission Fluid",
+    "TRANSMISSION",
+    "4801234567900",
+    60,
+    850,
+    "A-05",
+    "L2",
+    "MEDIUM",
+    "MEDIUM",
+    "HIGH",
+    "Toyota, Honda, Mitsubishi Automatic Transmissions",
+  ],
+  [
+    "012",
+    "Heavy Duty Clutch Kit",
+    "TRANSMISSION",
+    "4801234567901",
+    8,
+    12500,
+    "D-01",
+    "L1",
+    "LARGE",
+    "HEAVY",
+    "MEDIUM",
+    "Mitsubishi Triton/L200, Isuzu D-Max",
+  ],
 ];
 
 const defaultUsers = [
   {
-    username: 'admin',
-    password: 'admin123',
-    role: 'admin',
-    email: 'admin@autosupply.local',
-    phone: '+60123456789',
+    username: "admin",
+    password: "admin123",
+    role: "admin",
+    email: "admin@autosupply.local",
+    phone: "+60123456789",
   },
   {
-    username: 'staff',
-    password: 'staff123',
-    role: 'staff',
-    email: 'staff@autosupply.local',
-    phone: '+60123456790',
+    username: "staff",
+    password: "staff123",
+    role: "staff",
+    email: "staff@autosupply.local",
+    phone: "+60123456790",
   },
 ];
 
 const movementSeed = [
-  ['MOV-1001', '004', 'OUT', 45, '2026-08-10', 'Warehouse Staff'],
-  ['MOV-1002', '003', 'OUT', 35, '2026-08-11', 'Warehouse Staff'],
-  ['MOV-1003', '001', 'OUT', 28, '2026-08-12', 'Warehouse Staff'],
+  ["MOV-1001", "004", "OUT", 45, "2026-08-10", "Warehouse Staff"],
+  ["MOV-1002", "003", "OUT", 35, "2026-08-11", "Warehouse Staff"],
+  ["MOV-1003", "001", "OUT", 28, "2026-08-12", "Warehouse Staff"],
 ];
 
 async function initializeDatabase() {
   const adminPool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
+    host: process.env.DB_HOST || "127.0.0.1",
     port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASSWORD || "",
     waitForConnections: true,
     connectionLimit: 2,
   });
-  await adminPool.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || 'skyrun'}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await adminPool.query(
+    `CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || "skyrun"}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  );
   await adminPool.end();
 
   await pool.query(`CREATE TABLE IF NOT EXISTS inventory (
@@ -96,11 +267,21 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS lead_time_days INT NOT NULL DEFAULT 7');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INT NOT NULL DEFAULT 10');
-  await pool.query('UPDATE inventory SET holding_cost = price * 0.2 WHERE holding_cost = 0');
+  await pool.query(
+    "ALTER TABLE inventory ADD COLUMN IF NOT EXISTS ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100",
+  );
+  await pool.query(
+    "ALTER TABLE inventory ADD COLUMN IF NOT EXISTS holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0",
+  );
+  await pool.query(
+    "ALTER TABLE inventory ADD COLUMN IF NOT EXISTS lead_time_days INT NOT NULL DEFAULT 7",
+  );
+  await pool.query(
+    "ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INT NOT NULL DEFAULT 10",
+  );
+  await pool.query(
+    "UPDATE inventory SET holding_cost = price * 0.2 WHERE holding_cost = 0",
+  );
   await pool.query(`CREATE TABLE IF NOT EXISTS inventory_audit (
     id VARCHAR(64) PRIMARY KEY,
     item_id VARCHAR(32) NOT NULL,
@@ -110,8 +291,12 @@ async function initializeDatabase() {
     created_by VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  await pool.query('ALTER TABLE inventory_audit ADD COLUMN IF NOT EXISTS item_data JSON NULL');
-  await pool.query('ALTER TABLE inventory_audit ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL');
+  await pool.query(
+    "ALTER TABLE inventory_audit ADD COLUMN IF NOT EXISTS item_data JSON NULL",
+  );
+  await pool.query(
+    "ALTER TABLE inventory_audit ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL",
+  );
   await pool.query(`CREATE TABLE IF NOT EXISTS movements (
     id VARCHAR(64) PRIMARY KEY,
     item_id VARCHAR(32) NOT NULL,
@@ -121,8 +306,12 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT movements_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  await pool.query('ALTER TABLE movements ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL AFTER movement_date');
-  await pool.query("UPDATE movements SET created_by = COALESCE(created_by, 'Warehouse Staff') WHERE created_by IS NULL");
+  await pool.query(
+    "ALTER TABLE movements ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL AFTER movement_date",
+  );
+  await pool.query(
+    "UPDATE movements SET created_by = COALESCE(created_by, 'Warehouse Staff') WHERE created_by IS NULL",
+  );
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(64) NOT NULL UNIQUE,
@@ -132,35 +321,58 @@ async function initializeDatabase() {
     phone VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) NULL');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(64) NULL');
+  await pool.query(
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) NULL",
+  );
+  await pool.query(
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(64) NULL",
+  );
 
-  await pool.query('SET FOREIGN_KEY_CHECKS = 0');
-  await pool.query("UPDATE movements SET item_id = REPLACE(item_id, 'STK-', '') WHERE item_id LIKE 'STK-%'");
-  await pool.query("UPDATE inventory SET id = REPLACE(id, 'STK-', '') WHERE id LIKE 'STK-%'");
-  await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+  await pool.query("SET FOREIGN_KEY_CHECKS = 0");
+  await pool.query(
+    "UPDATE movements SET item_id = REPLACE(item_id, 'STK-', '') WHERE item_id LIKE 'STK-%'",
+  );
+  await pool.query(
+    "UPDATE inventory SET id = REPLACE(id, 'STK-', '') WHERE id LIKE 'STK-%'",
+  );
+  await pool.query("SET FOREIGN_KEY_CHECKS = 1");
 
-  const [[userCount]] = await pool.query('SELECT COUNT(*) AS count FROM users');
+  const [[userCount]] = await pool.query("SELECT COUNT(*) AS count FROM users");
   if (userCount.count === 0) {
-    const userEntries = defaultUsers.map(({ username, password, role, email, phone }) => [
-      username,
-      crypto.createHash('sha256').update(password).digest('hex'),
-      role,
-      email,
-      phone,
-    ]);
-    await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES ?', [userEntries]);
+    const userEntries = defaultUsers.map(
+      ({ username, password, role, email, phone }) => [
+        username,
+        crypto.createHash("sha256").update(password).digest("hex"),
+        role,
+        email,
+        phone,
+      ],
+    );
+    await pool.query(
+      "INSERT INTO users (username, password_hash, role, email, phone) VALUES ?",
+      [userEntries],
+    );
   }
 
-  const [[inventoryCount]] = await pool.query('SELECT COUNT(*) AS count FROM inventory');
+  const [[inventoryCount]] = await pool.query(
+    "SELECT COUNT(*) AS count FROM inventory",
+  );
   if (inventoryCount.count === 0) {
-    await pool.query(`INSERT INTO inventory
+    await pool.query(
+      `INSERT INTO inventory
         (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles)
-        VALUES ?`, [inventorySeed]);
+        VALUES ?`,
+      [inventorySeed],
+    );
   }
-  const [[movementCount]] = await pool.query('SELECT COUNT(*) AS count FROM movements');
+  const [[movementCount]] = await pool.query(
+    "SELECT COUNT(*) AS count FROM movements",
+  );
   if (movementCount.count === 0) {
-    await pool.query('INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES ?', [movementSeed]);
+    await pool.query(
+      "INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES ?",
+      [movementSeed],
+    );
   }
 }
 
@@ -187,11 +399,22 @@ function toItem(row) {
 }
 
 function toMovement(row) {
-  const date = row.movement_date instanceof Date
-    ? row.movement_date.toISOString().slice(0, 10)
-    : String(row.movement_date).slice(0, 10);
-  const timestamp = row.created_at ? new Date(row.created_at).getTime() : new Date(date).getTime();
-  return { id: row.id, itemId: row.item_id, type: row.type, qty: Number(row.qty), date, timestamp, createdBy: row.created_by || undefined };
+  const date =
+    row.movement_date instanceof Date
+      ? row.movement_date.toISOString().slice(0, 10)
+      : String(row.movement_date).slice(0, 10);
+  const timestamp = row.created_at
+    ? new Date(row.created_at).getTime()
+    : new Date(date).getTime();
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    type: row.type,
+    qty: Number(row.qty),
+    date,
+    timestamp,
+    createdBy: row.created_by || undefined,
+  };
 }
 
 function toInventoryAudit(row) {
@@ -200,45 +423,50 @@ function toInventoryAudit(row) {
     itemId: row.item_id,
     itemName: row.item_name,
     action: row.action,
-    date: row.created_at instanceof Date
-      ? row.created_at.toISOString().slice(0, 10)
-      : String(row.created_at).slice(0, 10),
-    timestamp: row.created_at instanceof Date
-      ? row.created_at.getTime()
-      : new Date(row.created_at).getTime(),
+    date:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString().slice(0, 10)
+        : String(row.created_at).slice(0, 10),
+    timestamp:
+      row.created_at instanceof Date
+        ? row.created_at.getTime()
+        : new Date(row.created_at).getTime(),
     createdBy: row.created_by || undefined,
   };
 }
 
 function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  return crypto.createHash("sha256").update(password).digest("hex");
 }
 
 function normalizeItemId(value) {
-  const id = String(value ?? '').trim();
-  return /^\d+$/.test(id) ? String(Number(id)).padStart(3, '0') : id;
+  const id = String(value ?? "").trim();
+  return /^\d+$/.test(id) ? String(Number(id)).padStart(3, "0") : id;
 }
 
 function normalizeOptionalText(value) {
-  return typeof value === 'string' ? value.trim() : '';
+  return typeof value === "string" ? value.trim() : "";
 }
 
 const HISTORY_RETENTION_DAYS = Number(process.env.HISTORY_RETENTION_DAYS || 90);
 
 export async function purgeExpiredHistory() {
   const [result] = await pool.query(
-    'DELETE FROM inventory_audit WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+    "DELETE FROM inventory_audit WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)",
     [HISTORY_RETENTION_DAYS],
   );
   return Number(result?.affectedRows || 0);
 }
 
 export function scheduleHistoryCleanup() {
-  setInterval(() => {
-    void purgeExpiredHistory().catch((error) => {
-      console.error('Audit history cleanup failed:', error.message);
-    });
-  }, 60 * 60 * 1000);
+  setInterval(
+    () => {
+      void purgeExpiredHistory().catch((error) => {
+        console.error("Audit history cleanup failed:", error.message);
+      });
+    },
+    60 * 60 * 1000,
+  );
 }
 
 function normalizeEmail(value) {
@@ -251,201 +479,276 @@ function normalizePhone(value) {
   return phone || null;
 }
 
-app.get('/api/health', async (_req, res) => {
+app.get("/api/health", async (_req, res) => {
   const connection = await pool.getConnection();
   connection.release();
-  res.json({ ok: true, database: process.env.DB_NAME || 'skyrun' });
+  res.json({ ok: true, database: process.env.DB_NAME || "skyrun" });
 });
 
-app.get('/api/users', async (_req, res) => {
-  const [rows] = await pool.query('SELECT id, username, role, email, phone FROM users ORDER BY username');
+app.get("/api/users", async (_req, res) => {
+  const [rows] = await pool.query(
+    "SELECT id, username, role, email, phone FROM users ORDER BY username",
+  );
   res.json(rows);
 });
 
-app.post('/api/users', async (req, res) => {
+app.post("/api/users", async (req, res) => {
   const { username, password, role } = req.body || {};
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required.' });
+    return res
+      .status(400)
+      .json({ error: "Username and password are required." });
   }
 
   const normalizedUsername = String(username).trim();
   const normalizedPassword = String(password).trim();
-  const safeRole = (role === 'admin' ? 'admin' : 'staff');
+  const safeRole = role === "admin" ? "admin" : "staff";
 
   if (normalizedUsername.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+    return res
+      .status(400)
+      .json({ error: "Username must be at least 3 characters long." });
   }
 
   if (normalizedPassword.length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 4 characters long." });
   }
 
-  const [[existing]] = await pool.query('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedUsername]);
+  const [[existing]] = await pool.query(
+    "SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
+    [normalizedUsername],
+  );
   if (existing.count > 0) {
-    return res.status(409).json({ error: 'That username already exists.' });
+    return res.status(409).json({ error: "That username already exists." });
   }
 
-  await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES (?, ?, ?, NULL, NULL)', [
-    normalizedUsername,
-    hashPassword(normalizedPassword),
-    safeRole,
-  ]);
+  await pool.query(
+    "INSERT INTO users (username, password_hash, role, email, phone) VALUES (?, ?, ?, NULL, NULL)",
+    [normalizedUsername, hashPassword(normalizedPassword), safeRole],
+  );
 
   res.status(201).json({ ok: true, username: normalizedUsername });
 });
 
-app.put('/api/users/:id', async (req, res) => {
+app.put("/api/users/:id", async (req, res) => {
   const { username, password, role, actorUsername } = req.body || {};
   const userId = Number(req.params.id);
 
   if (!Number.isInteger(userId) || !username || !actorUsername) {
-    return res.status(400).json({ error: 'User ID, username, and admin account are required.' });
+    return res
+      .status(400)
+      .json({ error: "User ID, username, and admin account are required." });
   }
 
-  const [[actor]] = await pool.query('SELECT role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [String(actorUsername).trim()]);
-  if (!actor || actor.role !== 'admin') {
-    return res.status(403).json({ error: 'Administrator access is required.' });
+  const [[actor]] = await pool.query(
+    "SELECT role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
+    [String(actorUsername).trim()],
+  );
+  if (!actor || actor.role !== "admin") {
+    return res.status(403).json({ error: "Administrator access is required." });
   }
 
   const normalizedUsername = String(username).trim();
   if (normalizedUsername.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+    return res
+      .status(400)
+      .json({ error: "Username must be at least 3 characters long." });
   }
-  if (password !== undefined && String(password).trim().length > 0 && String(password).trim().length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+  if (
+    password !== undefined &&
+    String(password).trim().length > 0 &&
+    String(password).trim().length < 4
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 4 characters long." });
   }
 
-  const [[targetUser]] = await pool.query('SELECT role FROM users WHERE id=? LIMIT 1', [userId]);
+  const [[targetUser]] = await pool.query(
+    "SELECT role FROM users WHERE id=? LIMIT 1",
+    [userId],
+  );
   if (!targetUser) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: "User not found." });
   }
-  if (targetUser.role !== 'staff') {
-    return res.status(403).json({ error: 'Only staff accounts can be managed here.' });
+  if (targetUser.role !== "staff") {
+    return res
+      .status(403)
+      .json({ error: "Only staff accounts can be managed here." });
   }
 
-  const [[existing]] = await pool.query('SELECT id FROM users WHERE LOWER(username)=LOWER(?) AND id != ? LIMIT 1', [normalizedUsername, userId]);
+  const [[existing]] = await pool.query(
+    "SELECT id FROM users WHERE LOWER(username)=LOWER(?) AND id != ? LIMIT 1",
+    [normalizedUsername, userId],
+  );
   if (existing) {
-    return res.status(409).json({ error: 'That username is already in use.' });
+    return res.status(409).json({ error: "That username is already in use." });
   }
 
-  const updates = ['username=?', 'role=?'];
-  const values = [normalizedUsername, role === 'admin' ? 'admin' : 'staff'];
+  const updates = ["username=?", "role=?"];
+  const values = [normalizedUsername, role === "admin" ? "admin" : "staff"];
   if (password !== undefined && String(password).trim()) {
-    updates.push('password_hash=?');
+    updates.push("password_hash=?");
     values.push(hashPassword(String(password).trim()));
   }
   values.push(userId);
-  const [result] = await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id=?`, values);
+  const [result] = await pool.query(
+    `UPDATE users SET ${updates.join(", ")} WHERE id=?`,
+    values,
+  );
   if (result.affectedRows === 0) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: "User not found." });
   }
 
   res.json({ ok: true, username: normalizedUsername });
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+app.delete("/api/users/:id", async (req, res) => {
   const { actorUsername } = req.body || {};
   const userId = Number(req.params.id);
   if (!Number.isInteger(userId) || !actorUsername) {
-    return res.status(400).json({ error: 'User ID and admin account are required.' });
+    return res
+      .status(400)
+      .json({ error: "User ID and admin account are required." });
   }
 
-  const [[actor]] = await pool.query('SELECT id, role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [String(actorUsername).trim()]);
-  if (!actor || actor.role !== 'admin') {
-    return res.status(403).json({ error: 'Administrator access is required.' });
+  const [[actor]] = await pool.query(
+    "SELECT id, role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
+    [String(actorUsername).trim()],
+  );
+  if (!actor || actor.role !== "admin") {
+    return res.status(403).json({ error: "Administrator access is required." });
   }
   if (actor.id === userId) {
-    return res.status(400).json({ error: 'You cannot delete the active administrator account.' });
+    return res
+      .status(400)
+      .json({ error: "You cannot delete the active administrator account." });
   }
 
-  const [[targetUser]] = await pool.query('SELECT role FROM users WHERE id=? LIMIT 1', [userId]);
+  const [[targetUser]] = await pool.query(
+    "SELECT role FROM users WHERE id=? LIMIT 1",
+    [userId],
+  );
   if (!targetUser) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: "User not found." });
   }
-  if (targetUser.role !== 'staff') {
-    return res.status(403).json({ error: 'Only staff accounts can be managed here.' });
+  if (targetUser.role !== "staff") {
+    return res
+      .status(403)
+      .json({ error: "Only staff accounts can be managed here." });
   }
 
-  const [result] = await pool.query('DELETE FROM users WHERE id=?', [userId]);
+  const [result] = await pool.query("DELETE FROM users WHERE id=?", [userId]);
   if (result.affectedRows === 0) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: "User not found." });
   }
   res.json({ ok: true });
 });
 
-app.put('/api/users/change-password', async (req, res) => {
+app.put("/api/users/change-password", async (req, res) => {
   const { username, currentPassword, newPassword } = req.body || {};
 
   if (!username || !currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Username, current password, and new password are required.' });
+    return res.status(400).json({
+      error: "Username, current password, and new password are required.",
+    });
   }
 
   const normalizedUsername = String(username).trim();
   const newPasswordString = String(newPassword).trim();
 
   if (newPasswordString.length < 4) {
-    return res.status(400).json({ error: 'New password must be at least 4 characters long.' });
+    return res
+      .status(400)
+      .json({ error: "New password must be at least 4 characters long." });
   }
 
-  const [rows] = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedUsername]);
+  const [rows] = await pool.query(
+    "SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
+    [normalizedUsername],
+  );
   if (rows.length === 0) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: "User not found." });
   }
 
   const user = rows[0];
   if (user.password_hash !== hashPassword(String(currentPassword))) {
-    return res.status(401).json({ error: 'Current password is incorrect.' });
+    return res.status(401).json({ error: "Current password is incorrect." });
   }
 
-  await pool.query('UPDATE users SET password_hash=? WHERE id=?', [hashPassword(newPasswordString), user.id]);
+  await pool.query("UPDATE users SET password_hash=? WHERE id=?", [
+    hashPassword(newPasswordString),
+    user.id,
+  ]);
   res.json({ ok: true, username: user.username });
 });
 
-app.put('/api/users/change-username', async (req, res) => {
+app.put("/api/users/change-username", async (req, res) => {
   const { currentUsername, currentPassword, newUsername } = req.body || {};
 
   if (!currentUsername || !currentPassword || !newUsername) {
-    return res.status(400).json({ error: 'Current username, current password, and new username are required.' });
+    return res.status(400).json({
+      error:
+        "Current username, current password, and new username are required.",
+    });
   }
 
   const normalizedCurrentUsername = String(currentUsername).trim();
   const normalizedNewUsername = String(newUsername).trim();
 
   if (normalizedNewUsername.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+    return res
+      .status(400)
+      .json({ error: "Username must be at least 3 characters long." });
   }
 
-  const [existingRows] = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [normalizedCurrentUsername]);
+  const [existingRows] = await pool.query(
+    "SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
+    [normalizedCurrentUsername],
+  );
   if (existingRows.length === 0) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res.status(404).json({ error: "User not found." });
   }
 
   const user = existingRows[0];
   if (user.password_hash !== hashPassword(String(currentPassword))) {
-    return res.status(401).json({ error: 'Current password is incorrect.' });
+    return res.status(401).json({ error: "Current password is incorrect." });
   }
 
-  const [[duplicate]] = await pool.query('SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) AND id != ?', [normalizedNewUsername, user.id]);
+  const [[duplicate]] = await pool.query(
+    "SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?) AND id != ?",
+    [normalizedNewUsername, user.id],
+  );
   if (duplicate.count > 0) {
-    return res.status(409).json({ error: 'That username is already in use.' });
+    return res.status(409).json({ error: "That username is already in use." });
   }
 
-  await pool.query('UPDATE users SET username=? WHERE id=?', [normalizedNewUsername, user.id]);
+  await pool.query("UPDATE users SET username=? WHERE id=?", [
+    normalizedNewUsername,
+    user.id,
+  ]);
   res.json({ ok: true, username: normalizedNewUsername });
 });
 
-app.post('/api/login', async (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required.' });
+    return res
+      .status(400)
+      .json({ error: "Username and password are required." });
   }
 
   const normalizedUsername = String(username).trim();
-  const [rows] = await pool.query('SELECT username, role, email, phone FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1', [normalizedUsername, hashPassword(String(password))]);
+  const [rows] = await pool.query(
+    "SELECT username, role, email, phone FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1",
+    [normalizedUsername, hashPassword(String(password))],
+  );
 
   if (rows.length === 0) {
-    return res.status(401).json({ error: 'Invalid login details.' });
+    return res.status(401).json({ error: "Invalid login details." });
   }
 
   const user = rows[0];
@@ -457,90 +760,169 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-app.get('/api/inventory', async (_req, res) => {
-  const [rows] = await pool.query('SELECT * FROM inventory ORDER BY id');
+app.get("/api/inventory", async (_req, res) => {
+  const [rows] = await pool.query("SELECT * FROM inventory ORDER BY id");
   res.json(rows.map(toItem));
 });
 
-app.post('/api/inventory', async (req, res) => {
+app.post("/api/inventory", async (req, res) => {
   const item = req.body;
   const itemId = normalizeItemId(item.id);
-  const createdBy = item.createdBy || 'Unknown';
-  await pool.query(`INSERT INTO inventory
-    (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    itemId, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
-    item.rack, item.level || null, item.size || null, item.weight || null, item.demand || null,
-    item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 10,
-  ]);
+  const createdBy = item.createdBy || "Unknown";
   await pool.query(
-    'INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-    [`AUDIT-ADD-${crypto.randomUUID()}`, itemId, item.name, 'ADD', JSON.stringify({ ...item, id: itemId }), createdBy],
+    `INSERT INTO inventory
+    (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      itemId,
+      item.name,
+      item.category,
+      item.barcode || null,
+      item.quantity || 0,
+      item.price || 0,
+      item.rack,
+      item.level || null,
+      item.size || null,
+      item.weight || null,
+      item.demand || null,
+      item.compatibleVehicles || null,
+      item.image || null,
+      item.orderingCost ?? 100,
+      item.holdingCost > 0 ? item.holdingCost : item.price * 0.2,
+      item.leadTimeDays ?? 7,
+      item.safetyStock ?? 10,
+    ],
+  );
+  await pool.query(
+    "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      `AUDIT-ADD-${crypto.randomUUID()}`,
+      itemId,
+      item.name,
+      "ADD",
+      JSON.stringify({ ...item, id: itemId }),
+      createdBy,
+    ],
   );
   res.status(201).json({ ...item, id: itemId });
 });
 
-app.put('/api/inventory/:id', async (req, res) => {
+app.put("/api/inventory/:id", async (req, res) => {
   const item = req.body;
   const itemId = normalizeItemId(req.params.id);
   const submittedItemId = normalizeItemId(item.id || itemId);
-  await pool.query(`UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`, [
-    item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0, item.rack,
-    item.level || null, item.size || null, item.weight || null, item.demand || null,
-    item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 10, itemId,
-  ]);
+  await pool.query(
+    `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`,
+    [
+      item.name,
+      item.category,
+      item.barcode || null,
+      item.quantity || 0,
+      item.price || 0,
+      item.rack,
+      item.level || null,
+      item.size || null,
+      item.weight || null,
+      item.demand || null,
+      item.compatibleVehicles || null,
+      item.image || null,
+      item.orderingCost ?? 100,
+      item.holdingCost > 0 ? item.holdingCost : item.price * 0.2,
+      item.leadTimeDays ?? 7,
+      item.safetyStock ?? 10,
+      itemId,
+    ],
+  );
   res.json({ ...item, id: submittedItemId });
 });
 
-app.delete('/api/inventory/:id', async (req, res) => {
+app.delete("/api/inventory/:id", async (req, res) => {
   const itemId = normalizeItemId(req.params.id);
-  const createdBy = req.body?.createdBy || 'Unknown';
-  const [[item]] = await pool.query('SELECT * FROM inventory WHERE id=?', [itemId]);
-  await pool.query('DELETE FROM inventory WHERE id=?', [itemId]);
+  const createdBy = req.body?.createdBy || "Unknown";
+  const [[item]] = await pool.query("SELECT * FROM inventory WHERE id=?", [
+    itemId,
+  ]);
+  await pool.query("DELETE FROM inventory WHERE id=?", [itemId]);
   if (item) {
     await pool.query(
-      'INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-      [`AUDIT-DELETE-${crypto.randomUUID()}`, itemId, item.name, 'DELETE', JSON.stringify(toItem(item)), createdBy],
+      "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        `AUDIT-DELETE-${crypto.randomUUID()}`,
+        itemId,
+        item.name,
+        "DELETE",
+        JSON.stringify(toItem(item)),
+        createdBy,
+      ],
     );
   }
   res.status(204).end();
 });
 
-app.get('/api/inventory-audit', async (_req, res) => {
-  const [rows] = await pool.query('SELECT * FROM inventory_audit ORDER BY created_at DESC');
+app.get("/api/inventory-audit", async (_req, res) => {
+  const [rows] = await pool.query(
+    "SELECT * FROM inventory_audit ORDER BY created_at DESC",
+  );
   res.json(rows.map(toInventoryAudit));
 });
 
-app.patch('/api/inventory-audit/:id/undo', async (req, res) => {
+app.patch("/api/inventory-audit/:id/undo", async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [[audit]] = await connection.query('SELECT * FROM inventory_audit WHERE id=? FOR UPDATE', [req.params.id]);
+    const [[audit]] = await connection.query(
+      "SELECT * FROM inventory_audit WHERE id=? FOR UPDATE",
+      [req.params.id],
+    );
     if (!audit) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Audit entry not found.' });
+      return res.status(404).json({ error: "Audit entry not found." });
     }
-    if (!audit.item_data && audit.action === 'DELETE') {
+    if (!audit.item_data && audit.action === "DELETE") {
       await connection.rollback();
-      return res.status(400).json({ error: 'This audit entry cannot be undone because its item snapshot is unavailable.' });
+      return res.status(400).json({
+        error:
+          "This audit entry cannot be undone because its item snapshot is unavailable.",
+      });
     }
 
-    if (audit.action === 'ADD') {
-      await connection.query('DELETE FROM inventory WHERE id=?', [audit.item_id]);
-    } else {
-      const item = typeof audit.item_data === 'string' ? JSON.parse(audit.item_data) : audit.item_data;
-      await connection.query(`INSERT INTO inventory
-        (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-        audit.item_id, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
-        item.rack, item.level || null, item.size || null, item.weight || null, item.demand || null,
-        item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-        item.holdingCost ?? 0, item.leadTimeDays ?? 7, item.safetyStock ?? 10,
+    if (audit.action === "ADD") {
+      await connection.query("DELETE FROM inventory WHERE id=?", [
+        audit.item_id,
       ]);
+    } else {
+      const item =
+        typeof audit.item_data === "string"
+          ? JSON.parse(audit.item_data)
+          : audit.item_data;
+      await connection.query(
+        `INSERT INTO inventory
+        (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          audit.item_id,
+          item.name,
+          item.category,
+          item.barcode || null,
+          item.quantity || 0,
+          item.price || 0,
+          item.rack,
+          item.level || null,
+          item.size || null,
+          item.weight || null,
+          item.demand || null,
+          item.compatibleVehicles || null,
+          item.image || null,
+          item.orderingCost ?? 100,
+          item.holdingCost ?? 0,
+          item.leadTimeDays ?? 7,
+          item.safetyStock ?? 10,
+        ],
+      );
     }
-    await connection.query('DELETE FROM inventory_audit WHERE id=?', [req.params.id]);
+    await connection.query("DELETE FROM inventory_audit WHERE id=?", [
+      req.params.id,
+    ]);
     await connection.commit();
     res.json({ ok: true, action: audit.action });
   } catch (error) {
@@ -551,21 +933,36 @@ app.patch('/api/inventory-audit/:id/undo', async (req, res) => {
   }
 });
 
-app.get('/api/movements', async (_req, res) => {
-  const [rows] = await pool.query('SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC');
+app.get("/api/movements", async (_req, res) => {
+  const [rows] = await pool.query(
+    "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC",
+  );
   res.json(rows.map(toMovement));
 });
 
-app.post('/api/movements', async (req, res) => {
+app.post("/api/movements", async (req, res) => {
   const movement = req.body;
   const id = movement.id || `MOV-${crypto.randomUUID()}`;
   const date = movement.date || new Date().toISOString().slice(0, 10);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const delta = movement.type === 'IN' ? movement.qty : -movement.qty;
-    await connection.query('INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, ?, ?, ?, ?)', [id, movement.itemId, movement.type, movement.qty, date, movement.createdBy || null]);
-    await connection.query('UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?', [delta, movement.itemId]);
+    const delta = movement.type === "IN" ? movement.qty : -movement.qty;
+    await connection.query(
+      "INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        id,
+        movement.itemId,
+        movement.type,
+        movement.qty,
+        date,
+        movement.createdBy || null,
+      ],
+    );
+    await connection.query(
+      "UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?",
+      [delta, movement.itemId],
+    );
     await connection.commit();
     res.status(201).json({ ...movement, id, date, timestamp: Date.now() });
   } catch (error) {
@@ -576,15 +973,21 @@ app.post('/api/movements', async (req, res) => {
   }
 });
 
-app.delete('/api/movements/:id', async (req, res) => {
+app.delete("/api/movements/:id", async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [[movement]] = await connection.query('SELECT * FROM movements WHERE id=? FOR UPDATE', [req.params.id]);
-    if (!movement) return res.status(404).json({ error: 'Movement not found' });
-    const delta = movement.type === 'IN' ? -movement.qty : movement.qty;
-    await connection.query('DELETE FROM movements WHERE id=?', [req.params.id]);
-    await connection.query('UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?', [delta, movement.item_id]);
+    const [[movement]] = await connection.query(
+      "SELECT * FROM movements WHERE id=? FOR UPDATE",
+      [req.params.id],
+    );
+    if (!movement) return res.status(404).json({ error: "Movement not found" });
+    const delta = movement.type === "IN" ? -movement.qty : movement.qty;
+    await connection.query("DELETE FROM movements WHERE id=?", [req.params.id]);
+    await connection.query(
+      "UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?",
+      [delta, movement.item_id],
+    );
     await connection.commit();
     res.status(204).end();
   } catch (error) {
@@ -595,33 +998,48 @@ app.delete('/api/movements/:id', async (req, res) => {
   }
 });
 
-app.patch('/api/movements/:id/undo', async (req, res) => {
+app.patch("/api/movements/:id/undo", async (req, res) => {
   const requestedQty = Number(req.body?.qty);
   if (!Number.isInteger(requestedQty) || requestedQty < 1) {
-    return res.status(400).json({ error: 'Undo quantity must be a positive whole number.' });
+    return res
+      .status(400)
+      .json({ error: "Undo quantity must be a positive whole number." });
   }
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [[movement]] = await connection.query('SELECT * FROM movements WHERE id=? FOR UPDATE', [req.params.id]);
+    const [[movement]] = await connection.query(
+      "SELECT * FROM movements WHERE id=? FOR UPDATE",
+      [req.params.id],
+    );
     if (!movement) {
       await connection.rollback();
-      return res.status(404).json({ error: 'Movement not found' });
+      return res.status(404).json({ error: "Movement not found" });
     }
     if (requestedQty > movement.qty) {
       await connection.rollback();
-      return res.status(400).json({ error: 'Undo quantity cannot exceed the movement quantity.' });
+      return res
+        .status(400)
+        .json({ error: "Undo quantity cannot exceed the movement quantity." });
     }
 
-    const delta = movement.type === 'IN' ? -requestedQty : requestedQty;
+    const delta = movement.type === "IN" ? -requestedQty : requestedQty;
     const remainingQty = movement.qty - requestedQty;
     if (remainingQty === 0) {
-      await connection.query('DELETE FROM movements WHERE id=?', [req.params.id]);
+      await connection.query("DELETE FROM movements WHERE id=?", [
+        req.params.id,
+      ]);
     } else {
-      await connection.query('UPDATE movements SET qty=? WHERE id=?', [remainingQty, req.params.id]);
+      await connection.query("UPDATE movements SET qty=? WHERE id=?", [
+        remainingQty,
+        req.params.id,
+      ]);
     }
-    await connection.query('UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?', [delta, movement.item_id]);
+    await connection.query(
+      "UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?",
+      [delta, movement.item_id],
+    );
     await connection.commit();
 
     if (remainingQty === 0) {
@@ -640,30 +1058,34 @@ app.patch('/api/movements/:id/undo', async (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+app.use(express.static(path.join(__dirname, "dist")));
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  res.status(500).json({ error: 'Database request failed' });
+  res.status(500).json({ error: "Database request failed" });
 });
 
 export async function startServer() {
   await initializeDatabase();
   void purgeExpiredHistory().catch((error) => {
-    console.error('Initial audit history cleanup failed:', error.message);
+    console.error("Initial audit history cleanup failed:", error.message);
   });
   scheduleHistoryCleanup();
-  app.listen(port, () => console.log(`API listening on http://localhost:${port}`));
+  app.listen(port, () =>
+    console.log(`API listening on http://localhost:${port}`),
+  );
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirectRun =
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isDirectRun) {
   startServer().catch((error) => {
-    console.error('Database initialization failed:', error.message);
+    console.error("Database initialization failed:", error.message);
     process.exit(1);
   });
 }
