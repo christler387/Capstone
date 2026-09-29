@@ -10,7 +10,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('express').Express} */
 export const app = express();
-const port = Number(process.env.API_PORT || process.env.APP_PORT || 3001);
+const port = Number(
+  process.env.PORT || process.env.API_PORT || process.env.APP_PORT || 3001,
+);
 export const pool = mysql.createPool({
   host: process.env.MYSQLHOST || process.env.DB_HOST || "127.0.0.1",
   port: Number(process.env.MYSQLPORT || process.env.DB_PORT || 3306),
