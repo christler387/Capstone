@@ -236,10 +236,10 @@ const movementSeed = [
 
 async function initializeDatabase() {
   const adminPool = mysql.createPool({
-    host: process.env.DB_HOST || "127.0.0.1",
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || "",
+    host: process.env.MYSQLHOST || process.env.DB_HOST || "127.0.0.1",
+    port: Number(process.env.MYSQLPORT || process.env.DB_PORT || 3306),
+    user: process.env.MYSQLUSER || process.env.DB_USER || "root",
+    password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || "",
     waitForConnections: true,
     connectionLimit: 2,
   });
