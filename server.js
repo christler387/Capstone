@@ -1091,3 +1091,9 @@ if (isDirectRun) {
     process.exit(1);
   });
 }
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`API running on port ${port}`);
+  });
+}
