@@ -10,15 +10,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('express').Express} */
 export const app = express();
-const port = Number(
-  process.env.PORT || process.env.API_PORT || process.env.APP_PORT || 3001,
-);
+const port = Number(process.env.API_PORT || 3001);
 export const pool = mysql.createPool({
-  host: process.env.MYSQLHOST || process.env.DB_HOST || "127.0.0.1",
-  port: Number(process.env.MYSQLPORT || process.env.DB_PORT || 3306),
-  user: process.env.MYSQLUSER || process.env.DB_USER || "root",
-  password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || "",
-  database: process.env.MYSQLDATABASE || process.env.DB_NAME || "skyrun",
+  host: process.env.DB_HOST || "127.0.0.1",
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "skyrun",
   waitForConnections: true,
   connectionLimit: 10,
   decimalNumbers: true,
@@ -26,19 +24,6 @@ export const pool = mysql.createPool({
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
-
-// Health check
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    message: "Skyrun API is running",
-  });
-});
-
-// Your other API routes below
-app.get("/api/...", (req, res) => {
-  // ...
-});
 
 const inventorySeed = [
   [
@@ -236,10 +221,10 @@ const movementSeed = [
 
 async function initializeDatabase() {
   const adminPool = mysql.createPool({
-    host: process.env.MYSQLHOST || process.env.DB_HOST || "127.0.0.1",
-    port: Number(process.env.MYSQLPORT || process.env.DB_PORT || 3306),
-    user: process.env.MYSQLUSER || process.env.DB_USER || "root",
-    password: process.env.MYSQLPASSWORD || process.env.DB_PASSWORD || "",
+    host: process.env.DB_HOST || "127.0.0.1",
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASSWORD || "",
     waitForConnections: true,
     connectionLimit: 2,
   });
@@ -654,9 +639,11 @@ app.put("/api/users/change-password", async (req, res) => {
   const { username, currentPassword, newPassword } = req.body || {};
 
   if (!username || !currentPassword || !newPassword) {
-    return res.status(400).json({
-      error: "Username, current password, and new password are required.",
-    });
+    return res
+      .status(400)
+      .json({
+        error: "Username, current password, and new password are required.",
+      });
   }
 
   const normalizedUsername = String(username).trim();
@@ -692,10 +679,12 @@ app.put("/api/users/change-username", async (req, res) => {
   const { currentUsername, currentPassword, newUsername } = req.body || {};
 
   if (!currentUsername || !currentPassword || !newUsername) {
-    return res.status(400).json({
-      error:
-        "Current username, current password, and new username are required.",
-    });
+    return res
+      .status(400)
+      .json({
+        error:
+          "Current username, current password, and new username are required.",
+      });
   }
 
   const normalizedCurrentUsername = String(currentUsername).trim();
@@ -882,10 +871,12 @@ app.patch("/api/inventory-audit/:id/undo", async (req, res) => {
     }
     if (!audit.item_data && audit.action === "DELETE") {
       await connection.rollback();
-      return res.status(400).json({
-        error:
-          "This audit entry cannot be undone because its item snapshot is unavailable.",
-      });
+      return res
+        .status(400)
+        .json({
+          error:
+            "This audit entry cannot be undone because its item snapshot is unavailable.",
+        });
     }
 
     if (audit.action === "ADD") {
@@ -1089,11 +1080,5 @@ if (isDirectRun) {
   startServer().catch((error) => {
     console.error("Database initialization failed:", error.message);
     process.exit(1);
-  });
-}
-
-if (process.env.NODE_ENV !== "test") {
-  app.listen(port, "0.0.0.0", () => {
-    console.log(`API running on port ${port}`);
   });
 }

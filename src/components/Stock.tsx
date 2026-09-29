@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
