@@ -1,0 +1,67 @@
+{
+  "name": "autosupply",
+  "private": true,
+  "main": "electron.cjs",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
+    "build": "tsc -b && vite build",
+    "desktop": "npm run build && electron .",
+    "desktop:dist": "npm run build && electron-builder",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.22.2",
+    "google-auth-library": "^11.0.2",
+    "html5-qrcode": "^2.3.8",
+    "mysql2": "^3.14.1",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@types/supertest": "^7.2.1",
+    "concurrently": "^9.1.2",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "jsdom": "^29.1.1",
+    "supertest": "^7.2.2",
+    "typescript": "latest",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "qs": "6.16.0"
+  },
+  "build": {
+    "appId": "com.autosupply.desktop",
+    "productName": "Autosupply",
+    "asar": false,
+    "files": [
+      "dist/**/*",
+      "server.js",
+      "electron.cjs",
+      "package.json",
+      ".env*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "desktop-release"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

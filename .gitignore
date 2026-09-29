@@ -1,0 +1,17 @@
+node_modules/
+dist/
+release/
+desktop-release-new/
+*.exe
+*.msi
+*.zip
+.env
+.env.*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
