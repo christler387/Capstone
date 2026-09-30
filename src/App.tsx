@@ -29,27 +29,30 @@ import { Stock } from './components/Stock';
 import { WarehouseMap } from './components/WarehouseMap';
 import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
+import skyrunLogo from './assets/Skyrun.png';
 
 const App: React.FC = () => {
   const [inventory, setInventory] = useState<Item[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
-  const [user, setUser] = useState<string | null>(() => localStorage.getItem('skyrun_session_user'));
-  const [userRole, setUserRole] = useState<UserRole>(() => (localStorage.getItem('skyrun_session_role') as UserRole) || 'staff');
-  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('skyrun_session_email') || null);
-  const [userPhone, setUserPhone] = useState<string | null>(() => localStorage.getItem('skyrun_session_phone') || null);
+  const [user, setUser] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('staff');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     Promise.all([
       requestJson<Item[]>('/inventory'),
       requestJson<Movement[]>('/movements'),
+      requestJson<InventoryAuditEntry[]>('/inventory-audit'),
     ])
-      .then(([loadedInventory, loadedMovements]) => {
+      .then(([loadedInventory, loadedMovements, loadedInventoryAudit]) => {
         if (!active) return;
         setInventory(loadedInventory);
         setMovements(loadedMovements);
+        setInventoryAudit(loadedInventoryAudit);
       })
       .catch((error: Error) => {
         if (active) setDatabaseError(`Database unavailable: ${error.message}`);
@@ -122,8 +125,32 @@ const App: React.FC = () => {
   const [editingItem, setEditingItem] = useState<Item | undefined>(undefined);
   const [zoomImage, setZoomImage] = useState<{ url: string, name: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [stockToItem, setStockToItem] = useState<string | undefined>(undefined);
   const [locateRack, setLocateRack] = useState<string | null>(null);
+
+  const sectionInfo: Record<string, { title: string; description: string }> = {
+    dashboard: {
+      title: 'Dashboard Info',
+        description: 'hehehe hohoho'
+    },
+    inventory: {
+      title: 'Inventory Info',
+      description: 'hehehe'
+    },
+    stock: {
+      title: 'Stock Info',
+      description: 'hohoho'
+    },
+    warehouse: {
+      title: 'Warehouse Map Info',
+      description: 'hihihi'
+    },
+    user: {
+      title: 'User Info',
+      description: 'huhuhu'
+    }
+  };
 
   const handleGoToStock = (id: string) => {
     setStockToItem(id);
@@ -142,19 +169,13 @@ const App: React.FC = () => {
   };
 
   const addItem = async (item: Item) => {
+    const currentUser = localStorage.getItem('skyrun_session_user') || user || 'Unknown';
     const savedItem = await requestJson<Item>('/inventory', {
       method: 'POST',
-      body: JSON.stringify(item),
+      body: JSON.stringify({ ...item, createdBy: currentUser }),
     });
     setInventory(prev => [...prev, savedItem]);
-    setInventoryAudit(prev => [...prev, {
-      id: `AUDIT-ADD-${Date.now()}`,
-      itemId: savedItem.id,
-      itemName: savedItem.name,
-      action: 'ADD',
-      date: new Date().toISOString().slice(0, 10),
-      timestamp: Date.now(),
-    }]);
+    setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
   const updateItem = async (id: string, data: Item) => {
@@ -167,18 +188,13 @@ const App: React.FC = () => {
 
   const deleteItem = async (id: string) => {
     const deletedItem = inventory.find(item => item.id === id);
-    await requestJson<void>(`/inventory/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const currentUser = localStorage.getItem('skyrun_session_user') || user || 'Unknown';
+    await requestJson<void>(`/inventory/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ createdBy: currentUser }),
+    });
     setInventory(prev => prev.filter(i => i.id !== id));
-    if (deletedItem) {
-      setInventoryAudit(prev => [...prev, {
-        id: `AUDIT-DELETE-${Date.now()}`,
-        itemId: deletedItem.id,
-        itemName: deletedItem.name,
-        action: 'DELETE',
-        date: new Date().toISOString().slice(0, 10),
-        timestamp: Date.now(),
-      }]);
-    }
+    if (deletedItem) setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
   const addMovement = async (movement: Movement) => {
@@ -192,21 +208,41 @@ const App: React.FC = () => {
       : i));
   };
 
-  const undoMovement = async (movementId: string) => {
+  const undoMovement = async (movementId: string, undoQuantity: number) => {
+    if (userRole !== 'admin') return;
+
     const movementToUndo = movements.find(m => m.id === movementId);
     if (!movementToUndo) return;
 
-    await requestJson<void>(`/movements/${encodeURIComponent(movementId)}`, { method: 'DELETE' });
-    setMovements(prev => prev.filter(m => m.id !== movementId));
+    const result = await requestJson<{ deleted: boolean; movement?: Movement }>(`/movements/${encodeURIComponent(movementId)}/undo`, {
+      method: 'PATCH',
+      body: JSON.stringify({ qty: undoQuantity }),
+    });
+    setMovements(prev => result.deleted
+      ? prev.filter(m => m.id !== movementId)
+      : prev.map(m => m.id === movementId && result.movement ? result.movement : m));
     setInventory(prev => prev.map(i => {
       if (i.id === movementToUndo.itemId) {
         return {
           ...i,
-          quantity: Math.max(0, i.quantity + (movementToUndo.type === 'IN' ? -movementToUndo.qty : movementToUndo.qty))
+          quantity: Math.max(0, i.quantity + (movementToUndo.type === 'IN' ? -undoQuantity : undoQuantity))
         };
       }
       return i;
     }));
+  };
+
+  const undoInventoryAudit = async (auditId: string) => {
+    if (userRole !== 'admin') return;
+    await requestJson(`/inventory-audit/${encodeURIComponent(auditId)}/undo`, { method: 'PATCH' });
+    const [loadedInventory, loadedMovements, loadedInventoryAudit] = await Promise.all([
+      requestJson<Item[]>('/inventory'),
+      requestJson<Movement[]>('/movements'),
+      requestJson<InventoryAuditEntry[]>('/inventory-audit'),
+    ]);
+    setInventory(loadedInventory);
+    setMovements(loadedMovements);
+    setInventoryAudit(loadedInventoryAudit);
   };
 
   const bulkUpdateInventory = async (newInventory: Item[]) => {
@@ -321,6 +357,7 @@ const App: React.FC = () => {
             onLogout={handleLogout} 
             onGoToDashboard={() => setCurrentSection('dashboard')} 
             onUndoMovement={undoMovement}
+            onUndoInventoryAudit={undoInventoryAudit}
             onSwitchRole={handleSwitchRole}
             onChangePassword={handleChangePassword}
             onChangeUsername={handleChangeUsername}
@@ -380,29 +417,29 @@ const App: React.FC = () => {
             />
         </div>
       </Modal>
+
+      <Modal
+        isOpen={isInfoModalOpen}
+        onClose={() => setIsInfoModalOpen(false)}
+        title={sectionInfo[currentSection]?.title || 'SKYRUN Info'}
+      >
+        <div className="info-modal-content">
+          <p className="label-micro">hahaha</p>
+          <p className="label-micro opacity-70">{sectionInfo[currentSection]?.description}</p>
+        </div>
+      </Modal>
     </>
   );
 
   useEffect(() => {
-    const isDesktopLaunch = new URLSearchParams(window.location.search).has('desktop');
-    if (isDesktopLaunch) {
-      localStorage.removeItem('skyrun_session_user');
-      localStorage.removeItem('skyrun_session_role');
-      localStorage.removeItem('skyrun_session_email');
-      localStorage.removeItem('skyrun_session_phone');
-    }
-
-    const savedUser = localStorage.getItem('skyrun_session_user');
-    const savedRole = localStorage.getItem('skyrun_session_role') as UserRole | null;
-    const savedEmail = localStorage.getItem('skyrun_session_email');
-    const savedPhone = localStorage.getItem('skyrun_session_phone');
-
-    if (savedUser) {
-      setUser(savedUser);
-      setUserRole(savedRole === 'admin' || savedRole === 'staff' ? savedRole : 'staff');
-      setUserEmail(savedEmail || null);
-      setUserPhone(savedPhone || null);
-    }
+    localStorage.removeItem('skyrun_session_user');
+    localStorage.removeItem('skyrun_session_role');
+    localStorage.removeItem('skyrun_session_email');
+    localStorage.removeItem('skyrun_session_phone');
+    setUser(null);
+    setUserRole('staff');
+    setUserEmail(null);
+    setUserPhone(null);
   }, []);
 
   if (!user) {
@@ -415,9 +452,10 @@ const App: React.FC = () => {
         {databaseError && <div className="alert-text mb-4">{databaseError}</div>}
         <header>
           <div className="header-info" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <img className="brand-logo" src={skyrunLogo} alt="SkyRun logo" aria-label="SkyRun logo" style={{ width: '42px', height: '42px', objectFit: 'contain' }} />
             <h1 className="title-main" style={{ margin: 0 }}>
               {currentSection === 'dashboard' 
-                ? 'Dashboard' 
+                ? 'SKYRUN' 
                 : (currentSection === 'warehouse' ? 'Warehouse Map' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1))}
             </h1>
           </div>
@@ -428,6 +466,15 @@ const App: React.FC = () => {
       </div>
 
       {renderGlobalModals()}
+      <button
+        className="floating-info-button"
+        type="button"
+        onClick={() => setIsInfoModalOpen(true)}
+        aria-label="Open information"
+        title="Information"
+      >
+        <i className="bx bx-info-circle" aria-hidden="true"></i>
+      </button>
     </div>
   );
 };

@@ -12,7 +12,7 @@ vi.mock('mysql2/promise', () => ({
   },
 }));
 
-const { app } = await import('./server.js');
+const { app, purgeExpiredHistory } = await import('./server.js');
 
 describe('API backend', () => {
   beforeEach(() => {
@@ -76,5 +76,17 @@ describe('API backend', () => {
       .expect(201);
 
     expect(response.body).toMatchObject({ ok: true, username: 'adada' });
+  });
+
+  it('purges old audit entries based on retention days', async () => {
+    mockPool.query.mockResolvedValue([{ affectedRows: 7 }]);
+
+    const deletedCount = await purgeExpiredHistory();
+
+    expect(deletedCount).toBe(7);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      'DELETE FROM inventory_audit WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+      [90],
+    );
   });
 });

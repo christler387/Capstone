@@ -44,6 +44,7 @@ export interface InventoryAuditEntry {
   action: InventoryAuditAction;
   date: string;
   timestamp: number;
+  createdBy?: string;
 }
 
 

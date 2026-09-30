@@ -73,26 +73,9 @@ export const Inventory: React.FC<InventoryProps> = ({
     });
 
 
-  const renderInventoryStats = () => (
-    <div className="stats-bar">
-      <div className="stat-box">
-        <span className="label-micro">Total Items</span>
-        <p className="stat-value">{String(totalItems).padStart(3, '0')}</p>
-      </div>
-      <div className="stat-box">
-        <span className="label-micro">Inventory Value</span>
-        <p className="stat-value">₱{totalValue.toLocaleString()}</p>
-      </div>
-      <div className="stat-box">
-        <span className="label-micro">Critical Alerts</span>
-        <p className="stat-value" style={{ color: 'var(--accent)' }}>{String(lowCount).padStart(3, '0')}</p>
-      </div>
-    </div>
-  );
-
   const renderFilterSection = () => (
     <div className="flex-row-gap px-6 mb-4 overflow-x-auto no-scrollbar" style={{ padding: '0 var(--gap)' }}>
-      {['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION'].map(cat => (
+      {['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION', 'MISC'].map(cat => (
         <button 
           key={cat}
           className={`nav-btn ${categoryFilter === cat ? 'active' : ''}`} 
@@ -106,24 +89,18 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const renderScannerDrawer = () => (
     <div className="scanner-container-inline mb-6 p-4 border-soft" style={{ background: 'var(--bg-card)' }}>
-      <div className="flex-row-between mb-2">
-        <span className="label-micro"><i className="bx bx-camera"></i> Live Scanner Active</span>
-      </div>
       <BarcodeScanner 
         onScanSuccess={(val) => {
           setSearch(val);
           setIsScannerOpen(false);
         }} 
       />
-      <p className="label-micro opacity-50 text-center mt-2">Center the barcode in the frame to search</p>
     </div>
   );
 
   
   return (
     <div className="content-section">
-      {renderInventoryStats()}
-      
       <div className="actions-bar flex-row-between">
         <div className="flex-row-gap">
           <p className="label-micro opacity-50">Inventory Ledger</p>
@@ -197,11 +174,11 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <div className="name-cell flex-col" style={{ gap: '2px' }}>
                     <span style={{ fontWeight: 600 }}>{i.name}</span>
                     {i.compatibleVehicles && (
-                      <span className="text-success" style={{ fontSize: '9.5px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="text-success compatibility-line" style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <i className="bx bxs-car"></i> Fits: {i.compatibleVehicles}
                       </span>
                     )}
-                    <div className="flex-row items-center gap-2 opacity-50" style={{ fontSize: '9px', display: 'flex' }}>
+                    <div className="flex-row items-center gap-2 opacity-50 meta-row" style={{ display: 'flex' }}>
                       <span>ID: {i.id}</span>
                       <span>•</span>
                       <span style={{ fontFamily: 'var(--f-sans)' }}>BC: {i.barcode || '---'}</span>

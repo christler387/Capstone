@@ -11,11 +11,32 @@ interface UserProfileProps {
   inventoryAudit: InventoryAuditEntry[];
   onLogout: () => void;
   onGoToDashboard: () => void;
-  onUndoMovement?: (id: string) => void;
+  onUndoMovement?: (id: string, qty: number) => void;
+  onUndoInventoryAudit?: (id: string) => Promise<void>;
   onSwitchRole?: (role: UserRole, name: string) => void;
   onChangePassword?: (currentPassword: string, newPassword: string) => Promise<void>;
   onChangeUsername?: (currentPassword: string, newUsername: string) => Promise<void>;
   onCreateUser?: (username: string, password: string, role: UserRole, displayName?: string, email?: string, phone?: string) => Promise<void>;
+}
+
+interface ManagedUser {
+  id: number;
+  username: string;
+  role: UserRole;
+  email?: string | null;
+  phone?: string | null;
+}
+
+async function requestUserApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+    ...options,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'User account request failed.');
+  }
+  return response.json();
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({ 
@@ -29,6 +50,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   onLogout, 
   onGoToDashboard,
   onUndoMovement,
+  onUndoInventoryAudit,
   onSwitchRole,
   onChangePassword,
   onChangeUsername,
@@ -37,9 +59,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
+  const [undoQuantity, setUndoQuantity] = useState('');
+  const [undoError, setUndoError] = useState<string | null>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [isManageUsersModalOpen, setIsManageUsersModalOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -51,10 +76,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [usernameFeedback, setUsernameFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [createUserFeedback, setCreateUserFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
+  const [managedUsersFeedback, setManagedUsersFeedback] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingUsername, setEditingUsername] = useState('');
+  const [editingRole, setEditingRole] = useState<UserRole>('staff');
+  const [editingPassword, setEditingPassword] = useState('');
 
   const displayName = (role === 'staff' && user.toLowerCase().includes('admin')) ? 'Warehouse Staff' : user;
   const userRole = (role === 'admin' || (role !== 'staff' && user.toLowerCase().includes('admin'))) 
-    ? 'SYSTEM ROOT (ADMIN)' 
+    ? 'ADMIN' 
     : 'OPERATIONAL STAFF';
 
   const auditEntries = [
@@ -79,10 +110,24 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  const handleUndo = (id: string) => {
+  const handleUndo = (movement: Movement) => {
+    const quantity = Number(undoQuantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > movement.qty) return;
     if (onUndoMovement) {
-      onUndoMovement(id);
+      onUndoMovement(movement.id, quantity);
       setConfirmUndoId(null);
+      setUndoQuantity('');
+    }
+  };
+
+  const handleAuditUndo = async (auditId: string) => {
+    if (!onUndoInventoryAudit) return;
+    setUndoError(null);
+    try {
+      await onUndoInventoryAudit(auditId);
+      setConfirmUndoId(null);
+    } catch (error) {
+      setUndoError(error instanceof Error ? error.message : 'Unable to undo this audit entry.');
     }
   };
 
@@ -104,6 +149,48 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setCreateUserPassword('');
     setCreateUserRole('staff');
     setCreateUserFeedback(null);
+  };
+
+  const loadManagedUsers = async () => {
+    try {
+      const users = await requestUserApi<ManagedUser[]>('/users');
+      setManagedUsers(users.filter(account => account.role === 'staff'));
+      setManagedUsersFeedback(null);
+    } catch (error) {
+      setManagedUsersFeedback(error instanceof Error ? error.message : 'Unable to load user accounts.');
+    }
+  };
+
+  const saveManagedUser = async (account: ManagedUser) => {
+    try {
+      await requestUserApi(`/users/${account.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          username: editingUsername,
+          role: editingRole,
+          password: editingPassword,
+          actorUsername: user,
+        }),
+      });
+      setEditingUserId(null);
+      setEditingPassword('');
+      await loadManagedUsers();
+    } catch (error) {
+      setManagedUsersFeedback(error instanceof Error ? error.message : 'Unable to update user account.');
+    }
+  };
+
+  const deleteManagedUser = async (account: ManagedUser) => {
+    if (!window.confirm(`Delete ${account.username}?`)) return;
+    try {
+      await requestUserApi(`/users/${account.id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ actorUsername: user }),
+      });
+      await loadManagedUsers();
+    } catch (error) {
+      setManagedUsersFeedback(error instanceof Error ? error.message : 'Unable to delete user account.');
+    }
   };
 
   const handlePasswordSubmit = async (event: React.FormEvent) => {
@@ -225,8 +312,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               <div className="flex-col-center" style={{ margin: '2.5rem 0', textAlign: 'center' }}>
                 <div 
                   style={{ 
-                    width: '72px', 
-                    height: '72px', 
+                    width: '96px', 
+                    height: '96px', 
                     borderRadius: '50%', 
                     background: 'var(--item-bg)', 
                     border: '1px solid var(--line-soft)',
@@ -236,7 +323,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     marginBottom: '1rem'
                   }}
                 >
-                  <i className="bx bx-user" style={{ fontSize: '2.25rem', opacity: 0.7 }}></i>
+                  <i className="bx bx-user" style={{ fontSize: '3rem', opacity: 0.7 }}></i>
                 </div>
                 <h2 className="title-main" style={{ fontSize: '1.75rem', textTransform: 'none', margin: '0' }}>{displayName}</h2>
                 <span className={`velocity-badge ${role === 'staff' ? 'velocity-low' : 'velocity-medium'}`} style={{ marginTop: '0.75rem', letterSpacing: '0.05em' }}>
@@ -247,27 +334,35 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             </div>
 
             <div className="flex-col-gap" style={{ gap: '0.5rem', marginTop: 'auto' }}>
-              <div className="flex-row-gap" style={{ width: '100%', gap: '0.5rem' }}>
-                <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => {
-                  clearUsernameForm();
-                  setIsUsernameModalOpen(true);
-                }}>
-                  <i className="bx bx-user-circle" style={{ marginRight: '6px' }}></i> Change Username
-                </button>
-                <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => {
-                  clearPasswordForm();
-                  setIsPasswordModalOpen(true);
-                }}>
-                  <i className="bx bx-lock-alt" style={{ marginRight: '6px' }}></i> Change Password
-                </button>
-              </div>
               {role === 'admin' && (
-                <button className="olive-button btn-outline w-full" onClick={() => {
-                  clearCreateUserForm();
-                  setIsCreateUserModalOpen(true);
-                }}>
-                  <i className="bx bx-user-plus" style={{ marginRight: '6px' }}></i> Add New User
-                </button>
+                <>
+                  <div className="flex-row-gap" style={{ width: '100%', gap: '0.5rem' }}>
+                    <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => {
+                      clearUsernameForm();
+                      setIsUsernameModalOpen(true);
+                    }}>
+                      <i className="bx bx-user-circle" style={{ marginRight: '6px' }}></i> Change Username
+                    </button>
+                    <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => {
+                      clearPasswordForm();
+                      setIsPasswordModalOpen(true);
+                    }}>
+                      <i className="bx bx-lock-alt" style={{ marginRight: '6px' }}></i> Change Password
+                    </button>
+                  </div>
+                  <button className="olive-button btn-outline w-full" onClick={() => {
+                    clearCreateUserForm();
+                    setIsCreateUserModalOpen(true);
+                  }}>
+                    <i className="bx bx-user-plus" style={{ marginRight: '6px' }}></i> Add New User
+                  </button>
+                  <button className="olive-button btn-outline w-full" onClick={async () => {
+                    await loadManagedUsers();
+                    setIsManageUsersModalOpen(true);
+                  }}>
+                    <i className="bx bx-group" style={{ marginRight: '6px' }}></i> Manage Accounts
+                  </button>
+                </>
               )}
               <button className="olive-button btn-danger w-full" onClick={onLogout}>
                 <i className="bx bx-log-out" style={{ marginRight: '6px' }}></i> Log Out Operator
@@ -277,7 +372,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         </div>
 
         <div className="flex-col-gap" style={{ height: '100%' }}>
-          <div className="dash-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: '480px' }}>
+          <div className="dash-card audit-history-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: '480px' }}>
             <div className="flex-row-between mb-3" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
               <div className="flex-row-center" style={{ gap: '0.5rem' }}>
                 <i className="bx bx-history" style={{ fontSize: '1.25rem' }}></i>
@@ -321,8 +416,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 style={{ fontSize: '12px', padding: '0.5rem 0.75rem' }}
               />
             </div>
+            {undoError && <p className="label-micro text-accent" role="alert">{undoError}</p>}
 
-            <div className="flex-col-gap dash-card-list" style={{ flex: 1, maxHeight: '420px', overflowY: 'auto', gap: '0.5rem' }}>
+            <div className="flex-col-gap dash-card-list" style={{ flex: 1, maxHeight: '600px', overflowY: 'auto', gap: '0.5rem' }}>
               {filteredMovements.length > 0 ? (
                 filteredMovements.map(m => {
                   const item = inventory.find(i => i.id === m.itemId);
@@ -335,9 +431,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     ? localDateTimestamp
                     : (m.timestamp || localDateTimestamp);
                   const dateFormatted = new Date(movementTimestamp)
-                    .toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    .toLocaleString('en-US', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })
                     .toUpperCase();
                   const isConfirmingThis = confirmUndoId === m.id;
+                  const parsedUndoQuantity = Number(undoQuantity);
+                  const isUndoQuantityValid = Number.isInteger(parsedUndoQuantity) && parsedUndoQuantity >= 1 && parsedUndoQuantity <= m.qty;
+                  const auditActor = ('createdBy' in m ? (m.createdBy || localStorage.getItem('skyrun_session_user') || 'Unknown') : (localStorage.getItem('skyrun_session_user') || 'Unknown'));
 
                   return (
                     <div 
@@ -360,43 +459,51 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                               textOverflow: 'ellipsis', 
                               overflow: 'hidden', 
                               whiteSpace: 'nowrap',
-                              fontSize: '12px',
+                              fontSize: '14px',
                               opacity: 1
                             }}
                           >
                             {'itemName' in m ? m.itemName : item?.name || m.itemId}
                           </span>
-                          <span className={`status-chip ${actionLabel === 'IN' || actionLabel === 'ADD' ? 'status-optimal' : 'status-critical'}`} style={{ padding: '1px 6px', fontSize: '8px' }}>
+                          <span className={`status-chip ${actionLabel === 'IN' || actionLabel === 'ADD' ? 'status-optimal' : 'status-critical'}`} style={{ padding: '1px 6px', fontSize: '9px' }}>
                             {actionLabel}
                           </span>
                         </div>
                         
-                        <div className="flex-row-center" style={{ gap: '0.75rem', fontSize: '10px', lineHeight: 1.2 }}>
+                        <div className="flex-row-center" style={{ gap: '0.75rem', fontSize: '11px', lineHeight: 1.2 }}>
                           <span className="font-mono opacity-50">ID: {m.itemId}</span>
-                          <span className="font-mono opacity-40" style={{ marginLeft: '0.5rem' }}>Ref: {m.id}</span>
-                          {isMovement && (
-                            <span className="font-mono opacity-50" style={{ marginLeft: '0.5rem' }}>
-                              By: {'createdBy' in m ? m.createdBy || 'Unknown' : 'Unknown'}
-                            </span>
-                          )}
+                          <span className="font-mono opacity-50" style={{ marginLeft: '0.5rem' }}>
+                            By: {auditActor}
+                          </span>
                         </div>
                       </div>
 
                       <div className="flex-row-center" style={{ gap: '0.75rem', flexShrink: 0 }}>
                         <div className="flex-col-end" style={{ textAlign: 'right' }}>
-                          <span className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`} style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                          <span className={`label-micro font-mono ${isIn || actionLabel === 'ADD' ? 'text-success' : 'text-accent'}`} style={{ fontWeight: 'bold', fontSize: '14px' }}>
                             {isMovement ? `${isIn ? '+' : '-'}${m.qty}` : actionLabel}
                           </span>
-                          <span className="label-micro font-mono text-micro opacity-50" style={{ fontSize: '9px' }}>
+                          <span className="label-micro font-mono text-micro opacity-50" style={{ fontSize: '10px' }}>
                             {dateFormatted}
                           </span>
                         </div>
 
-                        {isMovement && onUndoMovement && (
-                          isConfirmingThis ? (
+                        {role === 'admin' && ((isMovement && onUndoMovement) || (!isMovement && onUndoInventoryAudit)) && (
+                          isConfirmingThis ? isMovement ? (
                             <div className="flex-row-center" style={{ gap: '4px' }}>
+                              <input
+                                type="number"
+                                className="undo-quantity-input"
+                                min="1"
+                                max={m.qty}
+                                value={undoQuantity}
+                                onChange={(e) => setUndoQuantity(e.target.value)}
+                                aria-label={`Amount to undo for ${'itemName' in m ? m.itemName : item?.name || m.itemId}`}
+                                style={{ width: '48px', padding: '2px 4px', fontSize: '10px' }}
+                              />
                               <button 
-                                onClick={() => handleUndo(m.id)}
+                                onClick={() => handleUndo(m)}
+                                disabled={!isUndoQuantityValid}
                                 title="Confirm Undo"
                                 className="olive-button btn-danger label-micro"
                                 style={{ padding: '2px 6px', fontSize: '9px', textTransform: 'none' }}
@@ -405,15 +512,40 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                               </button>
                               <button 
                                 onClick={() => setConfirmUndoId(null)}
-                                className="olive-button btn-outline label-micro"
+                                className="olive-button btn-outline label-micro undo-cancel-button"
                                 style={{ padding: '2px 6px', fontSize: '9px', textTransform: 'none' }}
                               >
                                 Cancel
                               </button>
                             </div>
                           ) : (
-                            <button 
-                              onClick={() => setConfirmUndoId(m.id)}
+                            <div className="flex-row-center" style={{ gap: '4px' }}>
+                              <button
+                                onClick={() => void handleAuditUndo(m.id)}
+                                title="Confirm Undo"
+                                className="olive-button btn-danger label-micro"
+                                style={{ padding: '2px 6px', fontSize: '9px', textTransform: 'none' }}
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => setConfirmUndoId(null)}
+                                className="olive-button btn-outline label-micro undo-cancel-button"
+                                style={{ padding: '2px 6px', fontSize: '9px', textTransform: 'none' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (isMovement) {
+                                  setConfirmUndoId(m.id);
+                                  setUndoQuantity(String(m.qty));
+                                } else if (onUndoInventoryAudit) {
+                                  setConfirmUndoId(m.id);
+                                }
+                              }}
                               title="Undo Transaction"
                               style={{
                                 background: 'rgba(239, 68, 68, 0.05)',
@@ -526,6 +658,52 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             <button type="submit" className="olive-button" style={{ flex: 1 }}>Create</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div className={`modal-overlay ${isManageUsersModalOpen ? 'active' : ''}`}>
+      <div className="modal-content">
+        <div className="modal-header">
+          <span className="label-micro">Manage User Accounts</span>
+          <button className="close-modal" onClick={() => { setIsManageUsersModalOpen(false); setEditingUserId(null); }}><i className="bx bx-x"></i></button>
+        </div>
+        <div className="modal-body account-management-list">
+          {managedUsers.map(account => (
+            <div key={account.id} className="account-management-row">
+              {editingUserId === account.id ? (
+                <div className="account-management-edit">
+                  <input className="form-input" value={editingUsername} onChange={event => setEditingUsername(event.target.value)} aria-label="Username" />
+                  <select className="form-input" value={editingRole} onChange={event => setEditingRole(event.target.value as UserRole)} aria-label="Role">
+                    <option value="staff">Staff</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <input className="form-input" type="password" value={editingPassword} onChange={event => setEditingPassword(event.target.value)} placeholder="New password (optional)" aria-label="New password" />
+                  <div className="flex-row-gap">
+                    <button className="olive-button" onClick={() => saveManagedUser(account)}>Save</button>
+                    <button className="olive-button btn-outline" onClick={() => setEditingUserId(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="account-management-summary">
+                    <strong>{account.username}</strong>
+                    <span className="label-micro">{account.role}</span>
+                  </div>
+                  <div className="flex-row-gap">
+                    <button className="olive-button btn-outline btn-mini" onClick={() => {
+                      setEditingUserId(account.id);
+                      setEditingUsername(account.username);
+                      setEditingRole(account.role);
+                      setEditingPassword('');
+                    }}>Edit</button>
+                    <button className="olive-button btn-danger btn-mini" disabled={account.username.toLowerCase() === user.toLowerCase()} onClick={() => deleteManagedUser(account)}>Delete</button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          {managedUsersFeedback && <p className="label-micro text-accent">{managedUsersFeedback}</p>}
+        </div>
       </div>
     </div>
 

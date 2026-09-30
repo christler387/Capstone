@@ -28,6 +28,7 @@ export const Stock: React.FC<StockProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showConfirmOverdraw, setShowConfirmOverdraw] = useState<boolean>(false);
   const [pendingMovement, setPendingMovement] = useState<Movement | null>(null);
+  const [itemSearch, setItemSearch] = useState('');
   const [formData, setFormData] = useState({
     itemId: selectedItemId || '',
     name: '',
@@ -44,6 +45,7 @@ export const Stock: React.FC<StockProps> = ({
     if (selectedItemId) {
       const item = inventory.find(i => i.id === selectedItemId);
       if (item) {
+        setItemSearch(`${item.id} - ${item.name}`);
         setFormData({
           itemId: selectedItemId,
           name: item.name,
@@ -65,6 +67,7 @@ export const Stock: React.FC<StockProps> = ({
       return;
     }
     const item = inventory.find(i => i.id === id);
+    setItemSearch(item ? `${item.id} - ${item.name}` : '');
     setFormData({
       itemId: id,
       name: item?.name || '',
@@ -73,6 +76,17 @@ export const Stock: React.FC<StockProps> = ({
       compatibleVehicles: item?.compatibleVehicles || '',
       qty: 0
     });
+  };
+
+  const handleItemSearch = (value: string, type: 'in' | 'out') => {
+    setItemSearch(value);
+    const query = value.trim().toLowerCase();
+    const exactMatch = inventory.find(item => `${item.id} - ${item.name}`.toLowerCase() === query);
+    if (exactMatch) {
+      handleItemSelect(exactMatch.id, type);
+      return;
+    }
+    setFormData(prev => ({ ...prev, itemId: '', name: '', category: '', rack: '', compatibleVehicles: '' }));
   };
 
 
@@ -185,11 +199,33 @@ export const Stock: React.FC<StockProps> = ({
       )}
       <div className="form-group">
         <label className="label-micro">{type === 'in' ? 'Select Item to Restock' : 'Select Item to Deduct'}</label>
-        <select className="form-input" value={formData.itemId} onChange={(e) => handleItemSelect(e.target.value, type)}>
-          <option value="">-- Select Item --</option>
-          {type === 'in' && userRole === 'admin' && <option value="NEW">-- Add New Item --</option>}
-          {[...inventory].sort((a, b) => a.name.localeCompare(b.name)).map(i => <option key={i.id} value={i.id}>{i.id} - {i.name}</option>)}
-        </select>
+        <div className="stock-item-search">
+          <input
+            type="search"
+            className="form-input"
+            value={itemSearch}
+            onChange={(e) => handleItemSearch(e.target.value, type)}
+            placeholder="Search items by ID or name..."
+            aria-label={type === 'in' ? 'Search item to restock' : 'Search item to deduct'}
+          />
+          {!formData.itemId && itemSearch.trim() && (
+            <div className="stock-item-suggestions">
+              {type === 'in' && userRole === 'admin' && (
+                <button type="button" className="stock-item-suggestion" onClick={() => onAddItem()}>
+                  + Add New Item
+                </button>
+              )}
+              {[...inventory]
+                .filter(item => `${item.id} ${item.name}`.toLowerCase().includes(itemSearch.trim().toLowerCase()))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(item => (
+                  <button type="button" className="stock-item-suggestion" key={item.id} onClick={() => handleItemSelect(item.id, type)}>
+                    {item.id} - {item.name}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
       </div>
       <div className="form-group">
         <label className="label-micro">Item Name</label>

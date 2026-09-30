@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
+import catsImage from '../assets/cats.png';
+import skyrunLogo from '../assets/Skyrun.png';
 
 interface LoginProps {
   onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string | null, phone?: string | null) => void;
@@ -10,6 +12,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,63 +49,50 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="flex-col-center" style={{ minHeight: '100vh', padding: '2rem', background: 'var(--bg)' }}>
-      <div 
-        className="dash-card" 
-        style={{ 
-          maxWidth: '440px', 
-          width: '100%', 
-          padding: '2.5rem', 
-          border: '1px solid var(--line)',
-          borderRadius: 'var(--radius)',
-          background: 'var(--bg)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.05)'
-        }}
-      >
-        <div className="flex-col" style={{ gap: '0.5rem', marginBottom: '2rem', textAlign: 'center' }}>
-          <h1 className="title-main" style={{ fontSize: '2rem', marginTop: '0.5rem' }}>Skyrun Auto</h1>
+    <div className="login-shell">
+      <div className="login-panel">
+        <div className="brand-lockup" aria-label="Skyrun brand">
+          <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
+          <span className="brand-wordmark">SKYRUN</span>
         </div>
 
+        <h1 className="login-title">Login</h1>
+
         {error && (
-          <div 
-            className="font-mono alert-text" 
-            style={{ 
-              fontSize: '11px', 
-              padding: '0.75rem', 
-              border: '1px solid var(--accent)', 
-              background: 'rgba(255, 68, 68, 0.05)', 
-              marginBottom: '1.5rem',
-              borderRadius: 'var(--radius)'
-            }}
-          >
-            <i className="bx bx-error-circle" style={{ marginRight: '6px', verticalAlign: 'middle' }}></i>
+          <div className="login-alert">
+            <i className="bx bx-error-circle" aria-hidden="true"></i>
             {error}
           </div>
         )}
 
-        <form noValidate onSubmit={handleLogin} className="flex-col-gap" style={{ gap: '1.25rem' }}>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="label-micro" htmlFor="username">Username</label>
-            <input 
-              type="text" 
-              id="username" 
-              className="form-input font-mono" 
-              placeholder="e.g. admin"
+        <form noValidate onSubmit={handleLogin} className="login-form">
+          <div className="input-block">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  passwordInputRef.current?.focus();
+                }
+              }}
               disabled={isLoading}
               required
             />
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="label-micro" htmlFor="password">Password</label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                id="password" 
-                className="form-input font-mono" 
-                placeholder="••••••••"
+          <div className="input-block">
+            <label htmlFor="password">Password</label>
+            <div className="password-wrap">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                placeholder="Password"
+                ref={passwordInputRef}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
@@ -110,42 +100,31 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               />
               <button
                 type="button"
+                className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  opacity: 0.5,
-                  fontSize: '1.1rem',
-                  color: 'var(--ink)'
-                }}
                 title={showPassword ? 'Hide Password' : 'Show Password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                <i className={`bx ${showPassword ? 'bx-hide' : 'bx-show'}`}></i>
+                <i className={`bx ${showPassword ? 'bx-hide' : 'bx-show'}`} aria-hidden="true"></i>
               </button>
             </div>
           </div>
 
-          <button 
-            type="submit" 
-            className="olive-button" 
-            style={{ width: '100%', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-            disabled={isLoading}
-          >
+          <button type="submit" className="login-button" disabled={isLoading}>
             {isLoading ? (
               <>
-                <i className="bx bx-loader-alt bx-spin"></i>
+                <i className="bx bx-loader-alt bx-spin" aria-hidden="true"></i>
                 <span>Verifying...</span>
               </>
             ) : (
-              <span>Access System</span>
+              <span>Sign in</span>
             )}
           </button>
         </form>
+      </div>
+
+      <div className="login-art" aria-hidden="true">
+        <img src={catsImage} alt="" />
       </div>
     </div>
   );

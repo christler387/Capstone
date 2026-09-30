@@ -100,35 +100,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
     </div>
   );
 
-  return (
-    <div className="content-section">
-      {renderSummaryStats()}
-      <div className="dashboard-grid">
-        <SectionCard title="Category Prices">
-          {Object.entries(catData).length > 0 ? (
-            Object.entries(catData).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, d]) => (
-              <div key={cat} className="flex-row-between border-soft">
-                <span className="label-micro opacity-80" style={{ textTransform: 'none' }}>{cat}</span>
-                <span className="label-micro font-mono" style={{ fontWeight: 'bold' }}>₱{d.val.toLocaleString()}</span>
-              </div>
-            ))
-          ) : (
-            <p className="label-micro opacity-30">No category price data.</p>
-          )}
-        </SectionCard>
-        <SectionCard title="Category Units">
-          {Object.entries(catData).length > 0 ? (
-            Object.entries(catData).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, d]) => (
-              <div key={cat} className="flex-row-between border-soft">
-                <span className="label-micro opacity-80" style={{ textTransform: 'none' }}>{cat}</span>
-                <span className="label-micro font-mono" style={{ fontWeight: 'bold' }}>{d.qty.toLocaleString()} units</span>
-              </div>
-            ))
-          ) : (
-            <p className="label-micro opacity-30">No category unit data.</p>
-          )}
-        </SectionCard>
-        <SectionCard title="Low Stock Alerts">
+  const renderDashboardGrid = (includeOverview = true, includeReports = true) => (
+    <div className={`dashboard-grid ${includeOverview ? 'overview-grid' : 'report-grid'}`}>
+        {includeOverview && <SectionCard title="Low Stock Alerts">
           {lowStock.length > 0 ? (
             lowStock.sort((a, b) => a.name.localeCompare(b.name)).map(i => (
               <div key={i.id} className="flex-row-between border-soft low-stock-item cursor-pointer" onClick={() => onGoToStock(i.id)}>
@@ -141,14 +115,111 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
           ) : (
             <p className="label-micro opacity-30">All stock levels optimal.</p>
           )}
-        </SectionCard>
-        <SectionCard title="EOQ & ROP Reorder Report">
+        </SectionCard>}
+        {includeOverview && <SectionCard title="Category Units">
+          {Object.entries(catData).length > 0 ? (
+            Object.entries(catData).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, d]) => (
+              <div key={cat} className="flex-row-between border-soft">
+                <span className="label-micro opacity-80" style={{ textTransform: 'none' }}>{cat}</span>
+                <span className="label-micro font-mono" style={{ fontWeight: 'bold' }}>{d.qty.toLocaleString()} units</span>
+              </div>
+            ))
+          ) : (
+            <p className="label-micro opacity-30">No category unit data.</p>
+          )}
+        </SectionCard>}
+        {includeOverview && <SectionCard title="Category Prices">
+          {Object.entries(catData).length > 0 ? (
+            Object.entries(catData).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, d]) => (
+              <div key={cat} className="flex-row-between border-soft">
+                <span className="label-micro opacity-80" style={{ textTransform: 'none' }}>{cat}</span>
+                <span className="label-micro font-mono" style={{ fontWeight: 'bold' }}>₱{d.val.toLocaleString()}</span>
+              </div>
+            ))
+          ) : (
+            <p className="label-micro opacity-30">No category price data.</p>
+          )}
+        </SectionCard>}
+        {includeReports && <SectionCard title="Recent Audit History">
+          {recentMovements.length > 0 ? (
+            recentMovements.map(movement => {
+              const item = inventory.find(i => i.id === movement.itemId);
+              const isIn = movement.type === 'IN';
+              const dateFormatted = new Date(movement.timestamp).toLocaleString('en-US', {
+                day: '2-digit',
+                month: 'short',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              }).toUpperCase();
+
+              return (
+                <div
+                  key={movement.id}
+                  className="flex-row-between border-soft"
+                  style={{
+                    gap: '0.75rem',
+                    alignItems: 'flex-start',
+                    padding: '0.45rem 0.5rem',
+                    margin: '0 -0.5rem',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span
+                      className="label-micro opacity-80"
+                      style={{
+                        display: 'block',
+                        textTransform: 'uppercase',
+                        textOverflow: 'ellipsis',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        lineHeight: 1.2,
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {item?.name || movement.itemId}
+                    </span>
+                    <span
+                      className="label-micro font-mono opacity-50"
+                      style={{
+                        display: 'block',
+                        fontSize: '11px',
+                        marginTop: '2px',
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {dateFormatted}
+                    </span>
+                  </div>
+                  <span
+                    className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`}
+                    style={{
+                      fontWeight: 'bold',
+                      flexShrink: 0,
+                      minWidth: '2.5rem',
+                      textAlign: 'right',
+                      lineHeight: 1.2,
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    {isIn ? '+' : '-'}{movement.qty}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <p className="label-micro opacity-30">No recent audit activity.</p>
+          )}
+        </SectionCard>}
+        {includeReports && <SectionCard title="EOQ & ROP Reorder Report">
           {reorderReport.length > 0 ? (
             reorderReport.map(({ item, eoq, rop, reorderQty }) => (
               <div key={item.id} className="flex-row-between border-soft reorder-report-row" onClick={() => onGoToStock(item.id)}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span className="label-micro opacity-80" style={{ display: 'block', textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.name}</span>
-                  <span className="label-micro font-mono opacity-50" style={{ display: 'block', fontSize: '9px', marginTop: '2px' }}>
+                  <span className="label-micro font-mono opacity-50" style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
                     EOQ {Math.ceil(eoq || 0)} • ROP {Math.ceil(rop || 0)}
                   </span>
                 </div>
@@ -162,8 +233,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
           ) : (
             <p className="label-micro opacity-30">No reorder data available.</p>
           )}
-        </SectionCard>
-      </div>
+        </SectionCard>}
+    </div>
+  );
+
+  return (
+    <div className="content-section">
+      {renderSummaryStats()}
+      {renderDashboardGrid(true, false)}
+      {renderDashboardGrid(false, true)}
     </div>
   );
 };

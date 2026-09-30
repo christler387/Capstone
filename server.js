@@ -23,7 +23,7 @@ export const pool = mysql.createPool({
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const inventorySeed = [
   ['001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
@@ -92,15 +92,26 @@ async function initializeDatabase() {
     ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100,
     holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
     lead_time_days INT NOT NULL DEFAULT 7,
-    safety_stock INT NOT NULL DEFAULT 0,
+    safety_stock INT NOT NULL DEFAULT 10,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100');
   await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0');
   await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS lead_time_days INT NOT NULL DEFAULT 7');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INT NOT NULL DEFAULT 0');
+  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INT NOT NULL DEFAULT 10');
   await pool.query('UPDATE inventory SET holding_cost = price * 0.2 WHERE holding_cost = 0');
+  await pool.query(`CREATE TABLE IF NOT EXISTS inventory_audit (
+    id VARCHAR(64) PRIMARY KEY,
+    item_id VARCHAR(32) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    action ENUM('ADD', 'DELETE') NOT NULL,
+    item_data JSON NULL,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query('ALTER TABLE inventory_audit ADD COLUMN IF NOT EXISTS item_data JSON NULL');
+  await pool.query('ALTER TABLE inventory_audit ADD COLUMN IF NOT EXISTS created_by VARCHAR(64) NULL');
   await pool.query(`CREATE TABLE IF NOT EXISTS movements (
     id VARCHAR(64) PRIMARY KEY,
     item_id VARCHAR(32) NOT NULL,
@@ -171,7 +182,7 @@ function toItem(row) {
     orderingCost: Number(row.ordering_cost || 100),
     holdingCost: Number(row.holding_cost || Number(row.price) * 0.2),
     leadTimeDays: Number(row.lead_time_days || 7),
-    safetyStock: Number(row.safety_stock || 0),
+    safetyStock: Number(row.safety_stock ?? 10),
   };
 }
 
@@ -181,6 +192,22 @@ function toMovement(row) {
     : String(row.movement_date).slice(0, 10);
   const timestamp = row.created_at ? new Date(row.created_at).getTime() : new Date(date).getTime();
   return { id: row.id, itemId: row.item_id, type: row.type, qty: Number(row.qty), date, timestamp, createdBy: row.created_by || undefined };
+}
+
+function toInventoryAudit(row) {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    itemName: row.item_name,
+    action: row.action,
+    date: row.created_at instanceof Date
+      ? row.created_at.toISOString().slice(0, 10)
+      : String(row.created_at).slice(0, 10),
+    timestamp: row.created_at instanceof Date
+      ? row.created_at.getTime()
+      : new Date(row.created_at).getTime(),
+    createdBy: row.created_by || undefined,
+  };
 }
 
 function hashPassword(password) {
@@ -194,6 +221,24 @@ function normalizeItemId(value) {
 
 function normalizeOptionalText(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+const HISTORY_RETENTION_DAYS = Number(process.env.HISTORY_RETENTION_DAYS || 90);
+
+export async function purgeExpiredHistory() {
+  const [result] = await pool.query(
+    'DELETE FROM inventory_audit WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+    [HISTORY_RETENTION_DAYS],
+  );
+  return Number(result?.affectedRows || 0);
+}
+
+export function scheduleHistoryCleanup() {
+  setInterval(() => {
+    void purgeExpiredHistory().catch((error) => {
+      console.error('Audit history cleanup failed:', error.message);
+    });
+  }, 60 * 60 * 1000);
 }
 
 function normalizeEmail(value) {
@@ -248,6 +293,85 @@ app.post('/api/users', async (req, res) => {
   ]);
 
   res.status(201).json({ ok: true, username: normalizedUsername });
+});
+
+app.put('/api/users/:id', async (req, res) => {
+  const { username, password, role, actorUsername } = req.body || {};
+  const userId = Number(req.params.id);
+
+  if (!Number.isInteger(userId) || !username || !actorUsername) {
+    return res.status(400).json({ error: 'User ID, username, and admin account are required.' });
+  }
+
+  const [[actor]] = await pool.query('SELECT role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [String(actorUsername).trim()]);
+  if (!actor || actor.role !== 'admin') {
+    return res.status(403).json({ error: 'Administrator access is required.' });
+  }
+
+  const normalizedUsername = String(username).trim();
+  if (normalizedUsername.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+  }
+  if (password !== undefined && String(password).trim().length > 0 && String(password).trim().length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+  }
+
+  const [[targetUser]] = await pool.query('SELECT role FROM users WHERE id=? LIMIT 1', [userId]);
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+  if (targetUser.role !== 'staff') {
+    return res.status(403).json({ error: 'Only staff accounts can be managed here.' });
+  }
+
+  const [[existing]] = await pool.query('SELECT id FROM users WHERE LOWER(username)=LOWER(?) AND id != ? LIMIT 1', [normalizedUsername, userId]);
+  if (existing) {
+    return res.status(409).json({ error: 'That username is already in use.' });
+  }
+
+  const updates = ['username=?', 'role=?'];
+  const values = [normalizedUsername, role === 'admin' ? 'admin' : 'staff'];
+  if (password !== undefined && String(password).trim()) {
+    updates.push('password_hash=?');
+    values.push(hashPassword(String(password).trim()));
+  }
+  values.push(userId);
+  const [result] = await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id=?`, values);
+  if (result.affectedRows === 0) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  res.json({ ok: true, username: normalizedUsername });
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  const { actorUsername } = req.body || {};
+  const userId = Number(req.params.id);
+  if (!Number.isInteger(userId) || !actorUsername) {
+    return res.status(400).json({ error: 'User ID and admin account are required.' });
+  }
+
+  const [[actor]] = await pool.query('SELECT id, role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1', [String(actorUsername).trim()]);
+  if (!actor || actor.role !== 'admin') {
+    return res.status(403).json({ error: 'Administrator access is required.' });
+  }
+  if (actor.id === userId) {
+    return res.status(400).json({ error: 'You cannot delete the active administrator account.' });
+  }
+
+  const [[targetUser]] = await pool.query('SELECT role FROM users WHERE id=? LIMIT 1', [userId]);
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+  if (targetUser.role !== 'staff') {
+    return res.status(403).json({ error: 'Only staff accounts can be managed here.' });
+  }
+
+  const [result] = await pool.query('DELETE FROM users WHERE id=?', [userId]);
+  if (result.affectedRows === 0) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+  res.json({ ok: true });
 });
 
 app.put('/api/users/change-password', async (req, res) => {
@@ -341,14 +465,19 @@ app.get('/api/inventory', async (_req, res) => {
 app.post('/api/inventory', async (req, res) => {
   const item = req.body;
   const itemId = normalizeItemId(item.id);
+  const createdBy = item.createdBy || 'Unknown';
   await pool.query(`INSERT INTO inventory
     (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     itemId, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
     item.rack, item.level || null, item.size || null, item.weight || null, item.demand || null,
     item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 0,
+    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 10,
   ]);
+  await pool.query(
+    'INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+    [`AUDIT-ADD-${crypto.randomUUID()}`, itemId, item.name, 'ADD', JSON.stringify({ ...item, id: itemId }), createdBy],
+  );
   res.status(201).json({ ...item, id: itemId });
 });
 
@@ -360,14 +489,66 @@ app.put('/api/inventory/:id', async (req, res) => {
     item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0, item.rack,
     item.level || null, item.size || null, item.weight || null, item.demand || null,
     item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 0, itemId,
+    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 10, itemId,
   ]);
   res.json({ ...item, id: submittedItemId });
 });
 
 app.delete('/api/inventory/:id', async (req, res) => {
-  await pool.query('DELETE FROM inventory WHERE id=?', [normalizeItemId(req.params.id)]);
+  const itemId = normalizeItemId(req.params.id);
+  const createdBy = req.body?.createdBy || 'Unknown';
+  const [[item]] = await pool.query('SELECT * FROM inventory WHERE id=?', [itemId]);
+  await pool.query('DELETE FROM inventory WHERE id=?', [itemId]);
+  if (item) {
+    await pool.query(
+      'INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+      [`AUDIT-DELETE-${crypto.randomUUID()}`, itemId, item.name, 'DELETE', JSON.stringify(toItem(item)), createdBy],
+    );
+  }
   res.status(204).end();
+});
+
+app.get('/api/inventory-audit', async (_req, res) => {
+  const [rows] = await pool.query('SELECT * FROM inventory_audit ORDER BY created_at DESC');
+  res.json(rows.map(toInventoryAudit));
+});
+
+app.patch('/api/inventory-audit/:id/undo', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[audit]] = await connection.query('SELECT * FROM inventory_audit WHERE id=? FOR UPDATE', [req.params.id]);
+    if (!audit) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Audit entry not found.' });
+    }
+    if (!audit.item_data && audit.action === 'DELETE') {
+      await connection.rollback();
+      return res.status(400).json({ error: 'This audit entry cannot be undone because its item snapshot is unavailable.' });
+    }
+
+    if (audit.action === 'ADD') {
+      await connection.query('DELETE FROM inventory WHERE id=?', [audit.item_id]);
+    } else {
+      const item = typeof audit.item_data === 'string' ? JSON.parse(audit.item_data) : audit.item_data;
+      await connection.query(`INSERT INTO inventory
+        (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        audit.item_id, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
+        item.rack, item.level || null, item.size || null, item.weight || null, item.demand || null,
+        item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
+        item.holdingCost ?? 0, item.leadTimeDays ?? 7, item.safetyStock ?? 10,
+      ]);
+    }
+    await connection.query('DELETE FROM inventory_audit WHERE id=?', [req.params.id]);
+    await connection.commit();
+    res.json({ ok: true, action: audit.action });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 });
 
 app.get('/api/movements', async (_req, res) => {
@@ -414,6 +595,51 @@ app.delete('/api/movements/:id', async (req, res) => {
   }
 });
 
+app.patch('/api/movements/:id/undo', async (req, res) => {
+  const requestedQty = Number(req.body?.qty);
+  if (!Number.isInteger(requestedQty) || requestedQty < 1) {
+    return res.status(400).json({ error: 'Undo quantity must be a positive whole number.' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[movement]] = await connection.query('SELECT * FROM movements WHERE id=? FOR UPDATE', [req.params.id]);
+    if (!movement) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Movement not found' });
+    }
+    if (requestedQty > movement.qty) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Undo quantity cannot exceed the movement quantity.' });
+    }
+
+    const delta = movement.type === 'IN' ? -requestedQty : requestedQty;
+    const remainingQty = movement.qty - requestedQty;
+    if (remainingQty === 0) {
+      await connection.query('DELETE FROM movements WHERE id=?', [req.params.id]);
+    } else {
+      await connection.query('UPDATE movements SET qty=? WHERE id=?', [remainingQty, req.params.id]);
+    }
+    await connection.query('UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?', [delta, movement.item_id]);
+    await connection.commit();
+
+    if (remainingQty === 0) {
+      return res.json({ deleted: true });
+    }
+
+    res.json({
+      deleted: false,
+      movement: toMovement({ ...movement, qty: remainingQty }),
+    });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
@@ -426,6 +652,10 @@ app.use((error, _req, res, _next) => {
 
 export async function startServer() {
   await initializeDatabase();
+  void purgeExpiredHistory().catch((error) => {
+    console.error('Initial audit history cleanup failed:', error.message);
+  });
+  scheduleHistoryCleanup();
   app.listen(port, () => console.log(`API listening on http://localhost:${port}`));
 }
 
