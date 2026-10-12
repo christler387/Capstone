@@ -340,9 +340,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             onChange={handleChange}
             disabled={readOnly}
           >
-            <option value="HIGH">HIGH</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="LOW">LOW</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
           </select>
         </div>
       </div>

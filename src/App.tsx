@@ -38,8 +38,6 @@ const App: React.FC = () => {
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userPhone, setUserPhone] = useState<string | null>(null);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -60,15 +58,11 @@ const App: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const handleLoginSuccess = (username: string, role: UserRole, email?: string | null, phone?: string | null) => {
+  const handleLoginSuccess = (username: string, role: UserRole) => {
     localStorage.setItem('skyrun_session_user', username);
     localStorage.setItem('skyrun_session_role', role);
-    localStorage.setItem('skyrun_session_email', email || '');
-    localStorage.setItem('skyrun_session_phone', phone || '');
     setUser(username);
     setUserRole(role);
-    setUserEmail(email || null);
-    setUserPhone(phone || null);
   };
 
   const handleSwitchRole = (newRole: UserRole, newName: string) => {
@@ -81,12 +75,8 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('skyrun_session_user');
     localStorage.removeItem('skyrun_session_role');
-    localStorage.removeItem('skyrun_session_email');
-    localStorage.removeItem('skyrun_session_phone');
     setUser(null);
     setUserRole('staff');
-    setUserEmail(null);
-    setUserPhone(null);
     setCurrentSection('dashboard');
   };
 
@@ -129,26 +119,487 @@ const App: React.FC = () => {
   const [stockToItem, setStockToItem] = useState<string | undefined>(undefined);
   const [locateRack, setLocateRack] = useState<string | null>(null);
 
+  const renderManualHTML = (markdownText: string) => {
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const formatInline = (value: string) => escapeHtml(value)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>');
+
+    const lines = markdownText.split('\n');
+    let html = '';
+    let listType: 'ul' | 'ol' | null = null;
+    const listItems: string[] = [];
+    let tableRows: string[] = [];
+
+    const flushList = () => {
+      if (!listItems.length) return;
+
+      const tag = listType === 'ol' ? 'ol' : 'ul';
+      html += `<${tag}>${listItems.map(item => `<li>${formatInline(item)}</li>`).join('')}</${tag}>`;
+      listItems.length = 0;
+      listType = null;
+    };
+
+    const flushTable = () => {
+      if (tableRows.length === 0) return;
+
+      const rows = tableRows.map((rowText) => rowText.split('|').map(cell => cell.trim()).filter((_, index, array) => index > 0 && index < array.length - 1));
+      if (rows.length < 2) {
+        html += `<p>${formatInline(tableRows.join(' | '))}</p>`;
+      } else {
+        const [header, ...bodyRows] = rows;
+        const headerHtml = header.map(cell => `<th>${formatInline(cell)}</th>`).join('');
+        const bodyHtml = bodyRows.map(row => `<tr>${row.map(cell => `<td>${formatInline(cell)}</td>`).join('')}</tr>`).join('');
+        html += `<table class="manual-table"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+      }
+
+      tableRows = [];
+    };
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        flushList();
+        flushTable();
+        return;
+      }
+
+      if (trimmed.includes('|')) {
+        flushList();
+        tableRows.push(trimmed);
+        return;
+      }
+
+      const headingMatch = trimmed.match(/^(#+)\s+(.*)$/);
+      if (headingMatch) {
+        flushList();
+        flushTable();
+        const level = Math.min(Math.max(headingMatch[1].length, 1), 4);
+        html += `<h${level}>${formatInline(headingMatch[2])}</h${level}>`;
+        return;
+      }
+
+      if (/^[-*]\s+/.test(trimmed)) {
+        if (listType !== 'ul') {
+          flushList();
+          listType = 'ul';
+        }
+        listItems.push(trimmed.replace(/^[-*]\s+/, ''));
+        return;
+      }
+
+      if (/^\d+\.\s+/.test(trimmed)) {
+        if (listType !== 'ol') {
+          flushList();
+          listType = 'ol';
+        }
+        listItems.push(trimmed.replace(/^\d+\.\s+/, ''));
+        return;
+      }
+
+      flushList();
+      flushTable();
+      html += `<p>${formatInline(trimmed)}</p>`;
+    });
+
+    flushList();
+    flushTable();
+    return html;
+  };
+
   const sectionInfo: Record<string, { title: string; description: string }> = {
     dashboard: {
-      title: 'Dashboard Info',
-        description: 'hehehe hohoho'
+      title: 'Dashboard Manual',
+      description: `## Summary Bar
+Three headline figures run across the top of the dashboard.
+
+- **Total Items** – The number of distinct items in the system (shown as \`011\`, meaning 11 items). This counts item types, not individual units.
+- **Inventory Value** – The total peso value (₱) of everything in stock. It equals the sum of the Category Prices panel below.
+- **Critical Alerts** – The number of items that need immediate attention (shown in red). It matches the number of entries in the Low Stock Alerts panel.
+
+## 4. Category Units
+This panel (green top border) shows how many units are in stock for each category:
+
+- Body
+- Brakes
+- Electrical
+- Misc
+- Suspension
+- Transmission
+Use it to see which categories hold the most stock and which are thin. The total across categories is your total unit count.
+
+## 5. Category Prices
+This panel (purple top border) shows the peso value of the stock held in each category, using the same six categories. Compare it with Category Units to see where your money is tied up. A category can have many units but low value (for example, Misc), or few units but high value.
+
+## 6. Low Stock Alerts
+This panel (red top border) lists items whose stock has fallen to a level that needs action. Each row shows:
+
+- **Item name** (left)
+- **Current quantity on hand** (right, in red)
+For example, if *Front Fender Panel* shows \`4\`, there are only 4 on hand. When this panel is empty, no items are below their reorder point.
+
+**What to do:** Review each listed item and check the EOQ & ROP Reorder Report to see how many to order.
+
+## 7. Recent Audit History
+This panel (yellow top border) is a log of the latest stock changes. Each entry shows:
+
+- **Item name**
+- **Date and time** of the change (for example, "Sep 24, 4:03 PM")
+- **Quantity change** – a red negative number (e.g. \`-5\`) for stock removed, or a green positive number (e.g. \`+10\`) for stock added
+Use this log to confirm that adjustments were recorded correctly and to trace unexpected drops in quantity. If you see entries with placeholder or test-like names, they are likely test records and can be reviewed with your administrator.
+
+## 8. EOQ & ROP Reorder Report
+This panel (blue top border) tells you what to buy and how much. Two terms are used:
+
+- **ROP (Reorder Point)** – The stock level at which you should place a new order.
+- **EOQ (Economic Order Quantity)** – The standard, cost-efficient order size for that item.
+Each row shows the item name, its EOQ and ROP values, and a red **BUY** recommendation on the right.
+
+In the example screen, the recommended quantity matches the gap between the reorder point and the current stock: Front Fender Panel has ROP 79 and 4 on hand, giving BUY 75; Ceramic Brake Pads (Set) has ROP 19 and 15 on hand, giving BUY 4.
+
+**What to do:** Use the BUY figure as a guide when raising a purchase order. Compare it with the item's EOQ to decide whether to order the minimum needed or a full economic batch.
+
+## 9. Daily Routine
+
+1. Open the **Dashboard**.
+2. Check **Critical Alerts** in the summary bar.
+3. Review **Low Stock Alerts** to see which items are running low.
+4. Open the **EOQ & ROP Reorder Report** to see how many to order.
+5. Scan **Recent Audit History** for unexpected changes.
+6. Go to **Stock** to record any received or used items, then return to the Dashboard to confirm figures updated.`
     },
+    
     inventory: {
-      title: 'Inventory Info',
-      description: 'hehehe'
+      title: 'Inventory Manual',
+      description: `## 1. Overview
+The Inventory tab is the master list of every part. Use it to find items, add new ones, edit their details, and remove ones you no longer carry.
+
+The screen has four areas: the **Inventory Ledger** header with search and the **+ Add Item** button, the **category filter**, the **item table**, and the pop-up forms for adding or editing an item.
+
+## 2. Finding Items
+
+### Search and scan
+The **Search items or scan…** box sits beside the Inventory Ledger title. Type a part name, ID, or barcode to narrow the list. The small scan icon at the right end of the box lets you search by barcode using a camera.
+
+### Category filter
+The chips under the search box filter the table by category:
+
+- **All** (default, highlighted in red)
+- **Body**
+- **Brakes**
+- **Electrical**
+- **Engine**
+- **Suspension**
+- **Transmission**
+- **Misc**
+Click a chip to show only that category. Click **All** to see everything again.
+
+### Sorting
+The **Part Name** column header has a small arrow. Click it to change the sort order of the list.
+
+## 3. Reading the Item Table
+Each row is one item. The columns are:
+
+| Column | What it shows |
+| **Img** | Thumbnail photo of the part. A gray box means no image has been added. |
+| **Part Name** | The part's name. Underneath: the vehicles it fits (in green), the item **ID**, and its barcode (**BC**). |
+| **Category** | Which category the part belongs to. |
+| **Location** | Rack code (for example H-03) and shelf level (for example Level: L1). |
+| **Qty** | Units currently in stock. |
+| **Reorder Qty** | How many units to reorder. Shows 00 when no reorder is needed. |
+| **Price** | Unit price in pesos (₱). |
+| **Actions** | The trash icon, used to delete the item. |
+
+### Red numbers
+When **Qty** and **Reorder Qty** appear in red, the item is low on stock. These match the BUY figures in the Dashboard's EOQ & ROP Reorder Report and the entries in Low Stock Alerts.
+
+## 4. Adding a New Item (ADMIN)
+
+1. Click **+ Add Item** (top right).
+2. The **Add New Item** form opens. The **Item ID** is filled in automatically with the next number (for example 014).
+3. Fill in the fields described in section 6. Fields marked with a red asterisk (*) are required.
+4. Click **Save Item**, or **Cancel** to close the form without saving.
+Some fields start with default values: Category is Body, Ordering Cost is 100, Holding Cost / Year is 0, and Lead Time is 7 days. Change these to match the real part.
+
+**Tip:** Holding Cost / Year starts at 0. Enter a real value, because the reorder calculations depend on it.
+
+## 5. Editing an Item (ADMIN)
+
+1. Open the item from the table. The **Edit Item** form opens, titled with the item's ID (for example, Edit Item: 008).
+2. Change the fields you need. The form scrolls, so keep going down to reach every field.
+3. Click **Save Item** to apply your changes, or **Cancel** (or the **X** at the top right) to close without saving.
+
+## 6. Item Form Fields
+The Add and Edit forms share the same fields.
+
+### Identification
+
+- **Item ID*** – A unique number for the item (for example 008).
+- **Part Identification*** – The part's name (for example, 120A High Output Alternator).
+- **Barcode** – The barcode number printed on the part or shelf. You can use it later to find the item with the scanner.
+- **Category*** – Choose from the drop-down list.
+
+### Replenishment Settings*
+These values control when and how much to reorder.
+
+- **Ordering Cost (₱)*** – The cost of placing one order with your supplier.
+- **Holding Cost / Year (₱)*** – The yearly cost of keeping one unit in storage.
+- **Lead Time (days)*** – How many days a delivery takes after you order.
+- **Safety Stock*** – Extra units to keep on hand as a buffer.
+
+### Handling and demand
+
+- **Size** – Drop-down (for example, Medium).
+- **Weight** – Drop-down (for example, Heavy).
+- **Demand** – Drop-down for how quickly the part sells (for example, LOW).
+
+### Storage
+
+- **Rack Location** – The rack code (for example, H-03).
+- **Level** – The shelf level on that rack (for example, L1 (Bottom)).
+
+### Stock and price
+
+- **Quantity*** – Units in stock now.
+- **Price (₱)*** – Unit price in pesos.
+
+### Image
+Add a photo in one of two ways:
+
+- Click **Choose File** to upload an image from your device.
+- Paste an image web address (URL) into the box below it.
+
+### Compatible Vehicles
+Type the vehicles the part fits (for example, Toyota Fortuner). This text appears under the part name in the table.
+
+## 7. Scanning a Barcode
+When you start a scan, a camera panel opens with a white frame in the middle.
+
+1. Allow the browser to use your camera if asked.
+2. Under **Select Camera**, choose the camera you want from the drop-down (the screen shows how many cameras were found, for example 3).
+3. Hold the barcode inside the white frame until it is read.
+4. Click **Stop Scanning** when you are done to turn the camera off.
+For best results, use good lighting and keep the barcode steady and flat.
+
+## 8. Deleting an Item (ADMIN)
+Click the red trash icon in the **Actions** column to remove an item. Deleting cannot be assumed to be reversible, so check that you have the right row first.
+
+## 9. Locate (STAFF)
+Click the button in the **Locate** column of the item you want to find in the warehouse map.`
     },
+
     stock: {
-      title: 'Stock Info',
-      description: 'hohoho'
+      title: 'Stock Manual',
+      description: `## 1. Overview
+The Stock tab is where you update quantities after parts are received or used. It has two sub-tabs at the top left:
+
+- **Stock In** – add units to an item (deliveries, returns, restocking).
+- **Stock Out** – deduct units from an item (sales, installs, damaged or lost parts).
+The active sub-tab is underlined. Each one is a short form with a **Scan Barcode** button at the top right of the card.
+
+## 2. Recording Stock In
+Use this when new units arrive.
+
+1. Open the **Stock** tab, then select **Stock In**.
+2. Find the item under **Select Item to Restock**. Type the item's ID or name in the search box, or click **Scan Barcode** (see section 4).
+3. Check that **Item Name** and **Category** show the part you meant. These fields fill in once an item is chosen.
+4. Enter the **Rack Location** where the units are being stored (for example, A1). Leave it as the item's current location unless the units are going to a new rack.
+5. Enter **Quantity to Add**. This field is required.
+6. Click **Record Stock In** (the dark blue button).
+The item's quantity goes up by the amount you entered.
+
+## 3. Recording Stock Out
+Use this when units leave the warehouse.
+
+1. Open the **Stock** tab, then select **Stock Out**.
+2. Find the item under **Select Item to Deduct**. Type the item's ID or name, or click **Scan Barcode**.
+3. Check that **Item Name** and **Category** show the right part.
+4. Enter **Quantity to Deduct**. This field is required.
+5. Click **Record Stock Out** (the red button).
+The item's quantity goes down by the amount you entered. Stock Out has no Rack Location field, because units are taken from where the item is already stored.
+
+## 4. Scanning a Barcode
+Instead of typing, you can select an item by scanning its barcode.
+
+1. Click **Scan Barcode** at the top right of the form.
+2. Allow the browser to use your camera if asked.
+3. If you have more than one camera, choose the one you want under **Select Camera**.
+4. Hold the barcode inside the white frame until it is read. The item's details then fill in.
+5. Click **Stop Scanning** to turn the camera off if it is still running.
+Use good lighting and keep the barcode flat and steady.`
     },
+
     warehouse: {
-      title: 'Warehouse Map Info',
-      description: 'hihihi'
+      title: 'Warehouse Map Manual',
+      description: `## 1. Overview
+The Warehouse Map tab shows the physical layout of the warehouse. Use it to see which aisles and racks hold stock, spot racks that need attention, inspect what sits on each shelf level, and check whether the layout suits demand.
+
+The screen has three parts:
+
+- the **aisle map** (12 aisles, A to L)
+- the **Rack Inspection** pop-up for a single rack
+- the **Warehouse Layout Optimizer** with Aisle Density Analytics
+
+## 2. The Aisle Map
+The map shows 12 aisles, labeled **Aisle A** to **Aisle L**. Each aisle holds three racks: **Rack 1**, **Rack 2**, and **Rack 3**.
+
+**Aisles**
+
+Designated for:
+
+**High Demand Only:** A, B, C, D
+
+**Body & Brakes:** E, F
+
+**Electrical & Engine:** G, H
+
+**Suspension & Transmission:** I, J
+
+**Misc:** K, L
+
+
+A rack's code combines its aisle and rack number. For example, **B-02** is Aisle B, Rack 2. The same code appears in the **Location** column on the Inventory tab and in the **Rack Location** field of an item.
+
+### Red dots
+A small red dot on a rack means it holds an item that needs attention. Racks without a dot have no flagged items.
+
+## 3. Inspecting a Rack
+
+1. On the aisle map, click the rack you want to look at.
+2. The **Rack Inspection** pop-up opens. Its subtitle shows the rack code (for example, Cell Ident: B-R02), and the heading inside shows the aisle and rack (for example, Aisle B-02).
+3. Read the shelf levels, listed from top to bottom as **L4, L3, L2, L1**. L1 is the bottom shelf.
+
+### Reading the shelves
+
+- A level with a solid outline holds one or more items. Each item appears as a white tile with its part name.
+- A level with a dashed outline is empty.
+- A red dot on an item tile means that item is low on stock.
+In the sample, rack B-02 has Ceramic Brake Pads (Set) on level L2, with a red dot, and the other three levels are empty.
+
+## 4. Warehouse Layout Optimizer
+This section sits below the map. It helps you decide whether fast-selling parts are stored in the best places, with high-demand parts in Aisle A and the front slots.
+
+### Aisle Density Analytics
+This panel lists all 12 aisles in two columns. For each aisle you see:
+
+- the aisle letter and, in brackets, the number of items stored there (for example, Aisle F (3))
+- a status tag (the sample shows **Optimal** for every aisle)
+- a bar and a percentage showing how full the aisle is (the sample ranges from 0% to 6%)
+Use it to find crowded aisles and aisles with free space. The item counts add up to your Total Items on the Dashboard.
+
+### Analyze and optimize
+
+1. Click **Analyze & Optimize Layout**.
+2. The **Demand-Based Layout Optimizer** pop-up opens. It states how many items are recommended for relocation.
+3. Review the table of recommendations. It lists each item and its category with its demand level, its **Current** location, and its **Optimized** (suggested) location.
+4. Click **Apply Relocations** to accept the suggested moves. The number in brackets is how many moves will be applied.
+5. Click **Discard** to close the pop-up without changing anything.
+When no changes are needed, the pop-up shows "0 items recommended for demand-based relocation" and an empty table, as in the sample. In that case there is nothing to apply.
+
+**Before you apply:** relocations change where items are recorded. Move the physical stock to match, so the map and the shelves agree.`
     },
+
     user: {
-      title: 'User Info',
-      description: 'huhuhu'
+      title: 'User Manual',
+      description: `## 1. Overview
+The User tab is split into two panels:
+
+- **Active Session Profile** (left) – shows who is signed in and holds the account buttons.
+- **Session Audit History** (right) – a log of stock changes and item changes, with an **Undo** option on each entry.
+
+## 2. Active Session Profile
+The left panel shows your avatar, your username, and your role. Five buttons sit at the bottom:
+
+What it does
+
+**Change Username** - Rename your own account.
+
+**Change Password** - Set a new password for your own account.
+
+**Add New User** - Create an account for another person.
+
+**Manage Accounts** - Edit or delete other users' accounts.
+
+**Log Out Operator** - Sign out of Skyrun (red button).
+
+Change Username, Change Password, Add New User and Manage Accounts are shown on an Admin account. Staff accounts may not see them.
+
+## 3. Changing Your Username (ADMIN)
+
+1. Click **Change Username**.
+2. In **New Username**, type the name you want. The box starts with your current name.
+3. Enter your **Current Password** to confirm it is you.
+4. Click **Save**, or **Cancel** to close without changing anything.
+The new name appears in your profile and next to your future entries in the audit history.
+
+## 4. Changing Your Password (ADMIN)
+
+1. Click **Change Password**.
+2. Enter your **Current Password**.
+3. Enter your **New Password**.
+4. Enter it again under **Confirm Password**. Both entries must match.
+5. Click **Save**, or **Cancel** to close.
+
+## 5. Adding a New User (ADMIN)
+
+1. Click **Add New User**.
+2. Enter a **Username** for the person.
+3. Enter a **Password** for them.
+4. Choose a **Role** from the drop-down.
+5. Click **Create**, or **Cancel** to close.
+
+## 6. Managing Accounts (ADMIN)
+
+1. Click **Manage Accounts**. The **Manage User Accounts** pop-up lists the other accounts, each with its username and role.
+2. Use the buttons on each row:
+- **Edit** opens the row for editing (see below).
+- **Delete** (red) removes the account.
+
+### Editing an account
+When you click **Edit**, the row turns into a small form with three fields:
+
+- the **username**
+- the **role** drop-down (for example, Staff)
+- a **New password** box
+Change what you need and click **Save**, or click **Cancel** to leave the account as it was. Use the new password box to reset a password for someone who forgot theirs.
+
+**Be careful with Delete.** Removing an account means that person can no longer sign in. Check the name on the row before you click it.
+
+## 7. Session Audit History
+The right panel logs changes made in the system. The number in brackets in the title is the total number of entries.
+
+### Filtering and searching
+
+- **All** shows every entry.
+- **Stock In** shows only items added to stock.
+- **Stock Out** shows only items taken out.
+- The search box (**Search audit entries by item name or ID…**) narrows the list to entries that match an item's name or ID.
+The counts on the filters do not add up to the total in the sample, because the list also holds other entries, such as items being added or deleted.
+
+### Reading an entry
+Each entry shows:
+
+- the **item name**, with a colored tag for the type of action: **IN** (green), **OUT** (red), **ADD** (green), or **DELETE** (red)
+- the item **ID** and who made the change (**By:** username)
+- the **quantity change**: a green **+** number for stock in, a red **-** number for stock out, or the word ADD or DELETE for item changes
+- the **date and time**
+- an **Undo** button
+The newest entries are at the top. The Dashboard's Recent Audit History shows the latest of these same entries.
+
+### Undoing an entry
+Use **Undo** to reverse a mistake, such as a wrong quantity or an item deleted by accident.
+
+1. Find the entry, using the filters or search if needed.
+2. Click **Undo**. For a stock entry, a small box appears showing a quantity (for example, 10) with **Confirm** and **Cancel** buttons.
+3. Check the quantity. Change it if you only want to reverse part of the entry.
+4. Click **Confirm** to apply the undo, or **Cancel** to keep things as they are.
+After an undo, check the **Qty** on the Inventory tab to make sure the number is what you expect.`
     }
   };
 
@@ -349,8 +800,6 @@ const App: React.FC = () => {
           <UserProfile 
             user={user || (userRole === 'staff' ? 'Warehouse Staff' : 'Administrator')} 
             role={userRole}
-            email={userEmail || undefined}
-            phone={userPhone || undefined}
             movements={movements} 
             inventory={inventory} 
             inventoryAudit={inventoryAudit}
@@ -423,10 +872,12 @@ const App: React.FC = () => {
         onClose={() => setIsInfoModalOpen(false)}
         title={sectionInfo[currentSection]?.title || 'SKYRUN Info'}
       >
-        <div className="info-modal-content">
-          <p className="label-micro">hahaha</p>
-          <p className="label-micro opacity-70">{sectionInfo[currentSection]?.description}</p>
-        </div>
+        <div
+          className="info-modal-content"
+          dangerouslySetInnerHTML={{
+            __html: renderManualHTML(sectionInfo[currentSection]?.description || ''),
+          }}
+        />
       </Modal>
     </>
   );
@@ -434,12 +885,8 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.removeItem('skyrun_session_user');
     localStorage.removeItem('skyrun_session_role');
-    localStorage.removeItem('skyrun_session_email');
-    localStorage.removeItem('skyrun_session_phone');
     setUser(null);
     setUserRole('staff');
-    setUserEmail(null);
-    setUserPhone(null);
   }, []);
 
   if (!user) {

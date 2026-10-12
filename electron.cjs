@@ -30,7 +30,12 @@ function createWindow() {
     },
   });
 
-  window.loadURL('http://localhost:3001/?desktop=1');
+  const appUrl = process.env.ELECTRON_APP_URL || 'http://localhost:2026/?desktop=1';
+  const fallbackUrl = 'http://localhost:3001/?desktop=1';
+
+  window.loadURL(appUrl).catch(() => {
+    window.loadURL(fallbackUrl);
+  });
 }
 
 async function waitForApi() {

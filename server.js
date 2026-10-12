@@ -45,15 +45,11 @@ const defaultUsers = [
     username: 'admin',
     password: 'admin123',
     role: 'admin',
-    email: 'admin@autosupply.local',
-    phone: '+60123456789',
   },
   {
     username: 'staff',
     password: 'staff123',
     role: 'staff',
-    email: 'staff@autosupply.local',
-    phone: '+60123456790',
   },
 ];
 
@@ -128,12 +124,10 @@ async function initializeDatabase() {
     username VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(128) NOT NULL,
     role ENUM('admin', 'staff') NOT NULL,
-    email VARCHAR(255) NULL,
-    phone VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) NULL');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(64) NULL');
+  await pool.query('ALTER TABLE users DROP COLUMN IF EXISTS email');
+  await pool.query('ALTER TABLE users DROP COLUMN IF EXISTS phone');
 
   await pool.query('SET FOREIGN_KEY_CHECKS = 0');
   await pool.query("UPDATE movements SET item_id = REPLACE(item_id, 'STK-', '') WHERE item_id LIKE 'STK-%'");
@@ -142,14 +136,12 @@ async function initializeDatabase() {
 
   const [[userCount]] = await pool.query('SELECT COUNT(*) AS count FROM users');
   if (userCount.count === 0) {
-    const userEntries = defaultUsers.map(({ username, password, role, email, phone }) => [
+    const userEntries = defaultUsers.map(({ username, password, role }) => [
       username,
       crypto.createHash('sha256').update(password).digest('hex'),
       role,
-      email,
-      phone,
     ]);
-    await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES ?', [userEntries]);
+    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ?', [userEntries]);
   }
 
   const [[inventoryCount]] = await pool.query('SELECT COUNT(*) AS count FROM inventory');
@@ -241,16 +233,6 @@ export function scheduleHistoryCleanup() {
   }, 60 * 60 * 1000);
 }
 
-function normalizeEmail(value) {
-  const email = normalizeOptionalText(value);
-  return email ? email.toLowerCase() : null;
-}
-
-function normalizePhone(value) {
-  const phone = normalizeOptionalText(value);
-  return phone || null;
-}
-
 app.get('/api/health', async (_req, res) => {
   const connection = await pool.getConnection();
   connection.release();
@@ -258,7 +240,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.get('/api/users', async (_req, res) => {
-  const [rows] = await pool.query('SELECT id, username, role, email, phone FROM users ORDER BY username');
+  const [rows] = await pool.query('SELECT id, username, role FROM users ORDER BY username');
   res.json(rows);
 });
 
@@ -286,7 +268,7 @@ app.post('/api/users', async (req, res) => {
     return res.status(409).json({ error: 'That username already exists.' });
   }
 
-  await pool.query('INSERT INTO users (username, password_hash, role, email, phone) VALUES (?, ?, ?, NULL, NULL)', [
+  await pool.query('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', [
     normalizedUsername,
     hashPassword(normalizedPassword),
     safeRole,
@@ -442,7 +424,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   const normalizedUsername = String(username).trim();
-  const [rows] = await pool.query('SELECT username, role, email, phone FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1', [normalizedUsername, hashPassword(String(password))]);
+  const [rows] = await pool.query('SELECT username, role FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1', [normalizedUsername, hashPassword(String(password))]);
 
   if (rows.length === 0) {
     return res.status(401).json({ error: 'Invalid login details.' });
@@ -452,8 +434,6 @@ app.post('/api/login', async (req, res) => {
   res.json({
     username: user.username,
     role: user.role,
-    email: user.email,
-    phone: user.phone,
   });
 });
 

@@ -5,17 +5,17 @@ import { isAtReorderPoint } from '../inventoryMetrics';
 
 
 const ZONES = [
-  { id: 'A', name: 'AISLE A: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#3B82F6' },
-  { id: 'B', name: 'AISLE B: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#A855F7' },
-  { id: 'C', name: 'AISLE C: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#14B8A6' },
-  { id: 'D', name: 'AISLE D: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#F43F5E' },
+  { id: 'A', name: 'AISLE A: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
+  { id: 'B', name: 'AISLE B: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
+  { id: 'C', name: 'AISLE C: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
+  { id: 'D', name: 'AISLE D: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
   { id: 'E', name: 'AISLE E: Body & Brakes', desc: 'BODY & BRAKES categories only', racks: 3, color: '#F59E0B' },
-  { id: 'F', name: 'AISLE F: Body & Brakes', desc: 'BODY & BRAKES categories only', racks: 3, color: '#10B981' },
+  { id: 'F', name: 'AISLE F: Body & Brakes', desc: 'BODY & BRAKES categories only', racks: 3, color: '#F59E0B' },
   { id: 'G', name: 'AISLE G: Electrical & Engine', desc: 'ELECTRICAL & ENGINE categories only', racks: 3, color: '#6366F1' },
-  { id: 'H', name: 'AISLE H: Electrical & Engine', desc: 'ELECTRICAL & ENGINE categories only', racks: 3, color: '#EC4899' },
-  { id: 'I', name: 'AISLE I: Suspension & Transmission', desc: 'SUSPENSION & TRANSMISSION categories only', racks: 3, color: '#7C3AED' },
+  { id: 'H', name: 'AISLE H: Electrical & Engine', desc: 'ELECTRICAL & ENGINE categories only', racks: 3, color: '#6366F1' },
+  { id: 'I', name: 'AISLE I: Suspension & Transmission', desc: 'SUSPENSION & TRANSMISSION categories only', racks: 3, color: '#0891B2' },
   { id: 'J', name: 'AISLE J: Suspension & Transmission', desc: 'SUSPENSION & TRANSMISSION categories only', racks: 3, color: '#0891B2' },
-  { id: 'K', name: 'AISLE K: Misc', desc: 'MISC category only', racks: 3, color: '#CA8A04' },
+  { id: 'K', name: 'AISLE K: Misc', desc: 'MISC category only', racks: 3, color: '#DB2777' },
   { id: 'L', name: 'AISLE L: Misc', desc: 'MISC category only', racks: 3, color: '#DB2777' }
 ];
 
@@ -289,7 +289,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                <div key={zone.id} className="zone-cell" style={{ gridColumn: placement.gridColumn, gridRow: placement.gridRow }}>
                  <div className="zone-top-header">
                    <div className="aisle-title">AISLE {zone.id}</div>
-                   <div className="picking-label">
+                   <div className={`picking-label${pickingLabelText === 'High Demand Only' ? ' high-demand' : ''}${pickingLabelText === 'Body & Brakes' ? ' body-brakes' : ''}${pickingLabelText === 'Electrical & Engine' ? ' electrical-engine' : ''}${pickingLabelText === 'Suspension & Transmission' ? ' suspension-transmission' : ''}${pickingLabelText === 'Misc' ? ' misc' : ''}`}>
                      {pickingLabelText}
                    </div>
                  </div>
@@ -315,6 +315,18 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
         <div className="location-analytics-container">
           <div className="dash-card">
+            <div className="warehouse-optimizer border-soft mt-4 p-4">
+              <div className="flex-col mb-4">
+                <span className="label-micro"><i className="bx bx-bolt-circle"></i> WAREHOUSE LAYOUT OPTIMIZER</span>
+                <p className="label-micro opacity-70 mt-1" style={{ textTransform: 'none', lineHeight: '1.4' }}>
+                  Optimize layout by demand.
+                </p>
+              </div>
+              <button className={`olive-button w-full ${isOptimizing ? 'opacity-50' : ''}`} onClick={runOptimization} disabled={isOptimizing}>
+                {isOptimizing ? <i className="bx bx-loader-alt bx-spin mr-2"></i> : <i className="bx bx-refresh mr-2"></i>}
+                Analyze & Optimize Layout
+              </button>
+            </div>
             <div className="flex-row-between mb-2"><span className="label-micro">Aisle Density Analytics</span></div>
             <div className="flex-col-gap" style={{ gap: '0.5rem' }}>
               {aisleData.map(a => (
@@ -329,18 +341,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                   <div className="flex-row-end"><span className="label-micro font-mono" style={{ fontSize: '11px', padding: '0 3px' }}>{a.density}%</span></div>
                 </div>
               ))}
-            </div>
-            <div className="warehouse-optimizer border-soft mt-4 p-4">
-              <div className="flex-col mb-4">
-                <span className="label-micro"><i className="bx bx-bolt-circle"></i> WAREHOUSE LAYOUT OPTIMIZER</span>
-                <p className="label-micro opacity-70 mt-1" style={{ textTransform: 'none', lineHeight: '1.4' }}>
-                  Optimize layout by demand.
-                </p>
-              </div>
-              <button className={`olive-button w-full ${isOptimizing ? 'opacity-50' : ''}`} onClick={runOptimization} disabled={isOptimizing}>
-                {isOptimizing ? <i className="bx bx-loader-alt bx-spin mr-2"></i> : <i className="bx bx-refresh mr-2"></i>}
-                Analyze & Optimize Layout
-              </button>
             </div>
           </div>
         </div>

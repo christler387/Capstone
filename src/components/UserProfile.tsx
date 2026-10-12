@@ -4,8 +4,6 @@ import { InventoryAuditEntry, Movement, Item, UserRole } from '../types';
 interface UserProfileProps {
   user: string;
   role?: UserRole;
-  email?: string;
-  phone?: string;
   movements: Movement[];
   inventory: Item[];
   inventoryAudit: InventoryAuditEntry[];
@@ -16,15 +14,13 @@ interface UserProfileProps {
   onSwitchRole?: (role: UserRole, name: string) => void;
   onChangePassword?: (currentPassword: string, newPassword: string) => Promise<void>;
   onChangeUsername?: (currentPassword: string, newUsername: string) => Promise<void>;
-  onCreateUser?: (username: string, password: string, role: UserRole, displayName?: string, email?: string, phone?: string) => Promise<void>;
+  onCreateUser?: (username: string, password: string, role: UserRole) => Promise<void>;
 }
 
 interface ManagedUser {
   id: number;
   username: string;
   role: UserRole;
-  email?: string | null;
-  phone?: string | null;
 }
 
 async function requestUserApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -42,8 +38,6 @@ async function requestUserApi<T>(path: string, options?: RequestInit): Promise<T
 export const UserProfile: React.FC<UserProfileProps> = ({ 
   user, 
   role = 'staff',
-  email,
-  phone,
   movements, 
   inventory, 
   inventoryAudit,
@@ -743,4 +737,3 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     </>
   );
 };
-

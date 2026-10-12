@@ -1,9 +1,8 @@
 ﻿import React, { useRef, useState } from 'react';
-import catsImage from '../assets/cats.png';
 import skyrunLogo from '../assets/Skyrun.png';
 
 interface LoginProps {
-  onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string | null, phone?: string | null) => void;
+  onLoginSuccess: (username: string, role: 'admin' | 'staff') => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -40,7 +39,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         throw new Error(data?.error || 'Invalid login details. Try admin/admin123 or staff/staff123');
       }
 
-      onLoginSuccess(data.username || inputUser, data.role, data.email || null, data.phone || null);
+      onLoginSuccess(data.username || inputUser, data.role);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Unable to log in right now.');
     } finally {
@@ -52,7 +51,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     <div className="login-shell">
       <div className="login-panel">
         <div className="brand-lockup" aria-label="Skyrun brand">
-          <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
           <span className="brand-wordmark">SKYRUN</span>
         </div>
 
@@ -124,7 +122,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       </div>
 
       <div className="login-art" aria-hidden="true">
-        <img src={catsImage} alt="" />
+        <img src={skyrunLogo} alt="" />
       </div>
     </div>
   );
