@@ -6,7 +6,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  type?: 'default' | 'mini' | 'clean';
+  type?: 'default' | 'mini' | 'clean' | 'wide';
 }
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer, type = 'default' }) => {
@@ -14,7 +14,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   return (
     <div className={`modal-overlay active ${type === 'clean' ? 'clean-modal' : ''}`}>
-      <div className={`modal-content ${type === 'mini' ? 'mini' : ''} ${type === 'clean' ? 'clean' : ''}`}>
+      <div className={`modal-content ${type === 'mini' ? 'mini' : ''} ${type === 'clean' ? 'clean' : ''} ${type === 'wide' ? 'wide' : ''}`}>
         {type === 'clean' && (
           <button className="close-modal clean-modal-close" onClick={onClose} aria-label="Close image preview">
             <i className="bx bx-x"></i>

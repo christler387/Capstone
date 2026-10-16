@@ -58,7 +58,7 @@ const App: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const handleLoginSuccess = (username: string, role: UserRole) => {
+  const handleLoginSuccess = (username: string, role: UserRole, _email?: string, _phone?: string) => {
     localStorage.setItem('skyrun_session_user', username);
     localStorage.setItem('skyrun_session_role', role);
     setUser(username);
@@ -235,7 +235,7 @@ This panel (green top border) shows how many units are in stock for each categor
 Use it to see which categories hold the most stock and which are thin. The total across categories is your total unit count.
 
 ## 5. Category Prices
-This panel (purple top border) shows the peso value of the stock held in each category, using the same six categories. Compare it with Category Units to see where your money is tied up. A category can have many units but low value (for example, Misc), or few units but high value.
+This panel (purple top border) shows the peso value of the stock held in each category, using the same seven categories. Compare it with Category Units to see where your money is tied up. A category can have many units but low value (for example, Misc), or few units but high value.
 
 ## 6. Low Stock Alerts
 This panel (red top border) lists items whose stock has fallen to a level that needs action. Each row shows:
@@ -261,9 +261,6 @@ This panel (blue top border) tells you what to buy and how much. Two terms are u
 - **EOQ (Economic Order Quantity)** – The standard, cost-efficient order size for that item.
 Each row shows the item name, its EOQ and ROP values, and a red **BUY** recommendation on the right.
 
-In the example screen, the recommended quantity matches the gap between the reorder point and the current stock: Front Fender Panel has ROP 79 and 4 on hand, giving BUY 75; Ceramic Brake Pads (Set) has ROP 19 and 15 on hand, giving BUY 4.
-
-**What to do:** Use the BUY figure as a guide when raising a purchase order. Compare it with the item's EOQ to decide whether to order the minimum needed or a full economic batch.
 
 ## 9. Daily Routine
 
@@ -290,14 +287,13 @@ The **Search items or scan…** box sits beside the Inventory Ledger title. Type
 ### Category filter
 The chips under the search box filter the table by category:
 
-- **All** (default, highlighted in red)
+- **All**
 - **Body**
 - **Brakes**
 - **Electrical**
 - **Engine**
 - **Suspension**
 - **Transmission**
-- **Misc**
 Click a chip to show only that category. Click **All** to see everything again.
 
 ### Sorting
@@ -326,8 +322,6 @@ When **Qty** and **Reorder Qty** appear in red, the item is low on stock. These 
 3. Fill in the fields described in section 6. Fields marked with a red asterisk (*) are required.
 4. Click **Save Item**, or **Cancel** to close the form without saving.
 Some fields start with default values: Category is Body, Ordering Cost is 100, Holding Cost / Year is 0, and Lead Time is 7 days. Change these to match the real part.
-
-**Tip:** Holding Cost / Year starts at 0. Enter a real value, because the reorder calculations depend on it.
 
 ## 5. Editing an Item (ADMIN)
 

@@ -1,9 +1,48 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Dashboard } from './Dashboard';
 import { WarehouseMap } from './WarehouseMap';
 
 describe('Dashboard', () => {
+  it('groups uncategorized and custom categories under Misc', () => {
+    render(
+      <Dashboard
+        inventory={[
+          {
+            id: 'uncategorized',
+            name: 'Uncategorized item',
+            category: '',
+            rack: 'K1',
+            quantity: 2,
+            price: 10,
+          },
+          {
+            id: 'custom',
+            name: 'Custom category item',
+            category: 'HAHAHA',
+            rack: 'L1',
+            quantity: 3,
+            price: 10,
+          },
+        ]}
+        movements={[]}
+        onGoToStock={vi.fn()}
+      />,
+    );
+
+    const categoryUnits = within(
+      screen.getByText('Category Units').parentElement as HTMLElement,
+    );
+    const categoryPrices = within(
+      screen.getByText('Category Prices').parentElement as HTMLElement,
+    );
+
+    expect(categoryUnits.getByText('MISC')).toBeInTheDocument();
+    expect(categoryUnits.getByText('5 units')).toBeInTheDocument();
+    expect(categoryPrices.getByText('₱50')).toBeInTheDocument();
+    expect(screen.queryByText('HAHAHA')).not.toBeInTheDocument();
+  });
+
   it('shows the EOQ and ROP reorder report', () => {
     const inventory = [
       {

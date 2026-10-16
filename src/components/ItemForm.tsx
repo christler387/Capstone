@@ -8,6 +8,10 @@ interface ItemFormProps {
   readOnly?: boolean;
 }
 
+type ItemFormData = Omit<Partial<Item>, "safetyStock"> & {
+  safetyStock?: number | "";
+};
+
 export const ItemForm: React.FC<ItemFormProps> = ({
   item,
   onSave,
@@ -16,7 +20,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 }) => {
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
-  const [formData, setFormData] = useState<Partial<Item>>({
+  const [formData, setFormData] = useState<ItemFormData>({
     id: "",
     name: "",
     barcode: "",
@@ -47,7 +51,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { id, value } = e.target;
+    const { id } = e.target;
+    const value =
+      id === "edit-category" ? e.target.value.toUpperCase() : e.target.value;
     const field = id.replace("edit-", "");
     setError(null);
     setFormData((prev) => ({
@@ -61,7 +67,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         "safetyStock",
       ].includes(field)
         ? field === "safetyStock" && value === ""
-          ? 10
+          ? ""
           : parseFloat(value)
         : value,
     }));
@@ -107,6 +113,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     ] as const;
     const missingReplenishment = replenishmentFields.some(
       (field) =>
+        (field === "safetyStock" && formData[field] === "") ||
         formData[field] === undefined ||
         formData[field] === null ||
         Number(formData[field]) < 0 ||
@@ -208,22 +215,16 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
           </label>
-          <select
+          <input
+            type="text"
             id="edit-category"
             className="form-input"
-            value={formData.category || "BODY"}
+            value={formData.category || ""}
             onChange={handleChange}
             disabled={readOnly}
             required
-          >
-            <option value="BODY">BODY</option>
-            <option value="BRAKES">BRAKES</option>
-            <option value="ELECTRICAL">ELECTRICAL</option>
-            <option value="ENGINE">ENGINE</option>
-            <option value="SUSPENSION">SUSPENSION</option>
-            <option value="TRANSMISSION">TRANSMISSION</option>
-            <option value="MISC">MISC</option>
-          </select>
+            placeholder="Enter category"
+          />
         </div>
       </div>
       <div className="form-group">

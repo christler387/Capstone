@@ -424,9 +424,27 @@ app.post('/api/login', async (req, res) => {
   }
 
   const normalizedUsername = String(username).trim();
-  const [rows] = await pool.query('SELECT username, role FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1', [normalizedUsername, hashPassword(String(password))]);
+  const passwordHash = hashPassword(String(password));
 
-  if (rows.length === 0) {
+  let rows;
+  try {
+    [rows] = await pool.query(
+      'SELECT username, role, email, phone FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1',
+      [normalizedUsername, passwordHash],
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/Unknown column|does not exist/i.test(message)) {
+      throw error;
+    }
+
+    [rows] = await pool.query(
+      'SELECT username, role FROM users WHERE LOWER(username)=LOWER(?) AND password_hash=? LIMIT 1',
+      [normalizedUsername, passwordHash],
+    );
+  }
+
+  if (!rows || rows.length === 0) {
     return res.status(401).json({ error: 'Invalid login details.' });
   }
 
@@ -434,6 +452,8 @@ app.post('/api/login', async (req, res) => {
   res.json({
     username: user.username,
     role: user.role,
+    email: user.email || '',
+    phone: user.phone || '',
   });
 });
 

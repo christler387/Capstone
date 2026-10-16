@@ -84,53 +84,47 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
         const demand = getItemDemand(item);
         const stockOutQty = getStockOutQty(item);
         const itemSeed = item.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const category = (item.category || '').trim().toUpperCase();
+        const dedicatedAisleByCategory: Record<string, string> = {
+          BODY: 'F',
+          BRAKES: 'F',
+          ELECTRICAL: 'H',
+          ENGINE: 'H',
+          SUSPENSION: 'I',
+          TRANSMISSION: 'J',
+        };
+        const dedicatedAisle = dedicatedAisleByCategory[category];
+        const isMiscCategory = !dedicatedAisle;
+        const targetRackNum = 1 + (itemSeed % 3);
+        let targetZone: string;
+        let demandReason: string;
 
-        let targetZone = 'B';
-        let targetRackNum = 1;
-        let demandReason = '';
-
-        if (demand === 'HIGH') {
-          targetZone = ['A', 'B', 'C', 'D'][itemSeed % 4];
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `High Demand (${stockOutQty} units stocked out) → Aisle ${targetZone} (R0${targetRackNum}) dedicated fast-pick slot`;
-        } else if (['BODY', 'BRAKES'].includes(item.category.trim().toUpperCase())) {
-          targetZone = 'F';
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `${item.category} category → Aisle F (R0${targetRackNum}) dedicated category storage`;
-        } else if (['ELECTRICAL', 'ENGINE'].includes(item.category.trim().toUpperCase())) {
-          targetZone = 'H';
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `${item.category} category → Aisle H (R0${targetRackNum}) dedicated category storage`;
-        } else if (['SUSPENSION', 'TRANSMISSION'].includes(item.category.trim().toUpperCase())) {
-          targetZone = item.category.trim().toUpperCase() === 'SUSPENSION' ? 'I' : 'J';
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `${item.category} category → Aisle ${targetZone} (R0${targetRackNum}) dedicated category storage`;
-        } else if (item.category.trim().toUpperCase() === 'MISC') {
+        if (isMiscCategory) {
           targetZone = itemSeed % 2 === 0 ? 'K' : 'L';
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `MISC category → Aisle ${targetZone} (R0${targetRackNum}) dedicated category storage`;
-        } else if (demand === 'LOW') {
-          const cat = item.category.toUpperCase();
-          if (cat.includes('ELECTRICAL')) {
-            targetZone = 'C';
-          } else if (cat.includes('TRANSMISSION') || cat.includes('BULK') || cat.includes('HEAVY')) {
-            targetZone = 'D';
-          } else {
-            targetZone = 'B';
-          }
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `Low Demand (${stockOutQty} units stocked out) → Aisle ${targetZone} (R0${targetRackNum}) deep buffer storage`;
+          demandReason = `${category || 'UNCATEGORIZED'} category → Aisle ${targetZone} (R0${targetRackNum}) dedicated category storage`;
+
+        } else if (demand === 'HIGH') {
+          targetZone = ['A', 'B', 'C', 'D'][itemSeed % 4];
+          demandReason = `High Demand (${stockOutQty} units stocked out) → Aisle ${targetZone} (R0${targetRackNum}) dedicated fast-pick slot`;
+
+        } else if (dedicatedAisle) {
+          targetZone = dedicatedAisle;
+          demandReason = `${category} category → Aisle ${targetZone} (R0${targetRackNum}) dedicated category storage`;
+          
         } else {
-          const cat = item.category.toUpperCase();
-          if (cat.includes('ELECTRICAL')) {
-            targetZone = 'C';
-          } else if (cat.includes('TRANSMISSION') || cat.includes('BULK') || cat.includes('HEAVY')) {
-            targetZone = 'D';
-          } else {
-            targetZone = 'B';
-          }
-          targetRackNum = 1 + (itemSeed % 3);
-          demandReason = `Medium Demand (${stockOutQty} units stocked out) → Aisle ${targetZone} (R0${targetRackNum}) standard picking slot`;
+          const usesDeepBufferAisle = ['TRANSMISSION', 'BULK', 'HEAVY'].some(
+            keyword => category.includes(keyword),
+          );
+          targetZone = category.includes('ELECTRICAL')
+            ? 'C'
+            : usesDeepBufferAisle
+              ? 'D'
+              : 'B';
+          const demandLabel = demand === 'LOW' ? 'Low' : 'Medium';
+          const slotDescription = demand === 'LOW'
+            ? 'deep buffer storage'
+            : 'standard picking slot';
+          demandReason = `${demandLabel} Demand (${stockOutQty} units stocked out) → Aisle ${targetZone} (R0${targetRackNum}) ${slotDescription}`;
         }
 
         const suggestedRack = `${targetZone}-${String(targetRackNum).padStart(2, '0')}`;
@@ -353,6 +347,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           isOpen={true} 
           onClose={() => setOptimizationResult(null)} 
           title="DEMAND-BASED LAYOUT OPTIMIZER"
+          type="wide"
           footer={
             <div className="flex-row-gap">
                <button className="olive-button btn-outline" onClick={() => setOptimizationResult(null)}>Discard</button>

@@ -75,7 +75,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const renderFilterSection = () => (
     <div className="flex-row-gap px-6 mb-4 overflow-x-auto no-scrollbar" style={{ padding: '0 var(--gap)' }}>
-      {['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION', 'MISC'].map(cat => (
+      {['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION'].map(cat => (
         <button 
           key={cat}
           className={`nav-btn ${categoryFilter === cat ? 'active' : ''}`} 
@@ -229,4 +229,3 @@ export const Inventory: React.FC<InventoryProps> = ({
     </div>
   );
 };
-

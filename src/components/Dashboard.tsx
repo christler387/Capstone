@@ -36,6 +36,16 @@ const SectionCard: React.FC<{ title: string, children: React.ReactNode }> = ({ t
   </div>
 );
 
+const STANDARD_CATEGORIES = new Set([
+  'BODY',
+  'BRAKES',
+  'ELECTRICAL',
+  'ENGINE',
+  'MISC',
+  'SUSPENSION',
+  'TRANSMISSION',
+]);
+
 export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGoToStock }) => {
   const [insight, setInsight] = useState<string | null>(null);
   const [insightError, setInsightError] = useState<string | null>(null);
@@ -46,9 +56,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   const lowCount = lowStock.length;
 
   const catData = inventory.reduce((acc, i) => {
-    if (!acc[i.category]) acc[i.category] = { qty: 0, val: 0 };
-    acc[i.category].qty += i.quantity;
-    acc[i.category].val += (i.price * i.quantity);
+    const category = (i.category || '').trim().toUpperCase();
+    const displayCategory = STANDARD_CATEGORIES.has(category) ? category : 'MISC';
+    if (!acc[displayCategory]) acc[displayCategory] = { qty: 0, val: 0 };
+    acc[displayCategory].qty += i.quantity;
+    acc[displayCategory].val += (i.price * i.quantity);
     return acc;
   }, {} as Record<string, { qty: number, val: number }>);
 
