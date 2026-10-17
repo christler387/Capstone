@@ -12,6 +12,12 @@ type ItemFormData = Omit<Partial<Item>, "safetyStock"> & {
   safetyStock?: number | "";
 };
 
+const RACK_LOCATIONS = Array.from({ length: 12 }, (_, aisleIndex) =>
+  Array.from({ length: 3 }, (_, rackIndex) =>
+    `${String.fromCharCode(65 + aisleIndex)}-${String(rackIndex + 1).padStart(2, "0")}`,
+  ),
+).flat();
+
 export const ItemForm: React.FC<ItemFormProps> = ({
   item,
   onSave,
@@ -41,7 +47,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     ...item,
   });
 
-  // Scrolls only the nearest scrollable ancestor (the card), not the window.
   useEffect(() => {
     if (error) {
       errorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -129,6 +134,10 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
     onSave(formData as Item);
   };
+
+  const hasUnlistedRack = Boolean(
+    formData.rack && !RACK_LOCATIONS.includes(formData.rack),
+  );
 
   return (
     <div className="flex-col-gap">
@@ -351,16 +360,25 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       <div className="grid-2 border-soft-no-pad p-0">
         <div className="form-group">
           <label className="label-micro">Rack Location</label>
-          <input
-            type="text"
+          <select
             id="edit-rack"
             className="form-input"
-            value={formData.rack}
+            value={formData.rack || ""}
             onChange={handleChange}
-            placeholder="e.g. A-01"
             disabled={readOnly}
-          />
+          >
+            <option value="">Select a rack</option>
+            {hasUnlistedRack && (
+              <option value={formData.rack}>{formData.rack} (current)</option>
+            )}
+            {RACK_LOCATIONS.map((rack) => (
+              <option key={rack} value={rack}>
+                {rack}
+              </option>
+            ))}
+          </select>
         </div>
+
         <div className="form-group">
           <label className="label-micro">Level</label>
           <select
@@ -394,6 +412,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             required
           />
         </div>
+
         <div className="form-group">
           <label className="label-micro">
             Price (₱) {!readOnly && <span className="text-accent">*</span>}
@@ -411,6 +430,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           />
         </div>
       </div>
+      
       <div className="form-group">
         <label className="label-micro">IMAGE</label>
         <input

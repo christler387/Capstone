@@ -30,4 +30,40 @@ describe("ItemForm", () => {
     fireEvent.change(safetyStockInput, { target: { value: "1" } });
     expect(safetyStockInput).toHaveValue(1);
   });
+
+  it("offers warehouse rack locations in a dropdown", () => {
+    const { container } = render(
+      <ItemForm onSave={vi.fn()} onCancel={vi.fn()} />,
+    );
+    const rackSelect = container.querySelector(
+      "#edit-rack",
+    ) as HTMLSelectElement;
+
+    expect(rackSelect.tagName).toBe("SELECT");
+    expect(rackSelect).toHaveDisplayValue("Select a rack");
+    expect(rackSelect.options).toHaveLength(37);
+    expect(rackSelect.querySelector('option[value="A-01"]')).not.toBeNull();
+    expect(rackSelect.querySelector('option[value="L-03"]')).not.toBeNull();
+
+    fireEvent.change(rackSelect, { target: { value: "A-01" } });
+    expect(rackSelect).toHaveValue("A-01");
+  });
+
+  it("keeps an existing rack value that is not a standard warehouse slot", () => {
+    const { container } = render(
+      <ItemForm
+        item={{ rack: "A1" }}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const rackSelect = container.querySelector(
+      "#edit-rack",
+    ) as HTMLSelectElement;
+
+    expect(rackSelect).toHaveValue("A1");
+    expect(rackSelect.querySelector('option[value="A1"]')).toHaveTextContent(
+      "A1 (current)",
+    );
+  });
 });
