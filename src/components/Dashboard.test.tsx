@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Dashboard } from './Dashboard';
 import { WarehouseMap } from './WarehouseMap';
+import type { Movement } from '../types';
 
 describe('Dashboard', () => {
   it('groups uncategorized and custom categories under Misc', () => {
@@ -59,7 +60,7 @@ describe('Dashboard', () => {
       },
     ];
 
-    const movements = [
+    const movements: Movement[] = [
       { id: 'm1', itemId: 'item-1', type: 'OUT', qty: 8, date: '2025-01-01', timestamp: 1735689600000 },
       { id: 'm2', itemId: 'item-1', type: 'OUT', qty: 12, date: '2025-02-01', timestamp: 1738368000000 },
       { id: 'm3', itemId: 'item-1', type: 'OUT', qty: 9, date: '2025-03-01', timestamp: 1740787200000 },
@@ -84,7 +85,7 @@ describe('Dashboard', () => {
       },
     ];
 
-    const movements = [
+    const movements: Movement[] = [
       { id: 'm1', itemId: 'item-1', type: 'OUT', qty: 8, date: '2025-01-01', timestamp: 1735689600000 },
       { id: 'm2', itemId: 'item-1', type: 'IN', qty: 5, date: '2025-02-01', timestamp: 1738368000000 },
     ];
