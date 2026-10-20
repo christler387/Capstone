@@ -231,9 +231,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
               <div key={item.id} className="flex-row-between border-soft reorder-report-row" onClick={() => onGoToStock(item.id)}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span className="label-micro opacity-80" style={{ display: 'block', textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.name}</span>
-                  <span className="label-micro font-mono opacity-50" style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
-                    EOQ {Math.ceil(eoq || 0)} • ROP {Math.ceil(rop || 0)}
-                  </span>
                 </div>
                 <div className="flex-col-end" style={{ flexShrink: 0 }}>
                   <span className="label-micro font-mono text-accent" style={{ fontWeight: 'bold' }}>

@@ -43,7 +43,7 @@ describe('Dashboard', () => {
     expect(screen.queryByText('HAHAHA')).not.toBeInTheDocument();
   });
 
-  it('shows the EOQ and ROP reorder report', () => {
+  it('shows the reorder report without the EOQ and ROP detail line', () => {
     const inventory = [
       {
         id: 'item-1',
@@ -67,9 +67,9 @@ describe('Dashboard', () => {
 
     render(<Dashboard inventory={inventory} movements={movements} onGoToStock={vi.fn()} />);
 
-    expect(screen.getAllByText(/EOQ & ROP Reorder Report/i)).toHaveLength(1);
-    expect(screen.getAllByText(/ROP/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/EOQ/i).length).toBeGreaterThan(0);
+    const reportCard = screen.getByText(/EOQ & ROP Reorder Report/i).closest('.dash-card') as HTMLElement;
+    expect(reportCard).toBeInTheDocument();
+    expect(within(reportCard).queryByText(/EOQ\s+\d+\s+•\s+ROP\s+\d+/i)).not.toBeInTheDocument();
   });
 
   it('shows a recent audit history card', () => {
