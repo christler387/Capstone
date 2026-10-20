@@ -244,7 +244,7 @@ This panel (red top border) lists items whose stock has fallen to a level that n
 - **Current quantity on hand** (right, in red)
 For example, if *Front Fender Panel* shows \`4\`, there are only 4 on hand. When this panel is empty, no items are below their reorder point.
 
-**What to do:** Review each listed item and check the EOQ & ROP Reorder Report to see how many to order.
+**What to do:** Review each listed item and check the EOQ & ROP Report to see how many to order.
 
 ## 7. Recent Audit History
 This panel (yellow top border) is a log of the latest stock changes. Each entry shows:
@@ -254,20 +254,19 @@ This panel (yellow top border) is a log of the latest stock changes. Each entry 
 - **Quantity change** – a red negative number (e.g. \`-5\`) for stock removed, or a green positive number (e.g. \`+10\`) for stock added
 Use this log to confirm that adjustments were recorded correctly and to trace unexpected drops in quantity. If you see entries with placeholder or test-like names, they are likely test records and can be reviewed with your administrator.
 
-## 8. EOQ & ROP Reorder Report
+## 8. EOQ & ROP Report
 This panel (blue top border) tells you what to buy and how much. Two terms are used:
 
 - **ROP (Reorder Point)** – The stock level at which you should place a new order.
 - **EOQ (Economic Order Quantity)** – The standard, cost-efficient order size for that item.
 Each row shows the item name, its EOQ and ROP values, and a red **BUY** recommendation on the right.
 
-
 ## 9. Daily Routine
 
 1. Open the **Dashboard**.
 2. Check **Critical Alerts** in the summary bar.
 3. Review **Low Stock Alerts** to see which items are running low.
-4. Open the **EOQ & ROP Reorder Report** to see how many to order.
+4. Open the **EOQ & ROP Report** to see how many to order.
 5. Scan **Recent Audit History** for unexpected changes.
 6. Go to **Stock** to record any received or used items, then return to the Dashboard to confirm figures updated.`
     },

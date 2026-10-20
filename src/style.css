@@ -1416,6 +1416,7 @@ select.form-input {
 
 .level-belt {
   flex: 1;
+  min-width: 0;
   height: 72px;
   background: var(--bg);
   border: 2px dashed var(--line-soft);
@@ -1424,7 +1425,22 @@ select.form-input {
   display: flex;
   align-items: center;
   gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
   transition: 0.2s;
+}
+
+.level-belt::-webkit-scrollbar {
+  display: block;
+  width: auto;
+  height: 4px;
+}
+
+.level-belt::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
 }
 
 .level-belt.occupied-belt {
@@ -1445,6 +1461,7 @@ select.form-input {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   min-width: 80px;
   height: 48px;
   cursor: pointer;

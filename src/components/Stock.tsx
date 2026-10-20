@@ -164,13 +164,6 @@ export const Stock: React.FC<StockProps> = ({
           </div>
           <div className="flex-row-gap gap-2">
             <button 
-              className="olive-button btn-danger label-micro" 
-              style={{ padding: '4px 10px', fontSize: '9px', textTransform: 'none' }}
-              onClick={() => handleRecord(type, true)}
-            >
-              Force Deduct
-            </button>
-            <button 
               className="olive-button btn-outline label-micro" 
               style={{ padding: '4px 10px', fontSize: '9px', textTransform: 'none' }}
               onClick={() => setShowConfirmOverdraw(false)}

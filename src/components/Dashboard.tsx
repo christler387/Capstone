@@ -225,7 +225,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
             <p className="label-micro opacity-30">No recent audit activity.</p>
           )}
         </SectionCard>}
-        {includeReports && <SectionCard title="EOQ & ROP Reorder Report">
+        {includeReports && <SectionCard title="EOQ & ROP Report">
           {reorderReport.length > 0 ? (
             reorderReport.map(({ item, eoq, rop, reorderQty }) => (
               <div key={item.id} className="flex-row-between border-soft reorder-report-row" onClick={() => onGoToStock(item.id)}>
