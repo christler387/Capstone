@@ -235,6 +235,17 @@ body {
   -webkit-appearance: none;
 }
 
+.page-number-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.page-number-input::-webkit-inner-spin-button,
+.page-number-input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
 .undo-cancel-button {
   margin-left: 4px;
 }
@@ -397,6 +408,12 @@ main { padding: var(--gap); flex: 1; }
 .olive-button:hover { opacity: 0.8; }
 .olive-button.btn-outline { background: transparent; border: 1px solid var(--line); color: var(--ink); }
 .olive-button.btn-danger { background: var(--accent); color: #fff; }
+.olive-button.btn-outline:not(:disabled):hover {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+  opacity: 1;
+}
 .olive-button.btn-mini { padding: 4px 8px; font-size: 9px; min-height: unset; }
 
 .receipt-btn { 

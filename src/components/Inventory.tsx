@@ -32,6 +32,8 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [sortField, setSortField] = useState<keyof Item>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
 
   const handleToggleSort = (field: keyof Item) => {
@@ -72,14 +74,24 @@ export const Inventory: React.FC<InventoryProps> = ({
       return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
 
+  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
+  const displayedPage = Math.min(currentPage, totalPages);
+  const pageItems = filteredInventory.slice(
+    (displayedPage - 1) * pageSize,
+    displayedPage * pageSize
+  );
+
 
   const renderFilterSection = () => (
     <div className="flex-row-gap px-6 mb-4 overflow-x-auto no-scrollbar" style={{ padding: '0 var(--gap)' }}>
       {['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION'].map(cat => (
         <button 
           key={cat}
-          className={`nav-btn ${categoryFilter === cat ? 'active' : ''}`} 
-          onClick={() => setCategoryFilter(cat)}
+          className={`nav-btn ${categoryFilter === cat ? 'active' : ''}`}
+          onClick={() => {
+            setCategoryFilter(cat);
+            setCurrentPage(1);
+          }}
         >
           {cat.charAt(0) + cat.slice(1).toLowerCase()}
         </button>
@@ -92,6 +104,7 @@ export const Inventory: React.FC<InventoryProps> = ({
       <BarcodeScanner 
         onScanSuccess={(val) => {
           setSearch(val);
+          setCurrentPage(1);
           setIsScannerOpen(false);
         }} 
       />
@@ -111,7 +124,10 @@ export const Inventory: React.FC<InventoryProps> = ({
               className="form-input search-input-small" 
               placeholder="Search items or scan..." 
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
             />
             <button 
               className={`barcode-scan-toggle ${isScannerOpen ? 'active' : ''}`}
@@ -152,7 +168,7 @@ export const Inventory: React.FC<InventoryProps> = ({
           </div>
 
           <div className="table-body">
-            {filteredInventory.map(i => {
+            {pageItems.map(i => {
               const isLow = isAtReorderPoint(i, movements);
               const reorderQuantity = getReorderQuantity(i, movements);
               const needsReorder = isAtReorderPoint(i, movements);
@@ -224,6 +240,57 @@ export const Inventory: React.FC<InventoryProps> = ({
               );
             })}
           </div>
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            marginTop: 'var(--gap)',
+          }}
+        >
+          <span className="label-micro opacity-50">
+            {filteredInventory.length === 0
+              ? 'No items'
+              : `Showing ${(displayedPage - 1) * pageSize + 1}-${Math.min(displayedPage * pageSize, filteredInventory.length)} of ${filteredInventory.length}`}
+          </span>
+          <div className="flex-row-gap">
+            <button
+              className="olive-button btn-outline"
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              disabled={displayedPage === 1}
+            >
+              {"<"}
+            </button>
+            <span className="label-micro opacity-50" style={{ alignSelf: 'center' }}>
+              <label className="label-micro opacity-50" style={{ justifySelf: 'center' }}>
+                Page{' '}
+                <input
+                  className="page-number-input"
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={displayedPage}
+                  onChange={(event) => {
+                    const page = Number(event.target.value);
+                    if (Number.isInteger(page) && page >= 1 && page <= totalPages) {
+                      setCurrentPage(page);
+                    }
+                  }}
+                  style={{ width: '1em' }}
+                />{' '}
+                of {totalPages}
+            </label>
+            </span>
+            <button
+              className="olive-button btn-outline"
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+              disabled={displayedPage === totalPages}
+            >
+              {">"}
+            </button>
+          </div>
+          <span aria-hidden="true"/>
         </div>
       </main>
     </div>
