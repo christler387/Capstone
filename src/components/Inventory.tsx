@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect,useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { getReorderQuantity, isAtReorderPoint } from '../inventoryMetrics';
+
 
 interface InventoryProps {
   inventory: Item[];
@@ -33,6 +34,7 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState(String(currentPage));
   const pageSize = 10;
 
 
@@ -76,6 +78,9 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
   const displayedPage = Math.min(currentPage, totalPages);
+    useEffect(() => {
+      setPageInput(String(displayedPage));
+    }, [displayedPage]);
   const pageItems = filteredInventory.slice(
     (displayedPage - 1) * pageSize,
     displayedPage * pageSize
@@ -241,6 +246,9 @@ export const Inventory: React.FC<InventoryProps> = ({
             })}
           </div>
         </div>
+
+{/* ---- Pagination ---- */}
+
         <div
           style={{
             display: 'grid',
@@ -262,23 +270,39 @@ export const Inventory: React.FC<InventoryProps> = ({
             >
               {"<"}
             </button>
+
+{/* ---- page number input ---- */}
+
             <span className="label-micro opacity-50" style={{ alignSelf: 'center' }}>
               <label className="label-micro opacity-50" style={{ justifySelf: 'center' }}>
                 Page{' '}
+
                 <input
                   className="page-number-input"
                   type="number"
                   min={1}
                   max={totalPages}
-                  value={displayedPage}
+                  value={pageInput}
                   onChange={(event) => {
-                    const page = Number(event.target.value);
+                    const value = event.target.value;
+                    setPageInput(value);
+                    
+                    if (value === '') return;
+
+                    const page = Number(value);
                     if (Number.isInteger(page) && page >= 1 && page <= totalPages) {
                       setCurrentPage(page);
                     }
                   }}
-                  style={{ width: '1em' }}
+                  onBlur={() => {
+                    const page = Number(pageInput);
+                    if (!pageInput || page < 1 || page > totalPages) {
+                      setPageInput(String(displayedPage));
+                    }
+                  }}
+                  style={{ width: '2em', alignSelf: 'center' }}
                 />{' '}
+
                 of {totalPages}
             </label>
             </span>
