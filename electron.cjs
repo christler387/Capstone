@@ -7,7 +7,11 @@ let apiProcess;
 function startApi() {
   apiProcess = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
     cwd: __dirname,
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      AUTOSUPPLY_UPLOAD_DIR: path.join(app.getPath('userData'), 'uploads'),
+    },
     stdio: 'inherit',
     windowsHide: true,
   });

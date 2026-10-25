@@ -3,13 +3,33 @@ import { Item } from "../types";
 
 interface ItemFormProps {
   item?: Partial<Item>;
-  onSave: (data: Item) => void;
+  onSave: (data: Item) => void | Promise<void>;
   onCancel: () => void;
   readOnly?: boolean;
 }
 
 type ItemFormData = Omit<Partial<Item>, "safetyStock"> & {
   safetyStock?: number | "";
+  imageFileName?: string;
+};
+
+const getImageFileName = (image?: string) => {
+  if (!image || image.startsWith("data:")) return "";
+
+  const encodedFileName = image.split(/[?#]/, 1)[0].split("/").pop();
+  if (!encodedFileName) return "";
+
+  let fileName = encodedFileName;
+  try {
+    fileName = decodeURIComponent(encodedFileName);
+  } catch {
+    return encodedFileName;
+  }
+
+  return fileName.replace(
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-/i,
+    "",
+  );
 };
 
 const RACK_LOCATIONS = Array.from({ length: 12 }, (_, aisleIndex) =>
@@ -25,7 +45,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   readOnly = false,
 }) => {
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [imageFileName, setImageFileName] = useState(() =>
+    getImageFileName(item?.image),
+  );
   const [formData, setFormData] = useState<ItemFormData>({
     id: "",
     name: "",
@@ -52,6 +77,10 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       errorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [error]);
+
+  useEffect(() => {
+    setImageFileName(getImageFileName(item?.image));
+  }, [item?.image]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -95,17 +124,29 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        setFormData((prev) => ({ ...prev, image: reader.result as string }));
+        setFormData((prev) => ({
+          ...prev,
+          image: reader.result as string,
+          imageFileName: file.name,
+        }));
+        setImageFileName(file.name);
         setError(null);
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
-    if (!formData.id || !formData.name || !formData.category) {
+  const handleSave = async () => {
+    if (saving) return;
+
+    const id = (formData.id ?? "").trim();
+    const name = (formData.name ?? "").trim();
+    const category = (formData.category ?? "").trim();
+    const barcode = (formData.barcode ?? "").trim();
+
+    if (!id || !name || !category || !barcode) {
       setError(
-        "Please fill in all required fields (Item ID, Part Identification, and Category).",
+        "Please fill in all required fields (Item ID, Part Identification, Barcode, and Category).",
       );
       return;
     }
@@ -116,14 +157,15 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       "leadTimeDays",
       "safetyStock",
     ] as const;
-    const missingReplenishment = replenishmentFields.some(
-      (field) =>
-        (field === "safetyStock" && formData[field] === "") ||
+    const missingReplenishment = replenishmentFields.some((field) => {
+      const value = Number(formData[field]);
+      return (
         formData[field] === undefined ||
         formData[field] === null ||
-        Number(formData[field]) < 0 ||
-        Number.isNaN(Number(formData[field])),
-    );
+        Number.isNaN(value) ||
+        value < 0
+      );
+    });
 
     if (missingReplenishment) {
       setError(
@@ -132,7 +174,19 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       return;
     }
 
-    onSave(formData as Item);
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({ ...formData, id, name, category, barcode } as Item);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save the item. Please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const hasUnlistedRack = Boolean(
@@ -210,7 +264,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           />
         </div>
         <div className="form-group">
-          <label className="label-micro">Barcode</label>
+          <label className="label-micro">
+            Barcode {!readOnly && <span className="text-accent">*</span>}
+          </label>
           <input
             type="text"
             id="edit-barcode"
@@ -218,6 +274,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             value={formData.barcode || ""}
             onChange={handleChange}
             disabled={readOnly}
+            required={!readOnly}
           />
         </div>
         <div className="form-group">
@@ -436,22 +493,31 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         <input
           type="file"
           id="edit-image-file"
-          className="form-input"
           accept="image/*"
           onChange={handleImageUpload}
           disabled={readOnly}
+          ref={imageInputRef}
+          style={{ display: "none" }}
         />
-        <input
-          type="text"
-          id="edit-image"
-          className="form-input mt-2"
-          value={
-            formData.image?.startsWith("data:") ? "" : formData.image || ""
-          }
-          onChange={handleChange}
-          placeholder="Or paste an image URL..."
-          disabled={readOnly}
-        />
+        <div className="flex-row-gap">
+          <input
+            type="text"
+            className="form-input"
+            value={imageFileName}
+            placeholder="No image selected"
+            aria-label="Image file name"
+            readOnly
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <button
+            type="button"
+            className="olive-button btn-outline"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={readOnly}
+          >
+            Choose Image
+          </button>
+        </div>
       </div>
       <div className="form-group">
         <label className="label-micro">Compatible Vehicles</label>
@@ -488,8 +554,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               className="olive-button"
               style={{ flex: 1 }}
               onClick={handleSave}
+              disabled={saving}
             >
-              Save Item
+              {saving ? "Saving..." : "Save Item"}
             </button>
           </>
         )}

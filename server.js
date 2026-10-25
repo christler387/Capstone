@@ -3,10 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDirectory = process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, 'uploads');
 
 /** @type {import('express').Express} */
 export const app = express();
@@ -24,6 +26,49 @@ export const pool = mysql.createPool({
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+const asyncRoute = (handler) => (req, res, next) => {
+  Promise.resolve(handler(req, res, next)).catch(next);
+};
+
+async function storeItemImage(image, imageFileName) {
+  if (typeof image !== 'string' || !image.startsWith('data:')) {
+    return image || null;
+  }
+
+  const match = image.match(/^data:(image\/(?:png|jpeg|webp|gif|bmp|avif));base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match) {
+    throw new Error('The uploaded image format is not supported.');
+  }
+
+  const extensions = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/avif': 'avif',
+  };
+  const imageBuffer = Buffer.from(match[2], 'base64');
+  if (imageBuffer.length > 5 * 1024 * 1024) {
+    throw new Error('Please select an image smaller than 5 MB.');
+  }
+
+  const safeOriginalFilename = typeof imageFileName === 'string'
+    ? imageFileName
+      .split(/[\\/]/)
+      .pop()
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+      .trim()
+      .slice(0, 120)
+    : '';
+  const filename = safeOriginalFilename
+    ? `${crypto.randomUUID()}-${safeOriginalFilename}`
+    : `${crypto.randomUUID()}.${extensions[match[1]]}`;
+  await fs.mkdir(uploadsDirectory, { recursive: true });
+  await fs.writeFile(path.join(uploadsDirectory, filename), imageBuffer, { flag: 'wx' });
+  return `/api/uploads/${encodeURIComponent(filename)}`;
+}
 
 const inventorySeed = [
   ['001', 'Ceramic Brake Pads (Set)', 'BRAKES', '4801234567890', 25, 2450, 'A-01', 'L2', 'MEDIUM', 'MEDIUM', 'HIGH', 'Toyota Vios 2014-2020, Honda City 2012-2019'],
@@ -84,7 +129,7 @@ async function initializeDatabase() {
     weight VARCHAR(16),
     demand VARCHAR(16),
     compatible_vehicles TEXT,
-    image TEXT,
+    image LONGTEXT,
     ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100,
     holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
     lead_time_days INT NOT NULL DEFAULT 7,
@@ -92,6 +137,7 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query('ALTER TABLE inventory MODIFY COLUMN image LONGTEXT NULL');
   await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100');
   await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0');
   await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS lead_time_days INT NOT NULL DEFAULT 7');
@@ -462,37 +508,41 @@ app.get('/api/inventory', async (_req, res) => {
   res.json(rows.map(toItem));
 });
 
-app.post('/api/inventory', async (req, res) => {
+app.post('/api/inventory', asyncRoute(async (req, res) => {
   const item = req.body;
   const itemId = normalizeItemId(item.id);
+  const { imageFileName, ...itemData } = item;
+  const savedItem = { ...itemData, id: itemId, image: await storeItemImage(item.image, imageFileName) || undefined };
   const createdBy = item.createdBy || 'Unknown';
   await pool.query(`INSERT INTO inventory
     (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    itemId, item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0,
-    item.rack, item.level || null, item.size || null, item.weight || null, item.demand || null,
-    item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 10,
+    itemId, savedItem.name, savedItem.category, savedItem.barcode || null, savedItem.quantity || 0, savedItem.price || 0,
+    savedItem.rack, savedItem.level || null, savedItem.size || null, savedItem.weight || null, savedItem.demand || null,
+    savedItem.compatibleVehicles || null, savedItem.image || null, savedItem.orderingCost ?? 100,
+    savedItem.holdingCost > 0 ? savedItem.holdingCost : savedItem.price * 0.2, savedItem.leadTimeDays ?? 7, savedItem.safetyStock ?? 10,
   ]);
   await pool.query(
     'INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-    [`AUDIT-ADD-${crypto.randomUUID()}`, itemId, item.name, 'ADD', JSON.stringify({ ...item, id: itemId }), createdBy],
+    [`AUDIT-ADD-${crypto.randomUUID()}`, itemId, savedItem.name, 'ADD', JSON.stringify(savedItem), createdBy],
   );
-  res.status(201).json({ ...item, id: itemId });
-});
+  res.status(201).json(savedItem);
+}));
 
-app.put('/api/inventory/:id', async (req, res) => {
+app.put('/api/inventory/:id', asyncRoute(async (req, res) => {
   const item = req.body;
   const itemId = normalizeItemId(req.params.id);
   const submittedItemId = normalizeItemId(item.id || itemId);
+  const { imageFileName, ...itemData } = item;
+  const savedItem = { ...itemData, id: submittedItemId, image: await storeItemImage(item.image, imageFileName) || undefined };
   await pool.query(`UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`, [
-    item.name, item.category, item.barcode || null, item.quantity || 0, item.price || 0, item.rack,
-    item.level || null, item.size || null, item.weight || null, item.demand || null,
-    item.compatibleVehicles || null, item.image || null, item.orderingCost ?? 100,
-    item.holdingCost > 0 ? item.holdingCost : item.price * 0.2, item.leadTimeDays ?? 7, item.safetyStock ?? 10, itemId,
+    savedItem.name, savedItem.category, savedItem.barcode || null, savedItem.quantity || 0, savedItem.price || 0, savedItem.rack,
+    savedItem.level || null, savedItem.size || null, savedItem.weight || null, savedItem.demand || null,
+    savedItem.compatibleVehicles || null, savedItem.image || null, savedItem.orderingCost ?? 100,
+    savedItem.holdingCost > 0 ? savedItem.holdingCost : savedItem.price * 0.2, savedItem.leadTimeDays ?? 7, savedItem.safetyStock ?? 10, itemId,
   ]);
-  res.json({ ...item, id: submittedItemId });
-});
+  res.json(savedItem);
+}));
 
 app.delete('/api/inventory/:id', async (req, res) => {
   const itemId = normalizeItemId(req.params.id);
@@ -640,6 +690,7 @@ app.patch('/api/movements/:id/undo', async (req, res) => {
   }
 });
 
+app.use('/api/uploads', express.static(uploadsDirectory));
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
