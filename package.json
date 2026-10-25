@@ -1,16 +1,21 @@
 {
   "name": "autosupply",
   "private": true,
-  "main": "electron.cjs",
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "server": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "vite build"
   },
   "dependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "latest",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -20,36 +25,13 @@
     "mysql2": "^3.14.1",
     "react": "latest",
     "react-dom": "latest",
+    "typescript": "latest",
     "vite": "latest"
   },
   "devDependencies": {
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "concurrently": "^9.1.2",
-    "electron": "^38.0.0",
-    "electron-builder": "^26.0.0",
-    "typescript": "latest"
+    "concurrently": "^9.1.2"
   },
   "overrides": {
     "qs": "6.16.0"
-  },
-  "build": {
-    "appId": "com.autosupply.desktop",
-    "productName": "Autosupply",
-    "asar": false,
-    "files": [
-      "dist/**/*",
-      "server.js",
-      "electron.cjs",
-      "package.json",
-      ".env*",
-      "node_modules/**/*"
-    ],
-    "directories": {
-      "output": "desktop-release"
-    },
-    "win": {
-      "target": "nsis"
-    }
   }
 }
