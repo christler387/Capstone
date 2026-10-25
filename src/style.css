@@ -1,3 +1,4 @@
+/* ---- Global styles ---- */
 :root {
   font-size: 110%;
   --bg: #f7f3eb;
@@ -52,6 +53,7 @@ body {
   min-height: 100vh;
 }
 
+/* ---- Login.tsx ---- */
 .login-shell {
   min-height: 100vh;
   display: flex;
@@ -222,6 +224,7 @@ body {
 ::selection { background: var(--ink); color: var(--bg); }
 .hidden { display: none !important; }
 
+/* ---- Shared pagination and undo controls ---- */
 .undo-quantity-input {
   appearance: textfield;
   -moz-appearance: textfield;
@@ -244,6 +247,11 @@ body {
 .page-number-input::-webkit-outer-spin-button {
   margin: 0;
   -webkit-appearance: none;
+}
+.page-number-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  text-align: center;
 }
 
 .undo-cancel-button {
@@ -270,6 +278,7 @@ body {
   }
 }
 
+/* ---- Shared application layout and typography ---- */
 .font-mono { font-family: var(--f-mono); }
 .font-serif { font-family: var(--f-serif); }
 .alert-text { color: var(--accent) !important; opacity: 1 !important; }
@@ -321,6 +330,7 @@ main { padding: var(--gap); flex: 1; }
   gap: 1rem; 
 }
 
+/* ---- Dashboard.tsx ---- */
 .dashboard-grid { 
   display: grid; 
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -358,6 +368,7 @@ main { padding: var(--gap); flex: 1; }
 
 .dash-card-list::-webkit-scrollbar { display: none; width: 0; }
 
+/* ---- Navigation.tsx ---- */
 .top-nav {
   display: flex;
   gap: 0.5rem;
@@ -391,6 +402,7 @@ main { padding: var(--gap); flex: 1; }
   border-color: var(--accent);
 }
 
+/* ---- Shared buttons and controls ---- */
 .olive-button {
   background: var(--ink); 
   color: var(--bg); 
@@ -448,6 +460,7 @@ main { padding: var(--gap); flex: 1; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ---- Dashboard.tsx ---- */
 .dash-card { 
   background: rgba(255, 255, 255, 0.38); border: 1px solid var(--line); padding: var(--gap); 
   display: flex; flex-direction: column; gap: 1rem; 
@@ -471,6 +484,7 @@ main { padding: var(--gap); flex: 1; }
   padding-bottom: 3px;
 }
 
+/* ---- Modal.tsx ---- */
 .modal-overlay { 
   position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(4px); 
   display: none; align-items: center; justify-content: center; z-index: 2000; padding: 2rem; 
@@ -611,6 +625,7 @@ main { padding: var(--gap); flex: 1; }
 .sortable:hover { opacity: 0.8 !important; }
 .sort-icon-inner { font-size: 1rem; vertical-align: middle; margin-left: 4px; }
 
+/* ---- Dashboard.tsx ---- */
 .stats-bar { display: grid; grid-template-columns: 1fr; border-bottom: 1px solid var(--line); background: var(--bg); }
 .stat-box { padding: 1.5rem var(--gap); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; justify-content: center; }
 
@@ -626,6 +641,7 @@ main { padding: var(--gap); flex: 1; }
 
 .stat-value { font-size: 1.875rem; font-family: var(--f-mono); letter-spacing: -0.05em; margin-top: 0.5rem; }
 
+/* ---- Inventory.tsx and shared table styles ---- */
 .table-grid { display: grid; align-items: center; gap: 1rem; }
 .inventory-grid { grid-template-columns: 60px 2.5fr 1fr 140px 60px 90px 90px 80px; }
 .orders-grid { grid-template-columns: 80px 2fr 2fr 1fr 120px; }
@@ -681,10 +697,12 @@ main { padding: var(--gap); flex: 1; }
   text-transform: uppercase;
 }
 
+/* ---- Inventory.tsx ---- */
 .inventory-image { width: 52px; height: 52px; object-fit: cover; border: 1px solid var(--line); cursor: zoom-in; transition: 0.2s; }
 .inventory-image:hover { transform: scale(1.1); }
 .placeholder-img { display: inline-block; background: var(--line-soft); width: 52px; height: 52px; }
 
+/* ---- ItemForm.tsx ---- */
 .form-group { margin-bottom: 1.5rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; }
 .form-label-part-identification {
@@ -721,6 +739,7 @@ select.form-input {
   border-radius: var(--radius);
 }
 
+/* ---- Stock.tsx ---- */
 .stock-item-search { position: relative; }
 .stock-item-suggestions {
   position: absolute;
@@ -754,6 +773,8 @@ select.form-input {
 
 .search-wrapper { position: relative; display: flex; align-items: center; }
 .search-icon-small { position: absolute; left: 10px; font-size: 1rem; opacity: 0.3; pointer-events: none; }
+
+/* ---- Scanner controls in Inventory.tsx and Stock.tsx ---- */
 .barcode-scan-toggle {
   position: absolute;
   right: 6px;
@@ -844,6 +865,7 @@ select.form-input {
 }
 
 
+/* ---- BarcodeScanner.tsx ---- */
 #reader video { 
   border-radius: 8px; 
   object-fit: cover !important; 
@@ -889,6 +911,7 @@ select.form-input {
 }
 
 
+/* ---- WarehouseMap.tsx ---- */
 .warehouse-layout-container {
   display: flex;
   flex-direction: column;
@@ -1575,6 +1598,9 @@ select.form-input {
 }
 
 
+/* ==========================================================================
+                                9. App.tsx
+   ========================================================================== */
 footer {
   padding: 2rem var(--gap);
   border-top: 1px solid var(--line-soft);
@@ -1637,6 +1663,9 @@ footer p {
   gap: 0.75rem;
 }
 
+/* ==========================================================================
+                              10. UserProfile.tsx
+   ========================================================================== */
 .account-management-list {
   display: flex;
   flex-direction: column;
@@ -1692,6 +1721,9 @@ footer p {
   }
 }
 
+/* ==========================================================================
+                11. Responsive layout and shared utility classes
+   ========================================================================== */
 @keyframes fadeIn { 
   from { opacity: 0; transform: translateY(8px); } 
   to { opacity: 1; transform: translateY(0); } 
