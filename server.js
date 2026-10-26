@@ -1,24 +1,15 @@
-<<<<<<< HEAD
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import mysql from 'mysql2/promise';
-import crypto from 'node:crypto';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-=======
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
->>>>>>> 1b2ef7a9fb65521862522c690155c670d19f0940
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDirectory = process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, 'uploads');
+const uploadsDirectory =
+  process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, "uploads");
 
 /** @type {import('express').Express} */
 export const app = express();
@@ -50,46 +41,48 @@ app.use(express.json({ limit: "10mb" }));
 const ah = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
-const asyncRoute = (handler) => (req, res, next) => {
-  Promise.resolve(handler(req, res, next)).catch(next);
-};
-
+// Saves a base64 image sent by the item form to the uploads folder and returns its URL.
 async function storeItemImage(image, imageFileName) {
-  if (typeof image !== 'string' || !image.startsWith('data:')) {
+  if (typeof image !== "string" || !image.startsWith("data:")) {
     return image || null;
   }
 
-  const match = image.match(/^data:(image\/(?:png|jpeg|webp|gif|bmp|avif));base64,([A-Za-z0-9+/]+={0,2})$/);
+  const match = image.match(
+    /^data:(image\/(?:png|jpeg|webp|gif|bmp|avif));base64,([A-Za-z0-9+/]+={0,2})$/,
+  );
   if (!match) {
-    throw new Error('The uploaded image format is not supported.');
+    throw new Error("The uploaded image format is not supported.");
   }
 
   const extensions = {
-    'image/png': 'png',
-    'image/jpeg': 'jpg',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-    'image/bmp': 'bmp',
-    'image/avif': 'avif',
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/bmp": "bmp",
+    "image/avif": "avif",
   };
-  const imageBuffer = Buffer.from(match[2], 'base64');
+  const imageBuffer = Buffer.from(match[2], "base64");
   if (imageBuffer.length > 5 * 1024 * 1024) {
-    throw new Error('Please select an image smaller than 5 MB.');
+    throw new Error("Please select an image smaller than 5 MB.");
   }
 
-  const safeOriginalFilename = typeof imageFileName === 'string'
-    ? imageFileName
-      .split(/[\\/]/)
-      .pop()
-      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-      .trim()
-      .slice(0, 120)
-    : '';
+  const safeOriginalFilename =
+    typeof imageFileName === "string"
+      ? imageFileName
+          .split(/[\\/]/)
+          .pop()
+          .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+          .trim()
+          .slice(0, 120)
+      : "";
   const filename = safeOriginalFilename
     ? `${crypto.randomUUID()}-${safeOriginalFilename}`
     : `${crypto.randomUUID()}.${extensions[match[1]]}`;
   await fs.mkdir(uploadsDirectory, { recursive: true });
-  await fs.writeFile(path.join(uploadsDirectory, filename), imageBuffer, { flag: 'wx' });
+  await fs.writeFile(path.join(uploadsDirectory, filename), imageBuffer, {
+    flag: "wx",
+  });
   return `/api/uploads/${encodeURIComponent(filename)}`;
 }
 
@@ -331,14 +324,6 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-<<<<<<< HEAD
-  await pool.query('ALTER TABLE inventory MODIFY COLUMN image LONGTEXT NULL');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS ordering_cost DECIMAL(12,2) NOT NULL DEFAULT 100');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS holding_cost DECIMAL(12,2) NOT NULL DEFAULT 0');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS lead_time_days INT NOT NULL DEFAULT 7');
-  await pool.query('ALTER TABLE inventory ADD COLUMN IF NOT EXISTS safety_stock INT NOT NULL DEFAULT 10');
-  await pool.query('UPDATE inventory SET holding_cost = price * 0.2 WHERE holding_cost = 0');
-=======
   await addColumnIfMissing(
     "inventory",
     "ordering_cost",
@@ -359,8 +344,9 @@ async function initializeDatabase() {
     "safety_stock",
     "INT NOT NULL DEFAULT 10",
   );
+  // Existing databases may still have a TEXT image column, which is too small for uploaded images.
+  await pool.query("ALTER TABLE inventory MODIFY COLUMN image LONGTEXT NULL");
 
->>>>>>> 1b2ef7a9fb65521862522c690155c670d19f0940
   await pool.query(`CREATE TABLE IF NOT EXISTS inventory_audit (
     id VARCHAR(64) PRIMARY KEY,
     item_id VARCHAR(32) NOT NULL,
@@ -579,69 +565,6 @@ app.post(
       return res.status(409).json({ error: "That username already exists." });
     }
 
-<<<<<<< HEAD
-  if (!rows || rows.length === 0) {
-    return res.status(401).json({ error: 'Invalid login details.' });
-  }
-
-  const user = rows[0];
-  res.json({
-    username: user.username,
-    role: user.role,
-    email: user.email || '',
-    phone: user.phone || '',
-  });
-});
-
-app.get('/api/inventory', async (_req, res) => {
-  const [rows] = await pool.query('SELECT * FROM inventory ORDER BY id');
-  res.json(rows.map(toItem));
-});
-
-app.post('/api/inventory', asyncRoute(async (req, res) => {
-  const item = req.body;
-  const itemId = normalizeItemId(item.id);
-  const { imageFileName, ...itemData } = item;
-  const savedItem = { ...itemData, id: itemId, image: await storeItemImage(item.image, imageFileName) || undefined };
-  const createdBy = item.createdBy || 'Unknown';
-  await pool.query(`INSERT INTO inventory
-    (id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-    itemId, savedItem.name, savedItem.category, savedItem.barcode || null, savedItem.quantity || 0, savedItem.price || 0,
-    savedItem.rack, savedItem.level || null, savedItem.size || null, savedItem.weight || null, savedItem.demand || null,
-    savedItem.compatibleVehicles || null, savedItem.image || null, savedItem.orderingCost ?? 100,
-    savedItem.holdingCost > 0 ? savedItem.holdingCost : savedItem.price * 0.2, savedItem.leadTimeDays ?? 7, savedItem.safetyStock ?? 10,
-  ]);
-  await pool.query(
-    'INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-    [`AUDIT-ADD-${crypto.randomUUID()}`, itemId, savedItem.name, 'ADD', JSON.stringify(savedItem), createdBy],
-  );
-  res.status(201).json(savedItem);
-}));
-
-app.put('/api/inventory/:id', asyncRoute(async (req, res) => {
-  const item = req.body;
-  const itemId = normalizeItemId(req.params.id);
-  const submittedItemId = normalizeItemId(item.id || itemId);
-  const { imageFileName, ...itemData } = item;
-  const savedItem = { ...itemData, id: submittedItemId, image: await storeItemImage(item.image, imageFileName) || undefined };
-  await pool.query(`UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`, [
-    savedItem.name, savedItem.category, savedItem.barcode || null, savedItem.quantity || 0, savedItem.price || 0, savedItem.rack,
-    savedItem.level || null, savedItem.size || null, savedItem.weight || null, savedItem.demand || null,
-    savedItem.compatibleVehicles || null, savedItem.image || null, savedItem.orderingCost ?? 100,
-    savedItem.holdingCost > 0 ? savedItem.holdingCost : savedItem.price * 0.2, savedItem.leadTimeDays ?? 7, savedItem.safetyStock ?? 10, itemId,
-  ]);
-  res.json(savedItem);
-}));
-
-app.delete('/api/inventory/:id', async (req, res) => {
-  const itemId = normalizeItemId(req.params.id);
-  const createdBy = req.body?.createdBy || 'Unknown';
-  const [[item]] = await pool.query('SELECT * FROM inventory WHERE id=?', [itemId]);
-  await pool.query('DELETE FROM inventory WHERE id=?', [itemId]);
-  if (item) {
-=======
->>>>>>> 1b2ef7a9fb65521862522c690155c670d19f0940
     await pool.query(
       "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
       [normalizedUsername, hashPassword(normalizedPassword), safeRole],
@@ -908,12 +831,6 @@ app.post(
   }),
 );
 
-<<<<<<< HEAD
-app.use('/api/uploads', express.static(uploadsDirectory));
-app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-=======
 /* ----------------------------- Inventory ---------------------------- */
 
 const INVENTORY_COLUMNS =
@@ -953,7 +870,11 @@ app.get(
 app.post(
   "/api/inventory",
   ah(async (req, res) => {
-    const item = req.body || {};
+    const { imageFileName, ...itemData } = req.body || {};
+    const item = {
+      ...itemData,
+      image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
+    };
     if (!item.name || !item.category || !item.rack) {
       return res
         .status(400)
@@ -988,7 +909,11 @@ app.post(
 app.put(
   "/api/inventory/:id",
   ah(async (req, res) => {
-    const item = req.body || {};
+    const { imageFileName, ...itemData } = req.body || {};
+    const item = {
+      ...itemData,
+      image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
+    };
     const itemId = normalizeItemId(req.params.id);
     const submittedItemId = normalizeItemId(item.id || itemId);
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
@@ -1265,12 +1190,12 @@ app.patch(
 
 /* ------------------------ Static files & errors --------------------- */
 
+app.use("/api/uploads", express.static(uploadsDirectory));
 app.use(express.static(path.join(__dirname, "dist")));
 // Regex works on Express 4 and 5, and unknown /api routes get a JSON 404 instead of index.html.
 app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
 app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
->>>>>>> 1b2ef7a9fb65521862522c690155c670d19f0940
 });
 
 app.use((error, _req, res, _next) => {
