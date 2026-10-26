@@ -88,7 +88,6 @@ const App: React.FC = () => {
     setUserRole(newRole);
   };
 
-<<<<<<< HEAD
   const handleLogout = async () => {
     try {
       await requestJson<{ ok: boolean }>('/logout', { method: 'POST' });
@@ -97,19 +96,11 @@ const App: React.FC = () => {
         `Could not invalidate the server session: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     } finally {
-      localStorage.removeItem('skyrun_session_user');
-      localStorage.removeItem('skyrun_session_role');
+      clearStoredSession();
       setUser(null);
       setUserRole('staff');
       setCurrentSection('dashboard');
     }
-=======
-  const handleLogout = () => {
-    clearStoredSession();
-    setUser(null);
-    setUserRole('staff');
-    setCurrentSection('dashboard');
->>>>>>> 13615761e5c8bd41619d63a1f121174302435493
   };
 
   const handleChangePassword = async (currentPassword: string, newPassword: string) => {
