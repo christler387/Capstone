@@ -279,7 +279,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             Barcode {!readOnly && <span className="text-accent">*</span>}
           </label>
 
-/* ----- Barcode hahaha ----- */
+{/* ----- Barcode hahaha ----- */}
           <div className="flex-row-gap">
             <input
               type="text"
@@ -312,7 +312,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             )}
         </div>
 
-/* ----- Staff Mode ----- */
+{/* ----- Staff Mode ----- */}
         <div className="form-group">
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
