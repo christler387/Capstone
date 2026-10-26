@@ -876,10 +876,13 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   );
 
   useEffect(() => {
-    localStorage.removeItem('skyrun_session_user');
-    localStorage.removeItem('skyrun_session_role');
-    setUser(null);
-    setUserRole('staff');
+    const savedUser = localStorage.getItem('skyrun_session_user');
+    const savedRole = localStorage.getItem('skyrun_session_role') as UserRole | null;
+
+    if (savedUser && (savedRole === 'admin' || savedRole === 'staff')) {
+      setUser(savedUser);
+      setUserRole(savedRole);
+    }
   }, []);
 
   if (!user) {
