@@ -104,7 +104,7 @@ export const Stock: React.FC<StockProps> = ({
       return;
     }
 
-    const activeUserName = userName || localStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
+    const activeUserName = userName || sessionStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
     const movement: Movement = {
       id: `MOV-${Date.now()}`,
       itemId: formData.itemId,

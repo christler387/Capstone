@@ -1885,3 +1885,121 @@ footer p {
   padding: 0;
   text-transform: uppercase;
 }
+
+/* ---------------- Session timeout notice (login page) ---------------- */
+.session-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(20, 28, 40, 0.45);
+  backdrop-filter: blur(4px);
+  animation: session-dialog-fade 0.2s ease-out;
+}
+
+.session-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  padding: 2rem 1.75rem 1.5rem;
+  border-radius: 18px;
+  border: 1px solid var(--line-soft);
+  background: #f7f3eb;
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(20, 28, 40, 0.28);
+  animation: session-dialog-rise 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.session-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.session-dialog-close:hover {
+  background: var(--line-soft);
+}
+
+.session-dialog-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(175, 4, 4, 0.08);
+  color: var(--accent);
+  font-size: 2rem;
+}
+
+.session-dialog-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--f-sans);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.session-dialog-message {
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgba(32, 48, 71, 0.8);
+}
+
+.session-dialog-action {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1d3a5c, #0f2740);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 39, 64, 0.25);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.session-dialog-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(15, 39, 64, 0.3);
+}
+
+.session-dialog-action:focus-visible,
+.session-dialog-close:focus-visible {
+  outline: 3px solid rgba(56, 103, 168, 0.45);
+  outline-offset: 2px;
+}
+
+@keyframes session-dialog-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes session-dialog-rise {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-dialog-backdrop,
+  .session-dialog {
+    animation: none;
+  }
+}
