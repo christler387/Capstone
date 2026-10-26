@@ -72,12 +72,20 @@ const App: React.FC = () => {
     setUserRole(newRole);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('skyrun_session_user');
-    localStorage.removeItem('skyrun_session_role');
-    setUser(null);
-    setUserRole('staff');
-    setCurrentSection('dashboard');
+  const handleLogout = async () => {
+    try {
+      await requestJson<{ ok: boolean }>('/logout', { method: 'POST' });
+    } catch (error) {
+      setDatabaseError(
+        `Could not invalidate the server session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    } finally {
+      localStorage.removeItem('skyrun_session_user');
+      localStorage.removeItem('skyrun_session_role');
+      setUser(null);
+      setUserRole('staff');
+      setCurrentSection('dashboard');
+    }
   };
 
   const handleChangePassword = async (currentPassword: string, newPassword: string) => {
@@ -87,7 +95,7 @@ const App: React.FC = () => {
     }
     await requestJson<{ ok: boolean; username: string }>('/users/change-password', {
       method: 'PUT',
-      body: JSON.stringify({ username: activeUsername, currentPassword, newPassword }),
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
   };
   const handleChangeUsername = async (currentPassword: string, newUsername: string) => {
@@ -98,7 +106,7 @@ const App: React.FC = () => {
 
     const updatedUser = await requestJson<{ ok: boolean; username: string }>('/users/change-username', {
       method: 'PUT',
-      body: JSON.stringify({ currentUsername: activeUsername, currentPassword, newUsername }),
+      body: JSON.stringify({ currentPassword, newUsername }),
     });
     localStorage.setItem('skyrun_session_user', updatedUser.username);
     setUser(updatedUser.username);
@@ -517,11 +525,11 @@ What it does
 
 **Add New User** - Create an account for another person.
 
-**Manage Accounts** - Edit or delete other users' accounts.
+**Manage Accounts** - Edit or delete other Staff and Admin accounts.
 
 **Log Out Operator** - Sign out of Skyrun (red button).
 
-Change Username, Change Password, Add New User and Manage Accounts are shown on an Admin account. Staff accounts may not see them.
+Change Username, Change Password, Add New User and Manage Accounts are shown on an Admin account. Staff accounts may not see them. Admins can manage other Admin accounts as well as Staff accounts.
 
 ## 3. Changing Your Username (ADMIN)
 
@@ -549,20 +557,26 @@ The new name appears in your profile and next to your future entries in the audi
 
 ## 6. Managing Accounts (ADMIN)
 
-1. Click **Manage Accounts**. The **Manage User Accounts** pop-up lists the other accounts, each with its username and role.
-2. Use the buttons on each row:
+1. Sign in with an Admin account and open the **User** tab.
+2. Click **Manage Accounts**. The **Manage User Accounts** pop-up lists other accounts, including both Staff and Admin accounts, with each account's username and role.
+3. Use the buttons on each row:
 - **Edit** opens the row for editing (see below).
 - **Delete** (red) removes the account.
 
 ### Editing an account
-When you click **Edit**, the row turns into a small form with three fields:
+1. Click **Edit** beside the account. The row turns into a form with these fields:
 
 - the **username**
-- the **role** drop-down (for example, Staff)
+- the **role** drop-down (**Staff** or **Admin**)
 - a **New password** box
-Change what you need and click **Save**, or click **Cancel** to leave the account as it was. Use the new password box to reset a password for someone who forgot theirs.
+2. Change the username or role as needed. To reset the password, enter a new password; leave that field blank to keep the existing password.
+3. Click **Save** to apply the changes, or **Cancel** to discard them.
 
-**Be careful with Delete.** Removing an account means that person can no longer sign in. Check the name on the row before you click it.
+### Deleting an account
+1. Click **Delete** beside the account and confirm the prompt.
+2. That account will no longer be able to sign in.
+
+You cannot manage or delete your own account from this list. You also cannot demote or delete the last remaining Admin account, so the system always retains an administrator. Confirm the username and role before saving or deleting an account.
 
 ## 7. Session Audit History
 The right panel logs changes made in the system. The number in brackets in the title is the total number of entries.

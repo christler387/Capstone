@@ -41,6 +41,62 @@ app.use(express.json({ limit: "10mb" }));
 const ah = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
+const userSessions = new Map();
+const USER_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+function readSessionToken(req) {
+  const cookie = (req.headers.cookie || "")
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("autosupply_session="));
+  return cookie ? cookie.slice("autosupply_session=".length) : null;
+}
+
+async function getAuthenticatedUser(req) {
+  const token = readSessionToken(req);
+  const session = token ? userSessions.get(token) : null;
+  if (!session) return null;
+  if (session.expiresAt <= Date.now()) {
+    userSessions.delete(token);
+    return null;
+  }
+
+  const [[user]] = await pool.query(
+    "SELECT id, username, role FROM users WHERE id=? LIMIT 1",
+    [session.userId],
+  );
+  if (!user) userSessions.delete(token);
+  return user || null;
+}
+
+function setUserSession(req, res, userId) {
+  const now = Date.now();
+  for (const [token, session] of userSessions) {
+    if (session.expiresAt <= now) userSessions.delete(token);
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  userSessions.set(token, {
+    userId,
+    expiresAt: now + USER_SESSION_TTL_MS,
+  });
+  const secure = req.secure ? "; Secure" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `autosupply_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${Math.floor(USER_SESSION_TTL_MS / 1000)}${secure}`,
+  );
+}
+
+function clearUserSession(req, res) {
+  const token = readSessionToken(req);
+  if (token) userSessions.delete(token);
+  const secure = req.secure ? "; Secure" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `autosupply_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`,
+  );
+}
+
 // Saves a base64 image sent by the item form to the uploads folder and returns its URL.
 async function storeItemImage(image, imageFileName) {
   if (typeof image !== "string" || !image.startsWith("data:")) {
@@ -523,7 +579,13 @@ app.get(
 
 app.get(
   "/api/users",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor || actor.role !== "admin") {
+      return res
+        .status(actor ? 403 : 401)
+        .json({ error: "Administrator access is required." });
+    }
     const [rows] = await pool.query(
       "SELECT id, username, role FROM users ORDER BY username",
     );
@@ -534,6 +596,13 @@ app.get(
 app.post(
   "/api/users",
   ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor || actor.role !== "admin") {
+      return res
+        .status(actor ? 403 : 401)
+        .json({ error: "Administrator access is required." });
+    }
+
     const { username, password, role } = req.body || {};
 
     if (!username || !password) {
@@ -579,15 +648,18 @@ app.post(
 app.put(
   "/api/users/change-password",
   ah(async (req, res) => {
-    const { username, currentPassword, newPassword } = req.body || {};
+    const { currentPassword, newPassword } = req.body || {};
+    const actor = await getAuthenticatedUser(req);
 
-    if (!username || !currentPassword || !newPassword) {
+    if (!actor) {
+      return res.status(401).json({ error: "Sign in to change your password." });
+    }
+    if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        error: "Username, current password, and new password are required.",
+        error: "Current password and new password are required.",
       });
     }
 
-    const normalizedUsername = String(username).trim();
     const newPasswordString = String(newPassword).trim();
 
     if (newPasswordString.length < 4) {
@@ -597,8 +669,8 @@ app.put(
     }
 
     const [rows] = await pool.query(
-      "SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
-      [normalizedUsername],
+      "SELECT id, username, password_hash FROM users WHERE id=? LIMIT 1",
+      [actor.id],
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: "User not found." });
@@ -620,16 +692,18 @@ app.put(
 app.put(
   "/api/users/change-username",
   ah(async (req, res) => {
-    const { currentUsername, currentPassword, newUsername } = req.body || {};
+    const { currentPassword, newUsername } = req.body || {};
+    const actor = await getAuthenticatedUser(req);
 
-    if (!currentUsername || !currentPassword || !newUsername) {
+    if (!actor) {
+      return res.status(401).json({ error: "Sign in to change your username." });
+    }
+    if (!currentPassword || !newUsername) {
       return res.status(400).json({
-        error:
-          "Current username, current password, and new username are required.",
+        error: "Current password and new username are required.",
       });
     }
 
-    const normalizedCurrentUsername = String(currentUsername).trim();
     const normalizedNewUsername = String(newUsername).trim();
 
     if (normalizedNewUsername.length < 3) {
@@ -639,8 +713,8 @@ app.put(
     }
 
     const [existingRows] = await pool.query(
-      "SELECT id, username, password_hash FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
-      [normalizedCurrentUsername],
+      "SELECT id, username, password_hash FROM users WHERE id=? LIMIT 1",
+      [actor.id],
     );
     if (existingRows.length === 0) {
       return res.status(404).json({ error: "User not found." });
@@ -672,30 +746,30 @@ app.put(
 app.put(
   "/api/users/:id",
   ah(async (req, res) => {
-    const { username, password, role, actorUsername } = req.body || {};
+    const { username, password, role } = req.body || {};
     const userId = Number(req.params.id);
+    const actor = await getAuthenticatedUser(req);
 
-    if (!Number.isInteger(userId) || !username || !actorUsername) {
+    if (!Number.isInteger(userId) || !username) {
       return res
         .status(400)
-        .json({ error: "User ID, username, and admin account are required." });
+        .json({ error: "User ID and username are required." });
     }
-
-    const [[actor]] = await pool.query(
-      "SELECT role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
-      [String(actorUsername).trim()],
-    );
     if (!actor || actor.role !== "admin") {
       return res
-        .status(403)
+        .status(actor ? 403 : 401)
         .json({ error: "Administrator access is required." });
     }
 
     const normalizedUsername = String(username).trim();
+    const normalizedRole = role === "admin" || role === "staff" ? role : null;
     if (normalizedUsername.length < 3) {
       return res
         .status(400)
         .json({ error: "Username must be at least 3 characters long." });
+    }
+    if (!normalizedRole) {
+      return res.status(400).json({ error: "A valid account role is required." });
     }
     if (
       password !== undefined &&
@@ -707,92 +781,150 @@ app.put(
         .json({ error: "Password must be at least 4 characters long." });
     }
 
-    const [[targetUser]] = await pool.query(
-      "SELECT role FROM users WHERE id=? LIMIT 1",
-      [userId],
-    );
-    if (!targetUser) {
-      return res.status(404).json({ error: "User not found." });
-    }
-    if (targetUser.role !== "staff") {
-      return res
-        .status(403)
-        .json({ error: "Only staff accounts can be managed here." });
-    }
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [adminRows] = await connection.query(
+        "SELECT id FROM users WHERE role='admin' FOR UPDATE",
+      );
+      const [[targetUser]] = await connection.query(
+        "SELECT id, role FROM users WHERE id=? LIMIT 1 FOR UPDATE",
+        [userId],
+      );
+      if (!targetUser) {
+        await connection.rollback();
+        return res.status(404).json({ error: "User not found." });
+      }
 
-    const [[existing]] = await pool.query(
-      "SELECT id FROM users WHERE LOWER(username)=LOWER(?) AND id != ? LIMIT 1",
-      [normalizedUsername, userId],
-    );
-    if (existing) {
-      return res
-        .status(409)
-        .json({ error: "That username is already in use." });
-    }
+      const [[currentActor]] = await connection.query(
+        "SELECT role FROM users WHERE id=? LIMIT 1",
+        [actor.id],
+      );
+      if (!currentActor || currentActor.role !== "admin") {
+        await connection.rollback();
+        return res
+          .status(403)
+          .json({ error: "Administrator access is required." });
+      }
+      if (targetUser.id === actor.id) {
+        await connection.rollback();
+        return res
+          .status(400)
+          .json({ error: "You cannot manage your own account here." });
+      }
+      if (
+        targetUser.role === "admin" &&
+        normalizedRole !== "admin" &&
+        adminRows.length <= 1
+      ) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: "You cannot demote the last administrator account.",
+        });
+      }
 
-    const updates = ["username=?", "role=?"];
-    const values = [normalizedUsername, role === "admin" ? "admin" : "staff"];
-    if (password !== undefined && String(password).trim()) {
-      updates.push("password_hash=?");
-      values.push(hashPassword(String(password).trim()));
-    }
-    values.push(userId);
-    const [result] = await pool.query(
-      `UPDATE users SET ${updates.join(", ")} WHERE id=?`,
-      values,
-    );
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "User not found." });
-    }
+      const [[existing]] = await connection.query(
+        "SELECT id FROM users WHERE LOWER(username)=LOWER(?) AND id != ? LIMIT 1",
+        [normalizedUsername, userId],
+      );
+      if (existing) {
+        await connection.rollback();
+        return res
+          .status(409)
+          .json({ error: "That username is already in use." });
+      }
 
-    res.json({ ok: true, username: normalizedUsername });
+      const updates = ["username=?", "role=?"];
+      const values = [normalizedUsername, normalizedRole];
+      if (password !== undefined && String(password).trim()) {
+        updates.push("password_hash=?");
+        values.push(hashPassword(String(password).trim()));
+      }
+      values.push(userId);
+      await connection.query(
+        `UPDATE users SET ${updates.join(", ")} WHERE id=?`,
+        values,
+      );
+      await connection.commit();
+      if (password !== undefined && String(password).trim()) {
+        for (const [token, session] of userSessions) {
+          if (session.userId === userId) userSessions.delete(token);
+        }
+      }
+      res.json({ ok: true, username: normalizedUsername });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }),
 );
 
 app.delete(
   "/api/users/:id",
   ah(async (req, res) => {
-    const { actorUsername } = req.body || {};
     const userId = Number(req.params.id);
-    if (!Number.isInteger(userId) || !actorUsername) {
+    const actor = await getAuthenticatedUser(req);
+    if (!Number.isInteger(userId)) {
       return res
         .status(400)
-        .json({ error: "User ID and admin account are required." });
+        .json({ error: "A valid user ID is required." });
     }
-
-    const [[actor]] = await pool.query(
-      "SELECT id, role FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
-      [String(actorUsername).trim()],
-    );
     if (!actor || actor.role !== "admin") {
       return res
-        .status(403)
+        .status(actor ? 403 : 401)
         .json({ error: "Administrator access is required." });
     }
-    if (actor.id === userId) {
-      return res
-        .status(400)
-        .json({ error: "You cannot delete the active administrator account." });
-    }
 
-    const [[targetUser]] = await pool.query(
-      "SELECT role FROM users WHERE id=? LIMIT 1",
-      [userId],
-    );
-    if (!targetUser) {
-      return res.status(404).json({ error: "User not found." });
-    }
-    if (targetUser.role !== "staff") {
-      return res
-        .status(403)
-        .json({ error: "Only staff accounts can be managed here." });
-    }
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [adminRows] = await connection.query(
+        "SELECT id FROM users WHERE role='admin' FOR UPDATE",
+      );
+      const [[targetUser]] = await connection.query(
+        "SELECT id, role FROM users WHERE id=? LIMIT 1 FOR UPDATE",
+        [userId],
+      );
+      if (!targetUser) {
+        await connection.rollback();
+        return res.status(404).json({ error: "User not found." });
+      }
 
-    const [result] = await pool.query("DELETE FROM users WHERE id=?", [userId]);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "User not found." });
+      const [[currentActor]] = await connection.query(
+        "SELECT role FROM users WHERE id=? LIMIT 1",
+        [actor.id],
+      );
+      if (!currentActor || currentActor.role !== "admin") {
+        await connection.rollback();
+        return res
+          .status(403)
+          .json({ error: "Administrator access is required." });
+      }
+      if (actor.id === userId) {
+        await connection.rollback();
+        return res.status(400).json({ error: "You cannot delete your own account." });
+      }
+      if (targetUser.role === "admin" && adminRows.length <= 1) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: "You cannot delete the last administrator account.",
+        });
+      }
+
+      await connection.query("DELETE FROM users WHERE id=?", [userId]);
+      await connection.commit();
+      for (const [token, session] of userSessions) {
+        if (session.userId === userId) userSessions.delete(token);
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-    res.json({ ok: true });
   }),
 );
 
@@ -808,7 +940,7 @@ app.post(
     }
 
     const [rows] = await pool.query(
-      `SELECT username, role, display_name
+      `SELECT id, username, role, display_name
        FROM users
        WHERE LOWER(username) = LOWER(?)
          AND password_hash = ?
@@ -821,6 +953,7 @@ app.post(
     }
 
     const user = rows[0];
+    setUserSession(req, res, user.id);
     res.json({
       username: user.username,
       role: user.role,
@@ -830,6 +963,11 @@ app.post(
     });
   }),
 );
+
+app.post("/api/logout", (req, res) => {
+  clearUserSession(req, res);
+  res.json({ ok: true });
+});
 
 /* ----------------------------- Inventory ---------------------------- */
 

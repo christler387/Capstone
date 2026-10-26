@@ -194,7 +194,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const loadManagedUsers = async () => {
     try {
       const users = await requestUserApi<ManagedUser[]>("/users");
-      setManagedUsers(users.filter((account) => account.role === "staff"));
+      setManagedUsers(
+        users.filter(
+          (account) => account.username.toLowerCase() !== user.toLowerCase(),
+        ),
+      );
       setManagedUsersFeedback(null);
     } catch (error) {
       setManagedUsersFeedback(
@@ -213,7 +217,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           username: editingUsername,
           role: editingRole,
           password: editingPassword,
-          actorUsername: user,
         }),
       });
       setEditingUserId(null);
@@ -233,7 +236,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     try {
       await requestUserApi(`/users/${account.id}`, {
         method: "DELETE",
-        body: JSON.stringify({ actorUsername: user }),
       });
       await loadManagedUsers();
     } catch (error) {
