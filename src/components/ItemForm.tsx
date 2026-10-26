@@ -311,7 +311,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           )}
         </div>
 
-{/* Staff Mode */}
         <div className="form-group">
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
