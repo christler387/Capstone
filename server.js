@@ -1286,24 +1286,24 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: "Database request failed" });
 });
 
-export async function startServer() {
-  await initializeDatabase();
-  void purgeExpiredHistory().catch((error) => {
-    console.error("Initial audit history cleanup failed:", error.message);
-  });
-  scheduleHistoryCleanup();
+// Hostinger's Node.js launcher requires listen() within 3 seconds and does not
+// run the entry file as `node server.js`, so the server listens first and the
+// database setup runs in the background.
+export function startServer() {
   app.listen(port, () =>
     console.log(`API listening on http://localhost:${port}`),
   );
+
+  initializeDatabase()
+    .then(() => {
+      void purgeExpiredHistory().catch((error) => {
+        console.error("Initial audit history cleanup failed:", error.message);
+      });
+      scheduleHistoryCleanup();
+    })
+    .catch((error) => {
+      console.error("Database initialization failed:", error.message);
+    });
 }
 
-const isDirectRun =
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-
-if (isDirectRun) {
-  startServer().catch((error) => {
-    console.error("Database initialization failed:", error.message);
-    process.exit(1);
-  });
-}
+startServer();
