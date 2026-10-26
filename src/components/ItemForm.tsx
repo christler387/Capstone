@@ -295,7 +295,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             {!readOnly && (
               <button
                 type="button"
-                className={`barcode-scan-toggle ${isScannerOpen ? "active" : ""}`}
+                className={`item-barcode-scan-button ${isScannerOpen ? "active" : ""}`}
                 onClick={() => setIsScannerOpen((prev) => !prev)}
                 title="Scan barcode"
               >
