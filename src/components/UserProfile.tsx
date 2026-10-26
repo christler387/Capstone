@@ -695,9 +695,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     const auditActor =
                       "createdBy" in m
                         ? m.createdBy ||
-                          localStorage.getItem("skyrun_session_user") ||
+                          sessionStorage.getItem("skyrun_session_user") ||
                           "Unknown"
-                        : localStorage.getItem("skyrun_session_user") ||
+                        : sessionStorage.getItem("skyrun_session_user") ||
                           "Unknown";
 
                     return (

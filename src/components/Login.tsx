@@ -3,9 +3,10 @@ import skyrunLogo from '../assets/Skyrun.png';
 
 interface LoginProps {
   onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string, phone?: string) => void;
+  notice?: string | null;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -56,10 +57,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         <h1 className="login-title">Login</h1>
 
-        {error && (
+        {(error || notice) && (
           <div className="login-alert">
             <i className="bx bx-error-circle" aria-hidden="true"></i>
-            {error}
+            {error || notice}
           </div>
         )}
 

@@ -31,6 +31,19 @@ import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
 import skyrunLogo from './assets/Skyrun.png';
 
+// The session is kept in sessionStorage, so closing the tab signs the user out.
+// It also expires after 15 minutes without mouse, keyboard, touch or scroll activity.
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
+const SESSION_CHECK_MS = 15 * 1000;
+const SESSION_ACTIVITY_KEY = 'skyrun_session_last_active';
+const SESSION_EXPIRED_MESSAGE = 'Your session timed out after 15 minutes of inactivity. Please sign in again.';
+
+function clearStoredSession() {
+  sessionStorage.removeItem('skyrun_session_user');
+  sessionStorage.removeItem('skyrun_session_role');
+  sessionStorage.removeItem(SESSION_ACTIVITY_KEY);
+}
+
 const App: React.FC = () => {
   const [inventory, setInventory] = useState<Item[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -39,6 +52,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
   const [databaseError, setDatabaseError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -59,29 +73,30 @@ const App: React.FC = () => {
   }, []);
 
   const handleLoginSuccess = (username: string, role: UserRole, _email?: string, _phone?: string) => {
-    localStorage.setItem('skyrun_session_user', username);
-    localStorage.setItem('skyrun_session_role', role);
+    sessionStorage.setItem('skyrun_session_user', username);
+    sessionStorage.setItem('skyrun_session_role', role);
+    sessionStorage.setItem(SESSION_ACTIVITY_KEY, String(Date.now()));
+    setSessionNotice(null);
     setUser(username);
     setUserRole(role);
   };
 
   const handleSwitchRole = (newRole: UserRole, newName: string) => {
-    localStorage.setItem('skyrun_session_user', newName);
-    localStorage.setItem('skyrun_session_role', newRole);
+    sessionStorage.setItem('skyrun_session_user', newName);
+    sessionStorage.setItem('skyrun_session_role', newRole);
     setUser(newName);
     setUserRole(newRole);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('skyrun_session_user');
-    localStorage.removeItem('skyrun_session_role');
+    clearStoredSession();
     setUser(null);
     setUserRole('staff');
     setCurrentSection('dashboard');
   };
 
   const handleChangePassword = async (currentPassword: string, newPassword: string) => {
-    const activeUsername = localStorage.getItem('skyrun_session_user') || user;
+    const activeUsername = sessionStorage.getItem('skyrun_session_user') || user;
     if (!activeUsername) {
       throw new Error('No active user is logged in.');
     }
@@ -91,7 +106,7 @@ const App: React.FC = () => {
     });
   };
   const handleChangeUsername = async (currentPassword: string, newUsername: string) => {
-    const activeUsername = localStorage.getItem('skyrun_session_user') || user;
+    const activeUsername = sessionStorage.getItem('skyrun_session_user') || user;
     if (!activeUsername) {
       throw new Error('No active user is logged in.');
     }
@@ -100,7 +115,7 @@ const App: React.FC = () => {
       method: 'PUT',
       body: JSON.stringify({ currentUsername: activeUsername, currentPassword, newUsername }),
     });
-    localStorage.setItem('skyrun_session_user', updatedUser.username);
+    sessionStorage.setItem('skyrun_session_user', updatedUser.username);
     setUser(updatedUser.username);
   };
 
@@ -613,7 +628,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   };
 
   const addItem = async (item: Item) => {
-    const currentUser = localStorage.getItem('skyrun_session_user') || user || 'Unknown';
+    const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
     const savedItem = await requestJson<Item>('/inventory', {
       method: 'POST',
       body: JSON.stringify({ ...item, createdBy: currentUser }),
@@ -632,7 +647,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
 
   const deleteItem = async (id: string) => {
     const deletedItem = inventory.find(item => item.id === id);
-    const currentUser = localStorage.getItem('skyrun_session_user') || user || 'Unknown';
+    const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
     await requestJson<void>(`/inventory/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       body: JSON.stringify({ createdBy: currentUser }),
@@ -876,17 +891,58 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   );
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('skyrun_session_user');
-    const savedRole = localStorage.getItem('skyrun_session_role') as UserRole | null;
+    const savedUser = sessionStorage.getItem('skyrun_session_user');
+    const savedRole = sessionStorage.getItem('skyrun_session_role') as UserRole | null;
+    const lastActive = Number(sessionStorage.getItem(SESSION_ACTIVITY_KEY) || 0);
 
-    if (savedUser && (savedRole === 'admin' || savedRole === 'staff')) {
-      setUser(savedUser);
-      setUserRole(savedRole);
+    if (!savedUser || (savedRole !== 'admin' && savedRole !== 'staff')) return;
+
+    // A page reload keeps the session, but one that sat idle past the limit is ended.
+    if (Date.now() - lastActive > SESSION_TIMEOUT_MS) {
+      clearStoredSession();
+      setSessionNotice(SESSION_EXPIRED_MESSAGE);
+      return;
     }
+
+    setUser(savedUser);
+    setUserRole(savedRole);
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    let lastWrite = 0;
+    const markActive = () => {
+      const now = Date.now();
+      // Writing to storage on every mouse move is wasteful, so record activity at most every 10 seconds.
+      if (now - lastWrite < 10_000) return;
+      lastWrite = now;
+      sessionStorage.setItem(SESSION_ACTIVITY_KEY, String(now));
+    };
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, markActive, { passive: true }),
+    );
+
+    const expiryTimer = window.setInterval(() => {
+      const lastActive = Number(sessionStorage.getItem(SESSION_ACTIVITY_KEY) || 0);
+      if (Date.now() - lastActive > SESSION_TIMEOUT_MS) {
+        clearStoredSession();
+        setSessionNotice(SESSION_EXPIRED_MESSAGE);
+        setUser(null);
+        setUserRole('staff');
+        setCurrentSection('dashboard');
+      }
+    }, SESSION_CHECK_MS);
+
+    return () => {
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, markActive));
+      window.clearInterval(expiryTimer);
+    };
+  }, [user]);
+
   if (!user) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <Login onLoginSuccess={handleLoginSuccess} notice={sessionNotice} />;
   }
 
   return (
