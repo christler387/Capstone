@@ -274,12 +274,13 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             required
           />
         </div>
+
+{/* Barcode input and scanner */}
         <div className="form-group">
           <label className="label-micro">
             Barcode {!readOnly && <span className="text-accent">*</span>}
           </label>
 
-{/* ----- Barcode hahaha ----- */}
           <div className="flex-row-gap">
             <input
               type="text"
@@ -291,28 +292,26 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               required={!readOnly}
             />
 
-
             {!readOnly && (
               <button
                 type="button"
-                className={'barcode-scan-toggle ${isScannerOpen ? "active" : ""}'}
+                className={`barcode-scan-toggle ${isScannerOpen ? "active" : ""}`}
                 onClick={() => setIsScannerOpen((prev) => !prev)}
                 title="Scan barcode"
               >
-
-                <i className={' bx ${isScannerOpen ? "bx-x" : "bx-barcode-reader"}'}></i>
+                <i className={`bx ${isScannerOpen ? "bx-x" : "bx-barcode-reader"}`}></i>
               </button>
             )}
-            </div>
+          </div>
 
-            {isScannerOpen && (
-              <div style={{ marginTop: "10px"}}>
-                <BarcodeScanner onScanSuccess={handleBarcodeScanned} />
-              </div>
-            )}
+          {isScannerOpen && (
+            <div style={{ marginTop: "12px" }}>
+              <BarcodeScanner onScanSuccess={handleBarcodeScanned} />
+            </div>
+          )}
         </div>
 
-{/* ----- Staff Mode ----- */}
+{/* Staff Mode */}
         <div className="form-group">
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
