@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Item } from "../types";
+import { BarcodeScanner } from "./BarcodeScanner";
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -46,6 +47,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageFileName, setImageFileName] = useState(() =>
@@ -105,6 +107,15 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           : parseFloat(value)
         : value,
     }));
+  };
+
+  const handleBarcodeScanned = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      barcode: value,
+    }));
+    setIsScannerOpen(false);
+    setError(null);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,16 +278,41 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">
             Barcode {!readOnly && <span className="text-accent">*</span>}
           </label>
-          <input
-            type="text"
-            id="edit-barcode"
-            className="form-input"
-            value={formData.barcode || ""}
-            onChange={handleChange}
-            disabled={readOnly}
-            required={!readOnly}
-          />
+
+/* ----- Barcode hahaha ----- */
+          <div className="flex-row-gap">
+            <input
+              type="text"
+              id="edit-barcode"
+              className="form-input"
+              value={formData.barcode || ""}
+              onChange={handleChange}
+              disabled={readOnly}
+              required={!readOnly}
+            />
+
+
+            {!readOnly && (
+              <button
+                type="button"
+                className={'barcode-scan-toggle ${isScannerOpen ? "active" : ""}'}
+                onClick={() => setIsScannerOpen((prev) => !prev)}
+                title="Scan barcode"
+              >
+
+                <i className={' bx ${isScannerOpen ? "bx-x" : "bx-barcode-reader"}'}></i>
+              </button>
+            )}
+            </div>
+
+            {isScannerOpen && (
+              <div style={{ marginTop: "10px"}}>
+                <BarcodeScanner onScanSuccess={handleBarcodeScanned} />
+              </div>
+            )}
         </div>
+
+/* ----- Staff Mode ----- */
         <div className="form-group">
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
