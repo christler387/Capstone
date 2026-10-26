@@ -1,5 +1,6 @@
-﻿import React, { useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import skyrunLogo from '../assets/Skyrun.png';
+import { SessionNoticeDialog } from './SessionNoticeDialog';
 
 interface LoginProps {
   onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string, phone?: string) => void;
@@ -11,7 +12,14 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isNoticeOpen, setIsNoticeOpen] = useState(Boolean(notice));
   const [isLoading, setIsLoading] = useState(false);
+  const closeNotice = useCallback(() => setIsNoticeOpen(false), []);
+
+  // Open the notice again whenever a new one arrives (for example, another timeout).
+  useEffect(() => {
+    setIsNoticeOpen(Boolean(notice));
+  }, [notice]);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -57,11 +65,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
 
         <h1 className="login-title">Login</h1>
 
-        {(error || notice) && (
+        {error && (
           <div className="login-alert">
             <i className="bx bx-error-circle" aria-hidden="true"></i>
-            {error || notice}
+            {error}
           </div>
+        )}
+
+        {notice && isNoticeOpen && (
+          <SessionNoticeDialog message={notice} onClose={closeNotice} />
         )}
 
         <form noValidate onSubmit={handleLogin} className="login-form">
