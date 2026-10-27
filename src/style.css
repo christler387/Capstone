@@ -3411,3 +3411,20 @@ select.aisle-editor-input {
 .aisle-group .rack:not(.low-stock-alert) {
   border-color: color-mix(in srgb, var(--aisle-color, #64748b) 22%, #e6e2d9);
 }
+
+/* Racks sit inside the aisle frame with even breathing room, top label band included */
+.warehouse-map-grid {
+  --header-gap: 44px;
+}
+
+.aisle-group::before {
+  top: calc(-1 * var(--header-gap) + 18px);
+  bottom: -10px;
+  left: -6px;
+  right: -6px;
+}
+
+.aisle-group .aisle-label {
+  top: calc(-1 * var(--header-gap) + 24px);
+  height: 16px;
+}
