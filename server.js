@@ -1366,10 +1366,10 @@ const defaultLayoutAisles = [
   { code: "F", category: "Body & Brakes", color: "#F59E0B", gridCol: 6, gridRow: 1 },
   { code: "G", category: "Electrical & Engine", color: "#6366F1", gridCol: 7, gridRow: 1 },
   { code: "H", category: "Electrical & Engine", color: "#6366F1", gridCol: 8, gridRow: 1 },
-  { code: "I", category: "Suspension & Transmission", color: "#0891B2", gridCol: 5, gridRow: 2 },
-  { code: "J", category: "Suspension & Transmission", color: "#0891B2", gridCol: 6, gridRow: 2 },
-  { code: "K", category: "Misc", color: "#DB2777", gridCol: 7, gridRow: 2 },
-  { code: "L", category: "Misc", color: "#DB2777", gridCol: 8, gridRow: 2 },
+  { code: "I", category: "Suspension & Transmission", color: "#0891B2", gridCol: 5, gridRow: 4 },
+  { code: "J", category: "Suspension & Transmission", color: "#0891B2", gridCol: 6, gridRow: 4 },
+  { code: "K", category: "Misc", color: "#DB2777", gridCol: 7, gridRow: 4 },
+  { code: "L", category: "Misc", color: "#DB2777", gridCol: 8, gridRow: 4 },
 ];
 
 const DEFAULT_RACKS_PER_AISLE = 3;
