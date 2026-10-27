@@ -3455,3 +3455,12 @@ select.aisle-editor-input {
   top: 12px;
   z-index: 30;
 }
+
+/* Save and Cancel sit to the right of Delete aisle inside the editor header */
+.aisle-editor-header .layout-edit-bar {
+  margin-left: auto;
+}
+
+.aisle-editor-header-bare {
+  justify-content: flex-end;
+}

@@ -1056,23 +1056,11 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
             <i className="bx bx-plus"></i> Add Aisle to {activeFloor.name}
           </button>
         )}
-        {isAdmin && (isEditing ? (
-          <div className="layout-edit-bar">
-            <span className={`layout-edit-status${isDirty ? ' is-dirty' : ''}`}>
-              {isDirty ? 'Unsaved changes' : 'No changes yet'}
-            </span>
-            <button type="button" className="olive-button btn-outline" onClick={requestCancelEdit} disabled={isSavingLayout}>
-              Cancel
-            </button>
-            <button type="button" className="olive-button" onClick={saveLayoutEdits} disabled={isSavingLayout || !isDirty}>
-              {isSavingLayout ? 'Saving…' : 'Save Layout'}
-            </button>
-          </div>
-        ) : (
+        {isAdmin && !isEditing && (
           <button type="button" className="floor-tab-add" onClick={enterEditMode}>
             <i className="bx bx-edit-alt"></i> Edit Layout
           </button>
-        ))}
+        )}
       </div>
 
       {isEditing && (
@@ -1097,7 +1085,18 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                 >
                   <i className="bx bx-trash" aria-hidden="true"></i> Delete aisle
                 </button>
-              </header>
+            <div className="layout-edit-bar">
+              <span className={`layout-edit-status${isDirty ? ' is-dirty' : ''}`}>
+                {isDirty ? 'Unsaved changes' : 'No changes yet'}
+              </span>
+              <button type="button" className="olive-button btn-outline" onClick={requestCancelEdit} disabled={isSavingLayout}>
+                Cancel
+              </button>
+              <button type="button" className="olive-button" onClick={saveLayoutEdits} disabled={isSavingLayout || !isDirty}>
+                {isSavingLayout ? 'Saving…' : 'Save Layout'}
+              </button>
+            </div>
+                </header>
 
               <div className="aisle-editor-grid">
                 <div className="aisle-editor-field">
@@ -1220,6 +1219,19 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
               </div>
             </>
           ) : (
+            <header className="aisle-editor-header aisle-editor-header-bare">
+            <div className="layout-edit-bar">
+              <span className={`layout-edit-status${isDirty ? ' is-dirty' : ''}`}>
+                {isDirty ? 'Unsaved changes' : 'No changes yet'}
+              </span>
+              <button type="button" className="olive-button btn-outline" onClick={requestCancelEdit} disabled={isSavingLayout}>
+                Cancel
+              </button>
+              <button type="button" className="olive-button" onClick={saveLayoutEdits} disabled={isSavingLayout || !isDirty}>
+                {isSavingLayout ? 'Saving…' : 'Save Layout'}
+              </button>
+            </div>
+              </header>
             <div className="aisle-editor-empty">
               <i className="bx bx-pointer" aria-hidden="true"></i>
               <span>Select an aisle on the map to change its name, description, orientation or racks.</span>
