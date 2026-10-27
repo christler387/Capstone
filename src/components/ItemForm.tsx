@@ -116,12 +116,24 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   };
 
   const handleBarcodeScanned = (value: string) => {
+    const barcode = value.trim();
+    const duplicateBarcode = existingItems.some(
+      (existingItem) =>
+        existingItem.id !== item?.id &&
+        (existingItem.barcode ?? "").trim() === barcode,
+    );
+    if (duplicateBarcode) {
+      setError("That barcode is already registered to another item. Scan a different barcode.");
+      return false;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      barcode: value,
+      barcode,
     }));
     setIsScannerOpen(false);
     setError(null);
+    return true;
   };
 
   const toggleScanner = () => setIsScannerOpen((prev) => !prev);

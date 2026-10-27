@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { BarcodeScanner } from './BarcodeScanner';
 
 interface ScannerDialogProps {
-  onScanSuccess: (value: string) => void;
+  onScanSuccess: (value: string) => boolean | void;
   onClose: () => void;
 }
 
@@ -10,6 +10,7 @@ interface ScannerDialogProps {
 export const ScannerDialog: React.FC<ScannerDialogProps> = ({ onScanSuccess, onClose }) => {
   const scanSuccessRef = useRef(onScanSuccess);
   const hasScannedRef = useRef(false);
+  const lastRejectedValueRef = useRef<string | null>(null);
 
   useEffect(() => {
     scanSuccessRef.current = onScanSuccess;
@@ -17,9 +18,13 @@ export const ScannerDialog: React.FC<ScannerDialogProps> = ({ onScanSuccess, onC
 
   // The scanner can report the same code several times before the dialog closes.
   const handleScan = useCallback((value: string) => {
-    if (hasScannedRef.current) return;
+    if (hasScannedRef.current || lastRejectedValueRef.current === value) return;
+    const accepted = scanSuccessRef.current(value);
+    if (accepted === false) {
+      lastRejectedValueRef.current = value;
+      return;
+    }
     hasScannedRef.current = true;
-    scanSuccessRef.current(value);
   }, []);
 
   useEffect(() => {
