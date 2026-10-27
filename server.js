@@ -470,6 +470,7 @@ async function initializeDatabase() {
     CONSTRAINT fk_racks_aisle FOREIGN KEY (aisle_id) REFERENCES aisles(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   await seedWarehouseLayout();
+  await repairOldSeedPositions();
 
   // ---- Seed data ----
   const [[userCount]] = await pool.query("SELECT COUNT(*) AS count FROM users");
@@ -1396,6 +1397,25 @@ async function seedWarehouseLayout() {
       );
     }
   }
+}
+
+// One-time repair for databases seeded before aisles I to L moved to row 4. It only moves aisles still
+// at their old seed spots, and only when nothing else is in the way, so a layout changed by a user is left alone.
+async function repairOldSeedPositions() {
+  const [oldSpots] = await pool.query(
+    "SELECT id FROM aisles WHERE code IN ('I','J','K','L') AND grid_row = 2 AND grid_col BETWEEN 5 AND 8",
+  );
+  if (oldSpots.length !== 4) return;
+
+  const [[blocking]] = await pool.query(
+    "SELECT COUNT(*) AS count FROM aisles WHERE grid_row BETWEEN 4 AND 6 AND grid_col BETWEEN 5 AND 8 AND code NOT IN ('I','J','K','L')",
+  );
+  if (blocking.count > 0) return;
+
+  await pool.query(
+    "UPDATE aisles SET grid_row = 4 WHERE code IN ('I','J','K','L') AND grid_row = 2 AND grid_col BETWEEN 5 AND 8",
+  );
+  console.log("Moved aisles I to L below the three-rack aisles.");
 }
 
 function rackCode(aisleCode, rackNumber) {
