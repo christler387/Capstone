@@ -23,6 +23,9 @@ const CATEGORY_LABEL_BY_KEYWORD: Record<string, string> = {
   TRANSMISSION: 'Suspension & Transmission',
 };
 
+// Width of the vertical label strip on the left of every aisle. Same width everywhere, so racks line up.
+const LABEL_STRIP_WIDTH = 30;
+
 const FLOOR_STORAGE_KEY = 'skyrun_warehouse_floor';
 
 // Rows at or beyond this are off the grid (parked aisles).
@@ -1259,7 +1262,9 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                   style={{
                     gridColumn: `${aisle.gridCol} / span ${footprint.cols}`,
                     gridRow: `${aisle.gridRow} / span ${footprint.rows}`,
-                    gridTemplateColumns: isLandscape ? `repeat(${rackCount}, minmax(0, 1fr))` : undefined,
+                    gridTemplateColumns: isLandscape
+                      ? `${LABEL_STRIP_WIDTH}px repeat(${rackCount}, minmax(0, 1fr))`
+                      : `${LABEL_STRIP_WIDTH}px minmax(0, 1fr)`,
                     gridTemplateRows: isLandscape ? 'var(--rack-h)' : `repeat(${rackCount}, var(--rack-h))`,
                     '--aisle-color': aisle.color,
                   } as React.CSSProperties}
