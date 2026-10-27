@@ -123,7 +123,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         (existingItem.barcode ?? "").trim() === barcode,
     );
     if (duplicateBarcode) {
-      setError("That barcode is already registered to another item. Scan a different barcode.");
       return false;
     }
 

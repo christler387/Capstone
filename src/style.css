@@ -2079,6 +2079,25 @@ footer p {
   overflow-y: auto;
 }
 
+.scanner-dialog-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(176, 62, 52, 0.25);
+  border-radius: 8px;
+  background: rgba(176, 62, 52, 0.08);
+  color: #8d3029;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.scanner-dialog-warning i {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
 /* html5-qrcode draws its own controls inside #reader; restyle them to match the app. */
 .scanner-dialog #reader {
   max-width: 100% !important;

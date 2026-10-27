@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BarcodeScanner } from './BarcodeScanner';
 
 interface ScannerDialogProps {
@@ -11,6 +11,7 @@ export const ScannerDialog: React.FC<ScannerDialogProps> = ({ onScanSuccess, onC
   const scanSuccessRef = useRef(onScanSuccess);
   const hasScannedRef = useRef(false);
   const lastRejectedValueRef = useRef<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
     scanSuccessRef.current = onScanSuccess;
@@ -22,6 +23,7 @@ export const ScannerDialog: React.FC<ScannerDialogProps> = ({ onScanSuccess, onC
     const accepted = scanSuccessRef.current(value);
     if (accepted === false) {
       lastRejectedValueRef.current = value;
+      setWarning('That barcode is already registered to another item. Scan a different barcode.');
       return;
     }
     hasScannedRef.current = true;
@@ -65,6 +67,11 @@ export const ScannerDialog: React.FC<ScannerDialogProps> = ({ onScanSuccess, onC
 
         <div className="scanner-dialog-body">
           <BarcodeScanner onScanSuccess={handleScan} />
+          {warning && (
+            <p role="alert" className="scanner-dialog-warning">
+              <i className="bx bx-error-circle" aria-hidden="true"></i> {warning}
+            </p>
+          )}
         </div>
 
         <div className="scanner-dialog-footer">
