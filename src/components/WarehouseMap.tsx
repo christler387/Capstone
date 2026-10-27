@@ -117,7 +117,7 @@ interface WarehouseMapProps {
   onLayoutChange?: (layout: WarehouseLayout) => void;
   onEditItem: (id: string) => void;
   onAddItem: (rack?: string) => void;
-  onBulkUpdate: (newInventory: Item[]) => void;
+  onBulkUpdate: (newInventory: Item[]) => void | Promise<void>;
   initialRack?: string | null;
   onClearInitialRack?: () => void;
   userRole?: 'admin' | 'staff';
@@ -348,6 +348,83 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       setError(saveError instanceof Error ? saveError.message : 'Could not save the floor.');
     } finally {
       setIsSavingFloor(false);
+    }
+  };
+
+  // ---- Moving items out before deleting an aisle or a floor ----
+
+  const [moveDialog, setMoveDialog] = useState<{ kind: 'aisle' | 'floor'; id: number } | null>(null);
+  const [moveTargets, setMoveTargets] = useState<Record<string, string>>({});
+  const [isMovingItems, setIsMovingItems] = useState(false);
+
+  const sourceAislesFor = (kind: 'aisle' | 'floor', id: number): WarehouseAisle[] =>
+    kind === 'aisle'
+      ? layout.flatMap(floor => floor.aisles).filter(aisle => aisle.id === id)
+      : (layout.find(floor => floor.id === id)?.aisles ?? []);
+
+  // Rack codes that stay in the warehouse, so the items have somewhere to go.
+  const targetRacksExcluding = (sources: WarehouseAisle[]): string[] => {
+    const removed = new Set(sources.map(aisle => aisle.id));
+    return layout.flatMap(floor =>
+      floor.aisles.filter(aisle => !removed.has(aisle.id)).flatMap(aisle => aisle.racks.map(rack => rack.code)),
+    );
+  };
+
+  const openMoveDialog = (kind: 'aisle' | 'floor', id: number) => {
+    const sources = sourceAislesFor(kind, id);
+    const targets = targetRacksExcluding(sources);
+    const defaults: Record<string, string> = {};
+    sources.forEach(aisle => {
+      defaults[aisle.code] = targets[0] ?? '';
+    });
+    setMoveTargets(defaults);
+    setMoveDialog({ kind, id });
+    setError(null);
+  };
+
+  const openDeleteFloor = (floorId: number) => {
+    const floor = layout.find(candidate => candidate.id === floorId);
+    if (floor && floor.aisles.some(aisle => aisleItemCount(aisle.code) > 0)) {
+      openMoveDialog('floor', floorId);
+    } else {
+      setFloorToDelete(floorId);
+    }
+  };
+
+  // Moves the items to the chosen racks, then deletes the aisle (in the draft) or the floor.
+  const confirmMoveAndDelete = async () => {
+    if (!moveDialog) return;
+    const sources = sourceAislesFor(moveDialog.kind, moveDialog.id);
+    const sourceCodes = new Set(sources.map(aisle => aisle.code));
+    const missingTarget = sources.some(aisle => aisleItemCount(aisle.code) > 0 && !moveTargets[aisle.code]);
+    if (missingTarget) {
+      setError('Choose a rack for every aisle that holds items.');
+      return;
+    }
+
+    const movedInventory = inventory.map(item => {
+      const code = aisleCodeOfRack(item.rack);
+      if (!sourceCodes.has(code)) return item;
+      const target = moveTargets[code];
+      return target ? { ...item, rack: target } : item;
+    });
+    const itemsMove = movedInventory.some((item, index) => item !== inventory[index]);
+
+    setIsMovingItems(true);
+    setError(null);
+    try {
+      if (itemsMove) await onBulkUpdate(movedInventory);
+      if (moveDialog.kind === 'aisle') {
+        removeAisleFromDraft(moveDialog.id);
+      } else {
+        const updated = await requestLayout('DELETE', `/floors/${moveDialog.id}`);
+        onLayoutChange?.(updated);
+      }
+      setMoveDialog(null);
+    } catch (moveError) {
+      setError(moveError instanceof Error ? moveError.message : 'Could not move the items.');
+    } finally {
+      setIsMovingItems(false);
     }
   };
 
@@ -596,13 +673,18 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     });
   };
 
+  // Deleting an aisle that holds items first asks where those items should go.
   const deleteAisleInDraft = (aisleId: number) => {
     const aisle = getDraftAisle(aisleId);
     if (!aisle) return;
     if (aisleItemCount(aisle.code) > 0) {
-      setError(`Aisle ${aisle.code} still holds items. Move them before deleting it.`);
+      openMoveDialog('aisle', aisleId);
       return;
     }
+    removeAisleFromDraft(aisleId);
+  };
+
+  const removeAisleFromDraft = (aisleId: number) => {
     setSelectedAisleId(null);
     updateDraft(copy => {
       copy.forEach(floor => {
@@ -799,7 +881,10 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   // Close the floor options menu when the user clicks anywhere else.
   useEffect(() => {
     if (floorMenuId === null) return;
-    const closeMenu = () => setFloorMenuId(null);
+    const closeMenu = (event: MouseEvent) => {
+      if ((event.target as HTMLElement).closest('.floor-tab-menu-wrap')) return;
+      setFloorMenuId(null);
+    };
     document.addEventListener('mousedown', closeMenu);
     return () => document.removeEventListener('mousedown', closeMenu);
   }, [floorMenuId]);
@@ -949,7 +1034,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                         title={layout.length <= 1 ? 'The warehouse needs at least one floor' : undefined}
                         onClick={() => {
                           setFloorMenuId(null);
-                          setFloorToDelete(floor.id);
+                          openDeleteFloor(floor.id);
                         }}
                       >
                         <i className="bx bx-trash"></i> Delete
@@ -1007,8 +1092,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                 <button
                   type="button"
                   className="aisle-editor-delete"
-                  disabled={aisleItemCount(selectedAisle.code) > 0}
-                  title={aisleItemCount(selectedAisle.code) > 0 ? 'Move the items out of this aisle first' : 'Delete this aisle'}
+                  title={aisleItemCount(selectedAisle.code) > 0 ? 'This aisle holds items. You will choose where they go.' : 'Delete this aisle'}
                   onClick={() => deleteAisleInDraft(selectedAisle.id)}
                 >
                   <i className="bx bx-trash" aria-hidden="true"></i> Delete aisle
@@ -1472,6 +1556,66 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           </p>
         </Modal>
       )}
+
+      {moveDialog && (() => {
+        const sources = sourceAislesFor(moveDialog.kind, moveDialog.id);
+        const holding = sources
+          .map(aisle => ({ aisle, count: aisleItemCount(aisle.code) }))
+          .filter(entry => entry.count > 0);
+        const targets = targetRacksExcluding(sources);
+        const name = moveDialog.kind === 'aisle'
+          ? `Aisle ${sources[0]?.code ?? ''}`
+          : (layout.find(floor => floor.id === moveDialog.id)?.name ?? 'this floor');
+        const cannotMove = holding.length > 0 && targets.length === 0;
+        return (
+          <Modal
+            isOpen={true}
+            onClose={() => setMoveDialog(null)}
+            title={`Delete ${name}`}
+            type="mini"
+            footer={
+              <div className="flex-row-gap">
+                <button className="olive-button btn-outline" onClick={() => setMoveDialog(null)} disabled={isMovingItems}>Cancel</button>
+                <button
+                  className="olive-button btn-danger"
+                  onClick={confirmMoveAndDelete}
+                  disabled={isMovingItems || cannotMove}
+                >
+                  {isMovingItems ? 'Moving…' : 'Move Items & Delete'}
+                </button>
+              </div>
+            }
+          >
+            <p className="label-micro" style={{ textTransform: 'none', lineHeight: 1.5 }}>
+              {name} holds items. Choose the rack each aisle's items should move to. The items are moved right away, before the delete.
+            </p>
+            <div className="move-items-list">
+              {holding.map(({ aisle, count }) => (
+                <div key={aisle.id} className="move-items-row">
+                  <div>
+                    <div className="move-items-aisle">Aisle {aisle.code}</div>
+                    <div className="move-items-count">{count} item{count === 1 ? '' : 's'}</div>
+                  </div>
+                  <select
+                    className="aisle-editor-input font-mono"
+                    aria-label={`Move items from Aisle ${aisle.code} to`}
+                    value={moveTargets[aisle.code] ?? ''}
+                    onChange={(event) => setMoveTargets(current => ({ ...current, [aisle.code]: event.target.value }))}
+                  >
+                    {targets.map(code => (
+                      <option key={code} value={code}>{code}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            {cannotMove && (
+              <p className="label-micro text-accent mt-2">There is no other rack to move these items to. Add a rack elsewhere first.</p>
+            )}
+            {error && <div className="label-micro text-accent mt-2">{error}</div>}
+          </Modal>
+        );
+      })()}
 
       {rackRemoval && (
         <Modal
