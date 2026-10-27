@@ -3444,3 +3444,14 @@ select.aisle-editor-input {
 .aisle-group {
   row-gap: var(--header-gap);
 }
+
+/* The aisle editor stays in view while scrolling the map during Edit Layout */
+.content-wrapper {
+  overflow-x: clip;
+}
+
+.aisle-editor {
+  position: sticky;
+  top: 12px;
+  z-index: 30;
+}
