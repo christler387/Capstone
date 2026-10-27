@@ -2587,3 +2587,199 @@ footer p {
   border-color: var(--success);
   background: rgba(31, 157, 139, 0.08);
 }
+
+/* ---------------- Shared floor grid: one column per portrait aisle, rack-sized rows ----------------
+   Every aisle sits on the same grid. Rows are one rack tall, and the gap between rows equals the
+   gap between racks, so racks line up across aisles. A card's height is exactly its footprint:
+   portrait = header row + one row per rack; landscape = header row + one rack row.
+   Racks are the same size in both orientations: full column width and one row tall. */
+.warehouse-map-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.warehouse-map-grid {
+  --rack-h: 96px;
+  --map-gap: 12px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: none;
+  grid-auto-rows: var(--rack-h);
+  gap: var(--map-gap);
+  align-items: start;
+  min-height: 0;
+}
+
+@media (max-width: 1023px) {
+  .warehouse-map-grid {
+    min-width: 820px;
+  }
+}
+
+.warehouse-map-grid .zone-cell {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--map-gap);
+  min-height: 0;
+  height: auto;
+  min-width: 0;
+  align-self: start;
+  padding: 0;
+  overflow: hidden;
+  cursor: default;
+}
+
+.warehouse-map-grid .zone-cell.is-selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.warehouse-map-grid .zone-cell.is-dragging {
+  opacity: 0.45;
+}
+
+.warehouse-map-grid .zone-top-header {
+  box-sizing: border-box;
+  height: var(--rack-h);
+  margin: 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  min-width: 0;
+}
+
+.warehouse-map-grid .zone-top-header > div {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warehouse-map-grid .rack-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--map-gap);
+  flex: none;
+  align-items: stretch;
+  justify-items: stretch;
+  grid-template-rows: none;
+  grid-template-columns: none;
+  padding: 0;
+  min-width: 0;
+}
+
+.warehouse-map-grid .rack-container-landscape {
+  display: grid;
+  grid-template-rows: var(--rack-h);
+  gap: var(--map-gap);
+  overflow: visible;
+}
+
+.warehouse-map-grid .rack {
+  box-sizing: border-box;
+  height: var(--rack-h);
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  aspect-ratio: auto;
+  margin: 0;
+}
+
+.warehouse-map-grid .grid-empty-cell {
+  border: 1px dashed rgba(32, 48, 71, 0.16);
+  border-radius: 12px;
+}
+
+/* Edit Layout: drag handle, ghost preview, selected-aisle panel */
+.warehouse-map-grid .aisle-drag-handle {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--line-soft);
+  color: var(--ink);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.warehouse-map-grid .aisle-drop-ghost {
+  position: relative;
+  z-index: 3;
+  border-radius: 12px;
+  border: 2px dashed;
+  pointer-events: none;
+}
+
+.warehouse-map-grid .aisle-drop-ghost.is-valid {
+  border-color: var(--success);
+  background: rgba(31, 157, 139, 0.14);
+}
+
+.warehouse-map-grid .aisle-drop-ghost.is-invalid {
+  border-color: var(--accent);
+  background: rgba(175, 4, 4, 0.12);
+}
+
+.aisle-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.aisle-edit-panel-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.aisle-edit-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.aisle-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.aisle-edit-panel .aisle-edit-btn {
+  width: auto;
+  height: 34px;
+  padding: 0 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aisle-edit-panel .aisle-rack-stepper button {
+  width: 30px;
+  height: 30px;
+}
+
+.aisle-edit-panel .aisle-rack-stepper span {
+  min-width: 6ch;
+  font-size: 12px;
+}
+
+.aisle-edit-panel .aisle-rename-input,
+.aisle-edit-panel .aisle-floor-select {
+  height: 34px;
+  min-width: 90px;
+}

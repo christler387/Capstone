@@ -1484,26 +1484,38 @@ async function rackHasStock(db, code) {
   return row.count > 0;
 }
 
-// The floor grid has this many columns. A landscape aisle is two columns wide and one row tall;
-// a portrait aisle is one column wide.
+// The floor grid has this many columns. One column is the width of one portrait aisle.
+// A portrait aisle is one column wide; its header row and racks stack down (rows = racks + 1).
+// A landscape aisle has one rack per column (columns = racks); header row plus one rack row (rows = 2).
 const GRID_COLUMNS = 8;
 
-function aisleSpan(orientation) {
-  return orientation === "landscape" ? 2 : 1;
+function rackFootprint(orientation, rackCount) {
+  const racks = Math.max(rackCount, 1);
+  return orientation === "landscape"
+    ? { cols: racks, rows: 2 }
+    : { cols: 1, rows: racks + 1 };
 }
 
-// True when an aisle of this orientation at this cell would leave the grid or overlap another aisle.
-async function isFootprintBlocked(db, floorId, gridCol, gridRow, orientation, exceptAisleId = null) {
-  const span = aisleSpan(orientation);
-  if (gridCol < 1 || gridRow < 1 || gridCol + span - 1 > GRID_COLUMNS) return true;
+// True when an aisle with this orientation and rack count at this cell would leave the grid
+// or overlap another aisle on the floor.
+async function isFootprintBlocked(db, floorId, gridCol, gridRow, orientation, rackCount, exceptAisleId = null) {
+  const footprint = rackFootprint(orientation, rackCount);
+  if (gridCol < 1 || gridRow < 1 || gridCol + footprint.cols - 1 > GRID_COLUMNS) return true;
 
   const [others] = await db.query(
-    "SELECT id, grid_col, orientation FROM aisles WHERE floor_id=? AND grid_row=? AND id<>?",
-    [floorId, gridRow, exceptAisleId ?? 0],
+    `SELECT a.id, a.grid_col, a.grid_row, a.orientation,
+            (SELECT COUNT(*) FROM racks r WHERE r.aisle_id = a.id) AS rack_count
+     FROM aisles a WHERE a.floor_id=? AND a.id<>?`,
+    [floorId, exceptAisleId ?? 0],
   );
   return others.some((other) => {
-    const otherEnd = other.grid_col + aisleSpan(other.orientation) - 1;
-    return other.grid_col <= gridCol + span - 1 && otherEnd >= gridCol;
+    const otherFootprint = rackFootprint(other.orientation, other.rack_count);
+    return (
+      other.grid_col <= gridCol + footprint.cols - 1 &&
+      other.grid_col + otherFootprint.cols - 1 >= gridCol &&
+      other.grid_row <= gridRow + footprint.rows - 1 &&
+      other.grid_row + otherFootprint.rows - 1 >= gridRow
+    );
   });
 }
 
@@ -1615,7 +1627,7 @@ app.post(
 
     const [[codeTaken]] = await pool.query("SELECT id FROM aisles WHERE code=?", [code]);
     if (codeTaken) return res.status(409).json({ error: `Aisle ${code} already exists.` });
-    if (await isFootprintBlocked(pool, floorId, gridCol, gridRow, orientation)) {
+    if (await isFootprintBlocked(pool, floorId, gridCol, gridRow, orientation, rackCount)) {
       return res.status(409).json({ error: "That spot is taken or does not fit on this floor." });
     }
 
@@ -1651,7 +1663,7 @@ app.put(
     if (!aisleId) return res.status(400).json({ error: "Invalid aisle." });
 
     const [[aisle]] = await pool.query(
-      "SELECT id, floor_id, code, orientation, grid_col, grid_row FROM aisles WHERE id=?",
+      "SELECT id, floor_id, code, orientation, grid_col, grid_row, (SELECT COUNT(*) FROM racks r WHERE r.aisle_id = aisles.id) AS rack_count FROM aisles WHERE id=?",
       [aisleId],
     );
     if (!aisle) return res.status(404).json({ error: "Aisle not found." });
@@ -1713,7 +1725,7 @@ app.put(
       next.orientation !== aisle.orientation;
     if (
       shapeChanged &&
-      (await isFootprintBlocked(pool, next.floorId, next.gridCol, next.gridRow, next.orientation, aisleId))
+      (await isFootprintBlocked(pool, next.floorId, next.gridCol, next.gridRow, next.orientation, aisle.rack_count, aisleId))
     ) {
       return res.status(409).json({ error: "That spot is taken or does not fit on this floor." });
     }
@@ -1767,7 +1779,7 @@ app.post(
     const aisleId = toPositiveInt(req.params.id);
     if (!aisleId) return res.status(400).json({ error: "Invalid aisle." });
 
-    const [[aisle]] = await pool.query("SELECT id FROM aisles WHERE id=?", [aisleId]);
+    const [[aisle]] = await pool.query("SELECT id, orientation FROM aisles WHERE id=?", [aisleId]);
     if (!aisle) return res.status(404).json({ error: "Aisle not found." });
 
     const [[counts]] = await pool.query(
@@ -1776,6 +1788,10 @@ app.post(
     );
     if (counts.count >= MAX_RACKS_PER_AISLE) {
       return res.status(400).json({ error: `An aisle can have at most ${MAX_RACKS_PER_AISLE} racks.` });
+    }
+    // A landscape aisle has one rack per grid column, so it cannot be wider than the grid.
+    if (aisle.orientation === "landscape" && counts.count + 1 > GRID_COLUMNS) {
+      return res.status(400).json({ error: `A landscape aisle can have at most ${GRID_COLUMNS} racks.` });
     }
     await pool.query(
       "INSERT INTO racks (aisle_id, rack_number) VALUES (?, ?)",
