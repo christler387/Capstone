@@ -875,6 +875,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
           readOnly={userRole === 'staff'}
           rackLocations={rackLocations}
           rackFloors={rackFloors}
+          floors={layout.map(floor => ({ id: floor.id, name: floor.name }))}
         />
       </Modal>
   

@@ -11,6 +11,8 @@ interface ItemFormProps {
   rackLocations?: string[];
   // Each rack with the floor it sits on, so the Floor dropdown can narrow the rack choices.
   rackFloors?: { code: string; floorId: number; floorName: string }[];
+  // Every floor in the layout, including floors that have no racks yet.
+  floors?: { id: number; name: string }[];
 }
 
 type ItemFormData = Omit<Partial<Item>, "safetyStock"> & {
@@ -44,6 +46,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   readOnly = false,
   rackLocations = [],
   rackFloors = [],
+  floors = [],
 }) => {
   const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -209,14 +212,15 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   );
 
   // The floor the item is on: the one the user picked, otherwise the floor of its current rack.
+  const floorOptions: [number, string][] = floors.length > 0
+    ? floors.map((floor) => [floor.id, floor.name])
+    : Array.from(new Map(rackFloors.map((rack) => [rack.floorId, rack.floorName])).entries());
   const currentFloorId =
     selectedFloorId ??
     rackFloors.find((rack) => rack.code === formData.rack)?.floorId ??
-    rackFloors[0]?.floorId ??
+    floorOptions[0]?.[0] ??
     null;
-  const floorOptions = Array.from(
-    new Map(rackFloors.map((rack) => [rack.floorId, rack.floorName])).entries(),
-  );
+  // Racks on the chosen floor. Without floor data, fall back to the flat rack list.
   const racksOnFloor = rackFloors.length > 0
     ? rackFloors.filter((rack) => rack.floorId === currentFloorId).map((rack) => rack.code)
     : rackLocations;
@@ -500,6 +504,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             <option value="">Select a rack</option>
             {hasUnlistedRack && (
               <option value={formData.rack}>{formData.rack} (current)</option>
+            )}
+            {racksOnFloor.length === 0 && (
+              <option value="" disabled>No racks on this floor yet</option>
             )}
             {racksOnFloor.map((rack) => (
               <option key={rack} value={rack}>
