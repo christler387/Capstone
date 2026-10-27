@@ -24,7 +24,6 @@ const CATEGORY_LABEL_BY_KEYWORD: Record<string, string> = {
 };
 
 const FLOOR_STORAGE_KEY = 'skyrun_warehouse_floor';
-const FLOOR_COLLAPSED_KEY = 'skyrun_warehouse_floor_collapsed';
 
 // Rows at or beyond this are off the grid (parked aisles).
 const UNPLACED_ROW = 100;
@@ -139,13 +138,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   const isAdmin = userRole === 'admin';
   const gridRef = useRef<HTMLDivElement>(null);
   const [activeFloorId, setActiveFloorId] = useState<number | null>(readStoredFloorId);
-  const [floorCollapsed, setFloorCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(FLOOR_COLLAPSED_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
   const [analyticsScope, setAnalyticsScope] = useState<'floor' | 'all'>('floor');
   const [floorDialog, setFloorDialog] = useState<{ mode: 'add' | 'rename'; floorId?: number } | null>(null);
   const [floorName, setFloorName] = useState('');
@@ -311,11 +303,9 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   const selectFloor = (floorId: number) => {
     setActiveFloorId(floorId);
-    setFloorCollapsed(false);
     setFloorMenuId(null);
     try {
       localStorage.setItem(FLOOR_STORAGE_KEY, String(floorId));
-      localStorage.setItem(FLOOR_COLLAPSED_KEY, '0');
     } catch {
       // Storage can be blocked; the tab then simply resets to the first floor on reload.
     }
@@ -883,14 +873,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isDirty]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(FLOOR_COLLAPSED_KEY, floorCollapsed ? '1' : '0');
-    } catch {
-      // Storage can be blocked; the floor simply opens again on reload.
-    }
-  }, [floorCollapsed]);
-
   // Forget a half-typed new category when a different aisle is selected.
   useEffect(() => {
     setCreatingCategory(false);
@@ -1027,22 +1009,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                 <span>{floor.name}</span>
                 <span className="floor-tab-count" title="Aisles on this floor">{floor.aisles.length}</span>
               </button>
-              {isActive && (
-                <button
-                  type="button"
-                  className="floor-tab-collapse"
-                  aria-expanded={!floorCollapsed}
-                  aria-label={floorCollapsed ? `Show ${floor.name}` : `Hide ${floor.name}`}
-                  title={floorCollapsed ? 'Show this floor' : 'Hide this floor'}
-                  disabled={isEditing}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setFloorCollapsed(collapsed => !collapsed);
-                  }}
-                >
-                  <i className={`bx ${floorCollapsed ? 'bx-chevron-down' : 'bx-chevron-up'}`}></i>
-                </button>
-              )}
               {isAdmin && (
                 <div className="floor-tab-menu-wrap">
                   <button
@@ -1263,11 +1229,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
         </section>
       )}
 
-      {floorCollapsed ? (
-        <div className="floor-collapsed-note label-micro">
-          {activeFloor?.name ?? 'This floor'} is hidden. Choose another floor above, or press the arrow to show it again.
-        </div>
-      ) : (
       <div className="warehouse-layout-container">
         <div className="warehouse-map-scroll">
           <div className="warehouse-map-grid" ref={gridRef}>
@@ -1397,7 +1358,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           </div>
         </div>
       </div>
-      )}
 
       <InspectionModal />
 
