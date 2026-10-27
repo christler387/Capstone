@@ -55,6 +55,9 @@ const App: React.FC = () => {
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [layout, setLayout] = useState<WarehouseLayout>([]);
   const rackLocations = layout.flatMap(floor => floor.aisles.flatMap(aisle => aisle.racks.map(rack => rack.code)));
+  const rackFloors = layout.flatMap(floor =>
+    floor.aisles.flatMap(aisle => aisle.racks.map(rack => ({ code: rack.code, floorId: floor.id, floorName: floor.name }))),
+  );
 
   // The warehouse layout loads on its own, so a layout problem never blocks the inventory.
   const refreshLayout = () => requestJson<WarehouseLayout>('/layout').then(setLayout);
@@ -871,6 +874,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
           onCancel={() => setIsItemModalOpen(false)} 
           readOnly={userRole === 'staff'}
           rackLocations={rackLocations}
+          rackFloors={rackFloors}
         />
       </Modal>
   

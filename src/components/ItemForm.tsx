@@ -9,6 +9,8 @@ interface ItemFormProps {
   readOnly?: boolean;
   // Every rack code in the warehouse layout, for the Rack Location dropdown.
   rackLocations?: string[];
+  // Each rack with the floor it sits on, so the Floor dropdown can narrow the rack choices.
+  rackFloors?: { code: string; floorId: number; floorName: string }[];
 }
 
 type ItemFormData = Omit<Partial<Item>, "safetyStock"> & {
@@ -41,7 +43,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   onCancel,
   readOnly = false,
   rackLocations = [],
+  rackFloors = [],
 }) => {
+  const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -203,6 +207,28 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const hasUnlistedRack = Boolean(
     formData.rack && !rackLocations.includes(formData.rack),
   );
+
+  // The floor the item is on: the one the user picked, otherwise the floor of its current rack.
+  const currentFloorId =
+    selectedFloorId ??
+    rackFloors.find((rack) => rack.code === formData.rack)?.floorId ??
+    rackFloors[0]?.floorId ??
+    null;
+  const floorOptions = Array.from(
+    new Map(rackFloors.map((rack) => [rack.floorId, rack.floorName])).entries(),
+  );
+  const racksOnFloor = rackFloors.length > 0
+    ? rackFloors.filter((rack) => rack.floorId === currentFloorId).map((rack) => rack.code)
+    : rackLocations;
+
+  const chooseFloor = (floorId: number) => {
+    setSelectedFloorId(floorId);
+    const racksHere = rackFloors.filter((rack) => rack.floorId === floorId).map((rack) => rack.code);
+    // Keep the rack if it is already on this floor; otherwise take the floor's first rack.
+    if (!racksHere.includes(formData.rack || '')) {
+      setFormData((prev) => ({ ...prev, rack: racksHere[0] ?? '' }));
+    }
+  };
 
   return (
     <div className="flex-col-gap">
@@ -446,7 +472,22 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         </div>
       </div>
 
-      <div className="grid-2 border-soft-no-pad p-0">
+      <div className="grid-2 border-soft-no-pad p-0" style={{ gridTemplateColumns: 'minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr)' }}>
+        <div className="form-group">
+          <label className="label-micro" htmlFor="edit-floor">Floor</label>
+          <select
+            id="edit-floor"
+            className="form-input"
+            value={currentFloorId ?? ""}
+            onChange={(event) => chooseFloor(Number(event.target.value))}
+            disabled={readOnly || floorOptions.length === 0}
+          >
+            {floorOptions.map(([floorId, floorName]) => (
+              <option key={floorId} value={floorId}>{floorName}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="form-group">
           <label className="label-micro">Rack Location</label>
           <select
@@ -460,7 +501,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             {hasUnlistedRack && (
               <option value={formData.rack}>{formData.rack} (current)</option>
             )}
-            {rackLocations.map((rack) => (
+            {racksOnFloor.map((rack) => (
               <option key={rack} value={rack}>
                 {rack}
               </option>
