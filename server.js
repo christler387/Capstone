@@ -1038,19 +1038,33 @@ app.post(
   "/api/inventory",
   ah(async (req, res) => {
     const { imageFileName, ...itemData } = req.body || {};
-    const item = {
-      ...itemData,
-      image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
-    };
-    if (!item.name || !item.category || !item.rack) {
+    const barcode =
+      typeof itemData.barcode === "string" ? itemData.barcode.trim() : "";
+    if (!itemData.name || !itemData.category || !itemData.rack) {
       return res
         .status(400)
         .json({ error: "Name, category, and rack are required." });
     }
-    const itemId = normalizeItemId(item.id);
+    const itemId = normalizeItemId(itemData.id);
     if (!itemId) {
       return res.status(400).json({ error: "Item ID is required." });
     }
+    if (barcode) {
+      const [[existingItem]] = await pool.query(
+        "SELECT id FROM inventory WHERE TRIM(barcode)=? LIMIT 1",
+        [barcode],
+      );
+      if (existingItem) {
+        return res
+          .status(409)
+          .json({ error: "That barcode is already registered to another item." });
+      }
+    }
+    const item = {
+      ...itemData,
+      barcode: barcode || null,
+      image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
+    };
     const createdBy = item.createdBy || "Unknown";
 
     await pool.query(
@@ -1077,12 +1091,26 @@ app.put(
   "/api/inventory/:id",
   ah(async (req, res) => {
     const { imageFileName, ...itemData } = req.body || {};
+    const itemId = normalizeItemId(req.params.id);
+    const barcode =
+      typeof itemData.barcode === "string" ? itemData.barcode.trim() : "";
+    const submittedItemId = normalizeItemId(itemData.id || itemId);
+    if (barcode) {
+      const [[existingItem]] = await pool.query(
+        "SELECT id FROM inventory WHERE TRIM(barcode)=? AND id<>? LIMIT 1",
+        [barcode, itemId],
+      );
+      if (existingItem) {
+        return res
+          .status(409)
+          .json({ error: "That barcode is already registered to another item." });
+      }
+    }
     const item = {
       ...itemData,
+      barcode: barcode || null,
       image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
     };
-    const itemId = normalizeItemId(req.params.id);
-    const submittedItemId = normalizeItemId(item.id || itemId);
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
     const [result] = await pool.query(
       `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`,

@@ -14,7 +14,10 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const body = await response.text();
+    const message = response.headers.get('content-type')?.includes('application/json')
+      ? (JSON.parse(body) as { error?: string }).error || body
+      : body;
     throw new Error(message || `API request failed with ${response.status}`);
   }
 
@@ -870,6 +873,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
       >
         <ItemForm 
           item={editingItem} 
+          existingItems={inventory}
           onSave={handleSaveItem} 
           onCancel={() => setIsItemModalOpen(false)} 
           readOnly={userRole === 'staff'}

@@ -4,6 +4,7 @@ import { ScannerDialog } from "./ScannerDialog";
 
 interface ItemFormProps {
   item?: Partial<Item>;
+  existingItems?: Item[];
   onSave: (data: Item) => void | Promise<void>;
   onCancel: () => void;
   readOnly?: boolean;
@@ -41,6 +42,7 @@ const getImageFileName = (image?: string) => {
 
 export const ItemForm: React.FC<ItemFormProps> = ({
   item,
+  existingItems = [],
   onSave,
   onCancel,
   readOnly = false,
@@ -166,6 +168,16 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       setError(
         "Please fill in all required fields (Item ID, Part Identification, Barcode, and Category).",
       );
+      return;
+    }
+
+    const duplicateBarcode = existingItems.some(
+      (existingItem) =>
+        existingItem.id !== item?.id &&
+        (existingItem.barcode ?? "").trim() === barcode,
+    );
+    if (duplicateBarcode) {
+      setError("That barcode is already registered to another item.");
       return;
     }
 
