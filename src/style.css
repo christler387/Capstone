@@ -3543,3 +3543,9 @@ select.aisle-editor-input {
     overflow-x: auto;
   }
 }
+
+/* Room inside the map area so the aisle frames are not clipped at the edges */
+.warehouse-map-scroll {
+  padding: 12px 10px 18px;
+  box-sizing: border-box;
+}
