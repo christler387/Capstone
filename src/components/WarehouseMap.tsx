@@ -1108,13 +1108,19 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                   style={{
                     gridColumn: `${aisle.gridCol} / span ${footprint.cols}`,
                     gridRow: `${aisle.gridRow} / span ${footprint.rows}`,
-                  }}
+                    '--aisle-color': aisle.color,
+                  } as React.CSSProperties}
                   onClick={isEditing ? () => setSelectedAisleId(aisle.id) : undefined}
                 >
                   <div className="zone-top-header">
-                    <div className="aisle-title">AISLE {aisle.code}</div>
-                    <div className="picking-label" style={{ color: aisle.color, opacity: 1 }}>
-                      {aisle.category}
+                    <div className="aisle-heading">
+                      <span className="aisle-title">Aisle {aisle.code}</span>
+                      <span
+                        className="aisle-category-pill"
+                        style={{ color: aisle.color, borderColor: `${aisle.color}55`, background: `${aisle.color}14` }}
+                      >
+                        {aisle.category}
+                      </span>
                     </div>
                     {isEditing && (
                       <span
