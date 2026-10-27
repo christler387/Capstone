@@ -2003,3 +2003,161 @@ footer p {
     animation: none;
   }
 }
+
+/* ---------------- Barcode scanner dialog (Add Item form) ---------------- */
+.scanner-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(20, 28, 40, 0.5);
+  backdrop-filter: blur(4px);
+  animation: session-dialog-fade 0.2s ease-out;
+}
+
+.scanner-dialog {
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 2.5rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid var(--line-soft);
+  background: #f7f3eb;
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(20, 28, 40, 0.28);
+  overflow: hidden;
+  animation: session-dialog-rise 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.scanner-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 0.75rem 1.5rem;
+}
+
+.scanner-dialog-title {
+  margin: 0 0 0.25rem;
+  font-family: var(--f-sans);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.scanner-dialog-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(32, 48, 71, 0.7);
+}
+
+.scanner-dialog-close {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.scanner-dialog-close:hover {
+  background: var(--line-soft);
+}
+
+.scanner-dialog-body {
+  padding: 0 1.5rem 1rem;
+  overflow-y: auto;
+}
+
+/* html5-qrcode draws its own controls inside #reader; restyle them to match the app. */
+.scanner-dialog #reader {
+  max-width: 100% !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 14px !important;
+  background: #1f2a38;
+  overflow: hidden;
+}
+
+.scanner-dialog #reader video {
+  border-radius: 0;
+}
+
+.scanner-dialog #reader__dashboard_section_csr button,
+.scanner-dialog #reader button {
+  padding: 0.45rem 1rem;
+  margin: 0.25rem;
+  border: none;
+  border-radius: 8px;
+  background: #1d3a5c;
+  color: #fff;
+  font-family: var(--f-sans);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.scanner-dialog #reader select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--f-sans);
+}
+
+.scanner-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.85rem 1.5rem 1.25rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.scanner-dialog-cancel {
+  padding: 0.7rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--f-sans);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.scanner-dialog-cancel:hover {
+  background: var(--line-soft);
+}
+
+.scanner-dialog-close:focus-visible,
+.scanner-dialog-cancel:focus-visible {
+  outline: 3px solid rgba(56, 103, 168, 0.45);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .scanner-dialog-header,
+  .scanner-dialog-body,
+  .scanner-dialog-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-dialog-backdrop,
+  .scanner-dialog {
+    animation: none;
+  }
+}

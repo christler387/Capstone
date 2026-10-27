@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Item } from "../types";
-import { BARCODE_MESSAGE_TYPE } from "./ScannerPopup";
+import { ScannerDialog } from "./ScannerDialog";
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -48,7 +48,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const scannerWindowRef = useRef<Window | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageFileName, setImageFileName] = useState(() =>
@@ -119,52 +118,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     setError(null);
   };
 
-  // The scanner pop-out window sends the scanned barcode back to this window.
-  useEffect(() => {
-    const handleScannerMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== BARCODE_MESSAGE_TYPE) return;
-      handleBarcodeScanned(String(event.data.value ?? "").trim());
-    };
-    window.addEventListener("message", handleScannerMessage);
-    return () => window.removeEventListener("message", handleScannerMessage);
-  }, []);
-
-  // Keep the button in sync when the user closes the scanner window by hand.
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (scannerWindowRef.current && scannerWindowRef.current.closed) {
-        scannerWindowRef.current = null;
-        setIsScannerOpen(false);
-      }
-    }, 500);
-    return () => {
-      window.clearInterval(timer);
-      scannerWindowRef.current?.close();
-    };
-  }, []);
-
-  const toggleScannerWindow = () => {
-    if (scannerWindowRef.current && !scannerWindowRef.current.closed) {
-      scannerWindowRef.current.close();
-      scannerWindowRef.current = null;
-      setIsScannerOpen(false);
-      return;
-    }
-
-    const popup = window.open(
-      "/?scanner=1",
-      "autosupply-barcode-scanner",
-      "width=520,height=680,resizable=yes",
-    );
-    if (!popup) {
-      setError("Allow pop-ups for this site to use the barcode scanner.");
-      return;
-    }
-
-    scannerWindowRef.current = popup;
-    setIsScannerOpen(true);
-  };
+  const toggleScanner = () => setIsScannerOpen((prev) => !prev);
+  const closeScanner = useCallback(() => setIsScannerOpen(false), []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -344,14 +299,18 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               <button
                 type="button"
                 className={`item-barcode-scan-button ${isScannerOpen ? "active" : ""}`}
-                onClick={toggleScannerWindow}
-                title="Scan barcode in a new window"
+                onClick={toggleScanner}
+                title="Scan barcode"
               >
                 <i className={`bx ${isScannerOpen ? "bx-x" : "bx-barcode-reader"}`}></i>
               </button>
             )}
           </div>
         </div>
+
+        {isScannerOpen && (
+          <ScannerDialog onScanSuccess={handleBarcodeScanned} onClose={closeScanner} />
+        )}
 
         <div className="form-group">
           <label className="label-micro">
