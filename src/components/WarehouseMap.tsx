@@ -174,6 +174,8 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   const [isSavingLayout, setIsSavingLayout] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   const [selectedAisleId, setSelectedAisleId] = useState<number | null>(null);
+  // True while the user is typing a brand-new category name for the selected aisle.
+  const [creatingCategory, setCreatingCategory] = useState(false);
   const [pointerDrag, setPointerDrag] = useState<PointerDrag | null>(null);
   const [rackRemoval, setRackRemoval] = useState<{
     aisleId: number;
@@ -557,10 +559,20 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     });
   };
 
-  const setAisleCategory = (aisleId: number, value: string) => {
+  // Sets an aisle's category; a color is passed when the category is an existing one, so the aisle takes its color.
+  const setAisleCategory = (aisleId: number, value: string, color?: string) => {
     updateDraft(copy => {
       const found = findInCopy(copy, aisleId);
-      if (found) found.aisle.category = value;
+      if (!found) return;
+      found.aisle.category = value;
+      if (color !== undefined) found.aisle.color = color;
+    });
+  };
+
+  const setAisleColor = (aisleId: number, color: string) => {
+    updateDraft(copy => {
+      const found = findInCopy(copy, aisleId);
+      if (found) found.aisle.color = color;
     });
   };
 
@@ -779,6 +791,11 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isDirty]);
 
+  // Forget a half-typed new category when a different aisle is selected.
+  useEffect(() => {
+    setCreatingCategory(false);
+  }, [selectedAisleId]);
+
   // Close the floor options menu when the user clicks anywhere else.
   useEffect(() => {
     if (floorMenuId === null) return;
@@ -813,6 +830,10 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   // ---- Rendering helpers ----
 
   const selectedAisle = isEditing && selectedAisleId !== null ? getDraftAisle(selectedAisleId) : undefined;
+  // Show the name box when the user chose "Create new category", or when the aisle's category is not an existing one.
+  const showNewCategoryInput = Boolean(selectedAisle) && (
+    creatingCategory || !categoryChoices.some(([name]) => name === selectedAisle?.category)
+  );
 
   // Grid cells that no aisle covers while editing, so the grid's shape is visible.
   const emptyCells: { gridCol: number; gridRow: number }[] = [];
@@ -1030,22 +1051,52 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                     ))}
                   </select>
                 </label>
-                <label className="aisle-edit-field">
+                <div className="aisle-edit-field">
                   <span className="label-micro">Description</span>
-                  <input
-                    type="text"
+                  <select
                     className="aisle-description-input"
-                    list="aisle-category-options"
-                    value={selectedAisle.category}
-                    maxLength={100}
-                    onChange={(event) => setAisleCategory(selectedAisle.id, event.target.value)}
-                  />
-                  <datalist id="aisle-category-options">
+                    aria-label="Aisle description"
+                    value={showNewCategoryInput ? NEW_CATEGORY : selectedAisle.category}
+                    onChange={(event) => {
+                      if (event.target.value === NEW_CATEGORY) {
+                        setCreatingCategory(true);
+                        setAisleCategory(selectedAisle.id, '');
+                        return;
+                      }
+                      const existing = categoryChoices.find(([name]) => name === event.target.value);
+                      setCreatingCategory(false);
+                      setAisleCategory(selectedAisle.id, event.target.value, existing?.[1]);
+                    }}
+                  >
                     {categoryChoices.map(([name]) => (
-                      <option key={name} value={name} />
+                      <option key={name} value={name}>{name}</option>
                     ))}
-                  </datalist>
-                </label>
+                    <option value={NEW_CATEGORY}>Create new category…</option>
+                  </select>
+                </div>
+                {showNewCategoryInput && (
+                  <div className="aisle-edit-field">
+                    <span className="label-micro">New category</span>
+                    <div className="flex-row-gap" style={{ alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="aisle-description-input"
+                        placeholder="Category name"
+                        aria-label="New category name"
+                        value={selectedAisle.category}
+                        maxLength={100}
+                        onChange={(event) => setAisleCategory(selectedAisle.id, event.target.value)}
+                      />
+                      <input
+                        type="color"
+                        className="aisle-color-input"
+                        aria-label="Category color"
+                        value={selectedAisle.color}
+                        onChange={(event) => setAisleColor(selectedAisle.id, event.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="aisle-edit-btn danger"
