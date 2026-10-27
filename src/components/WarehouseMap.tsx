@@ -991,58 +991,48 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       </div>
 
       {isEditing && (
-        <div className="aisle-edit-panel">
+        <section className="aisle-editor" aria-label="Aisle settings">
           {selectedAisle ? (
             <>
-              <div className="aisle-edit-panel-title">
-                <strong>Aisle {selectedAisle.code}</strong>
-                <span className="label-micro opacity-70">
-                  {selectedAisle.orientation === 'landscape' ? 'Landscape' : 'Portrait'} · {selectedAisle.racks.length} racks
-                </span>
-              </div>
-              <div className="aisle-edit-controls">
+              <header className="aisle-editor-header">
+                <div className="aisle-editor-identity">
+                  <span className="aisle-editor-swatch" style={{ background: selectedAisle.color }} aria-hidden="true"></span>
+                  <div>
+                    <div className="aisle-editor-title">Aisle {selectedAisle.code}</div>
+                    <div className="aisle-editor-meta">
+                      {selectedAisle.orientation === 'landscape' ? 'Landscape' : 'Portrait'} · {selectedAisle.racks.length} racks
+                    </div>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  className="aisle-edit-btn"
-                  title="Rotate: portrait or landscape"
-                  onClick={() => rotateAisle(selectedAisle.id)}
+                  className="aisle-editor-delete"
+                  disabled={aisleItemCount(selectedAisle.code) > 0}
+                  title={aisleItemCount(selectedAisle.code) > 0 ? 'Move the items out of this aisle first' : 'Delete this aisle'}
+                  onClick={() => deleteAisleInDraft(selectedAisle.id)}
                 >
-                  <i className="bx bx-rotate-right"></i>
-                  <span>{selectedAisle.orientation === 'portrait' ? 'Make landscape' : 'Make portrait'}</span>
+                  <i className="bx bx-trash" aria-hidden="true"></i> Delete aisle
                 </button>
-                <div className="aisle-rack-stepper">
-                  <button
-                    type="button"
-                    onClick={() => changeRackCount(selectedAisle.id, -1)}
-                    disabled={selectedAisle.racks.length <= 1}
-                    aria-label="Remove rack"
-                  >
-                    <i className="bx bx-minus"></i>
-                  </button>
-                  <span className="font-mono">{selectedAisle.racks.length} racks</span>
-                  <button
-                    type="button"
-                    onClick={() => changeRackCount(selectedAisle.id, 1)}
-                    disabled={selectedAisle.racks.length >= MAX_RACKS}
-                    aria-label="Add rack"
-                  >
-                    <i className="bx bx-plus"></i>
-                  </button>
-                </div>
-                <label className="aisle-edit-field">
-                  <span className="label-micro">Name</span>
+              </header>
+
+              <div className="aisle-editor-grid">
+                <div className="aisle-editor-field">
+                  <label className="aisle-editor-label" htmlFor="aisle-editor-name">Name</label>
                   <input
+                    id="aisle-editor-name"
                     type="text"
-                    className="aisle-rename-input font-mono"
+                    className="aisle-editor-input font-mono"
                     value={selectedAisle.code}
                     maxLength={8}
                     onChange={(event) => renameAisle(selectedAisle.id, event.target.value)}
                   />
-                </label>
-                <label className="aisle-edit-field">
-                  <span className="label-micro">Floor</span>
+                </div>
+
+                <div className="aisle-editor-field">
+                  <label className="aisle-editor-label" htmlFor="aisle-editor-floor">Floor</label>
                   <select
-                    className="aisle-floor-select"
+                    id="aisle-editor-floor"
+                    className="aisle-editor-input"
                     value={selectedAisle.floorId}
                     onChange={(event) => moveAisleToFloor(selectedAisle.id, Number(event.target.value))}
                   >
@@ -1050,73 +1040,109 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                       <option key={floor.id} value={floor.id}>{floor.name}</option>
                     ))}
                   </select>
-                </label>
-                <div className="aisle-edit-field">
-                  <span className="label-micro">Description</span>
-                  <select
-                    className="aisle-description-input"
-                    aria-label="Aisle description"
-                    value={showNewCategoryInput ? NEW_CATEGORY : selectedAisle.category}
-                    onChange={(event) => {
-                      if (event.target.value === NEW_CATEGORY) {
-                        setCreatingCategory(true);
-                        setAisleCategory(selectedAisle.id, '');
-                        return;
-                      }
-                      const existing = categoryChoices.find(([name]) => name === event.target.value);
-                      setCreatingCategory(false);
-                      setAisleCategory(selectedAisle.id, event.target.value, existing?.[1]);
-                    }}
-                  >
-                    {categoryChoices.map(([name]) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                    <option value={NEW_CATEGORY}>Create new category…</option>
-                  </select>
                 </div>
-                {showNewCategoryInput && (
-                  <div className="aisle-edit-field">
-                    <span className="label-micro">New category</span>
-                    <div className="flex-row-gap" style={{ alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="aisle-description-input"
-                        placeholder="Category name"
-                        aria-label="New category name"
-                        value={selectedAisle.category}
-                        maxLength={100}
-                        onChange={(event) => setAisleCategory(selectedAisle.id, event.target.value)}
-                      />
-                      <input
-                        type="color"
-                        className="aisle-color-input"
-                        aria-label="Category color"
-                        value={selectedAisle.color}
-                        onChange={(event) => setAisleColor(selectedAisle.id, event.target.value)}
-                      />
-                    </div>
+
+                <div className="aisle-editor-field aisle-editor-field-wide">
+                  <label className="aisle-editor-label" htmlFor="aisle-editor-description">Description</label>
+                  <div className="aisle-editor-row">
+                    <select
+                      id="aisle-editor-description"
+                      className="aisle-editor-input"
+                      value={showNewCategoryInput ? NEW_CATEGORY : selectedAisle.category}
+                      onChange={(event) => {
+                        if (event.target.value === NEW_CATEGORY) {
+                          setCreatingCategory(true);
+                          setAisleCategory(selectedAisle.id, '');
+                          return;
+                        }
+                        const existing = categoryChoices.find(([name]) => name === event.target.value);
+                        setCreatingCategory(false);
+                        setAisleCategory(selectedAisle.id, event.target.value, existing?.[1]);
+                      }}
+                    >
+                      {categoryChoices.map(([name]) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                      <option value={NEW_CATEGORY}>Create new category…</option>
+                    </select>
+                    {showNewCategoryInput && (
+                      <>
+                        <input
+                          type="text"
+                          className="aisle-editor-input"
+                          placeholder="New category name"
+                          aria-label="New category name"
+                          value={selectedAisle.category}
+                          maxLength={100}
+                          onChange={(event) => setAisleCategory(selectedAisle.id, event.target.value)}
+                        />
+                        <input
+                          type="color"
+                          className="aisle-editor-color"
+                          aria-label="Category color"
+                          value={selectedAisle.color}
+                          onChange={(event) => setAisleColor(selectedAisle.id, event.target.value)}
+                        />
+                      </>
+                    )}
                   </div>
-                )}
-                <button
-                  type="button"
-                  className="aisle-edit-btn danger"
-                  title={aisleItemCount(selectedAisle.code) > 0 ? 'Move the items out of this aisle first' : 'Delete aisle'}
-                  disabled={aisleItemCount(selectedAisle.code) > 0}
-                  onClick={() => deleteAisleInDraft(selectedAisle.id)}
-                >
-                  <i className="bx bx-trash"></i> <span>Delete</span>
-                </button>
+                </div>
+
+                <div className="aisle-editor-field">
+                  <span className="aisle-editor-label" id="aisle-editor-orientation-label">Orientation</span>
+                  <div className="aisle-segmented" role="radiogroup" aria-labelledby="aisle-editor-orientation-label">
+                    {(['portrait', 'landscape'] as AisleOrientation[]).map(option => {
+                      const active = selectedAisle.orientation === option;
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          className={`aisle-segmented-option${active ? ' is-active' : ''}`}
+                          onClick={() => {
+                            if (!active) rotateAisle(selectedAisle.id);
+                          }}
+                        >
+                          {option === 'portrait' ? 'Portrait' : 'Landscape'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="aisle-editor-field">
+                  <span className="aisle-editor-label">Racks</span>
+                  <div className="aisle-stepper">
+                    <button
+                      type="button"
+                      onClick={() => changeRackCount(selectedAisle.id, -1)}
+                      disabled={selectedAisle.racks.length <= 1}
+                      aria-label="Remove rack"
+                    >
+                      <i className="bx bx-minus" aria-hidden="true"></i>
+                    </button>
+                    <span className="aisle-stepper-value">{selectedAisle.racks.length}</span>
+                    <button
+                      type="button"
+                      onClick={() => changeRackCount(selectedAisle.id, 1)}
+                      disabled={selectedAisle.racks.length >= MAX_RACKS}
+                      aria-label="Add rack"
+                    >
+                      <i className="bx bx-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
             </>
           ) : (
-            <div className="label-micro opacity-70">
-              Select an aisle to change it. Drag its handle (⠿) to move it to another spot on the grid.
+            <div className="aisle-editor-empty">
+              <i className="bx bx-pointer" aria-hidden="true"></i>
+              <span>Select an aisle on the map to change its name, description, orientation or racks.</span>
             </div>
           )}
-          <div className="label-micro opacity-70 aisle-edit-note">
-            Save Layout applies every change at once. Cancel discards them.
-          </div>
-        </div>
+          <p className="aisle-editor-note">Save Layout applies every change at once. Cancel discards them.</p>
+        </section>
       )}
 
       <div className="warehouse-layout-container">
