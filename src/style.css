@@ -3428,3 +3428,8 @@ select.aisle-editor-input {
   top: calc(-1 * var(--header-gap) + 24px);
   height: 16px;
 }
+
+/* Racks inside one aisle sit closer together; the gap between aisles stays as it was */
+.aisle-group {
+  row-gap: 12px;
+}
