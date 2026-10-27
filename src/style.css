@@ -3531,3 +3531,15 @@ select.aisle-editor-input {
 @media (prefers-reduced-motion: reduce) {
   .map-toast { animation: none; }
 }
+
+/* The map does not scroll sideways on desktop, even with the cursor over the aisles.
+   Narrow screens keep sideways scrolling, because the map is wider than the screen there. */
+.warehouse-map-scroll {
+  overflow: hidden;
+}
+
+@media (max-width: 1023px) {
+  .warehouse-map-scroll {
+    overflow-x: auto;
+  }
+}
