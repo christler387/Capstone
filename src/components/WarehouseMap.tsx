@@ -1219,6 +1219,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
               </div>
             </>
           ) : (
+            <>
             <header className="aisle-editor-header aisle-editor-header-bare">
             <div className="layout-edit-bar">
               <span className={`layout-edit-status${isDirty ? ' is-dirty' : ''}`}>
@@ -1236,6 +1237,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
               <i className="bx bx-pointer" aria-hidden="true"></i>
               <span>Select an aisle on the map to change its name, description, orientation or racks.</span>
             </div>
+            </>
           )}
           <p className="aisle-editor-note">Save Layout applies every change at once. Cancel discards them.</p>
         </section>
