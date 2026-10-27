@@ -101,8 +101,9 @@ const readStoredFloorId = (): number | null => {
 interface PointerDrag {
   aisleId: number;
   floorId: number;
-  offsetCol: number;
-  offsetRow: number;
+  // Where the pointer grabbed the aisle, measured from the aisle's own top-left corner in pixels.
+  grabX: number;
+  grabY: number;
   col: number;
   row: number;
   footprint: Footprint;
@@ -730,16 +731,16 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   // Pointer events cover mouse, pen and touch. The drag handle captures the pointer.
   const startAisleDrag = (event: React.PointerEvent<HTMLSpanElement>, aisle: WarehouseAisle) => {
     if (!isEditing || !activeFloor) return;
-    const cell = cellAt(event.clientX, event.clientY);
-    if (!cell) return;
+    const group = event.currentTarget.closest('.aisle-group')?.getBoundingClientRect();
+    if (!group) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelectedAisleId(aisle.id);
     setPointerDrag({
       aisleId: aisle.id,
       floorId: activeFloor.id,
-      offsetCol: cell.col - aisle.gridCol,
-      offsetRow: cell.row - aisle.gridRow,
+      grabX: event.clientX - group.left,
+      grabY: event.clientY - group.top,
       col: aisle.gridCol,
       row: aisle.gridRow,
       footprint: footprintOf(aisle),
@@ -749,10 +750,11 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   const moveAisleDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
     if (!pointerDrag || !activeFloor) return;
-    const cell = cellAt(event.clientX, event.clientY);
+    // The aisle's top-left corner follows the pointer, so the grab point (label or rack) doesn't matter.
+    const cell = cellAt(event.clientX - pointerDrag.grabX + 2, event.clientY - pointerDrag.grabY + 2);
     if (!cell) return;
-    const col = Math.max(1, cell.col - pointerDrag.offsetCol);
-    const row = Math.max(1, cell.row - pointerDrag.offsetRow);
+    const col = cell.col;
+    const row = cell.row;
     const valid = footprintFits(activeFloor, col, row, pointerDrag.footprint, pointerDrag.aisleId);
     setPointerDrag(current => (current ? { ...current, col, row, valid } : current));
   };
