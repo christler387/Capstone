@@ -1859,6 +1859,167 @@ app.delete(
   }),
 );
 
+// Saves a whole layout in one request. The server checks the complete result first, then applies
+// it inside one transaction, so a failed save never leaves the layout half-changed.
+app.put(
+  "/api/layout",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const floorsInput = Array.isArray(req.body?.floors) ? req.body.floors : null;
+    if (!floorsInput || floorsInput.length === 0) {
+      return res.status(400).json({ error: "The layout must contain at least one floor." });
+    }
+
+    const [dbFloors] = await pool.query("SELECT id FROM floors");
+    const floorIds = new Set(dbFloors.map((floor) => floor.id));
+    const [dbAisles] = await pool.query(
+      `SELECT a.id, a.floor_id, a.code, a.category, a.color, a.orientation, a.grid_col, a.grid_row,
+              (SELECT COUNT(*) FROM racks r WHERE r.aisle_id = a.id) AS rack_count
+       FROM aisles a`,
+    );
+    const dbAisleById = new Map(dbAisles.map((aisle) => [aisle.id, aisle]));
+
+    // 1. Validate every aisle in the submitted layout.
+    const submitted = [];
+    const codes = new Set();
+    for (const floorInput of floorsInput) {
+      const floorId = toPositiveInt(floorInput?.id);
+      if (!floorId || !floorIds.has(floorId)) {
+        return res.status(400).json({ error: "The layout refers to a floor that does not exist." });
+      }
+      for (const input of Array.isArray(floorInput.aisles) ? floorInput.aisles : []) {
+        const id = toPositiveInt(input.id);
+        const saved = id ? dbAisleById.get(id) : undefined;
+        if (!saved) return res.status(400).json({ error: "The layout refers to an aisle that does not exist." });
+        const code = cleanText(input.code, 8).toUpperCase();
+        const category = cleanText(input.category, 100);
+        const color = typeof input.color === "string" ? input.color : saved.color;
+        const orientation = input.orientation;
+        const gridCol = toPositiveInt(input.gridCol);
+        const gridRow = toPositiveInt(input.gridRow);
+        const rackCount = toPositiveInt(input.rackCount);
+        if (!/^[A-Z0-9]{1,8}$/.test(code)) {
+          return res.status(400).json({ error: "Aisle names must be 1 to 8 letters or numbers." });
+        }
+        if (codes.has(code)) return res.status(409).json({ error: `Aisle ${code} appears more than once.` });
+        codes.add(code);
+        if (!category) return res.status(400).json({ error: `Aisle ${code} needs a category.` });
+        if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: `Aisle ${code} has an invalid color.` });
+        if (!AISLE_ORIENTATIONS.includes(orientation)) return res.status(400).json({ error: `Aisle ${code} has an invalid orientation.` });
+        if (!gridCol || !gridRow) return res.status(400).json({ error: `Aisle ${code} needs a position.` });
+        if (!rackCount || rackCount > MAX_RACKS_PER_AISLE) {
+          return res.status(400).json({ error: `Aisle ${code} needs 1 to ${MAX_RACKS_PER_AISLE} racks.` });
+        }
+        submitted.push({ id, floorId, code, category, color, orientation, gridCol, gridRow, rackCount, saved });
+      }
+    }
+
+    // 2. Check that nothing overlaps and nothing leaves the grid. Only aisles that were changed are
+    // checked, so an overlap that already exists in the saved layout does not block unrelated saves.
+    const isChanged = (aisle) =>
+      aisle.floorId !== aisle.saved.floor_id ||
+      aisle.gridCol !== aisle.saved.grid_col ||
+      aisle.gridRow !== aisle.saved.grid_row ||
+      aisle.orientation !== aisle.saved.orientation ||
+      aisle.rackCount !== aisle.saved.rack_count;
+    for (const floorId of floorIds) {
+      const onFloor = submitted.filter((aisle) => aisle.floorId === floorId);
+      for (const aisle of onFloor) {
+        if (!isChanged(aisle)) continue;
+        const footprint = rackFootprint(aisle.orientation, aisle.rackCount);
+        if (aisle.gridCol + footprint.cols - 1 > GRID_COLUMNS) {
+          return res.status(409).json({ error: `Aisle ${aisle.code} does not fit on the floor.` });
+        }
+        for (const other of onFloor) {
+          if (other === aisle) continue;
+          if (!isChanged(aisle) && !isChanged(other)) continue;
+          const otherFootprint = rackFootprint(other.orientation, other.rackCount);
+          const overlaps =
+            other.gridCol <= aisle.gridCol + footprint.cols - 1 &&
+            other.gridCol + otherFootprint.cols - 1 >= aisle.gridCol &&
+            other.gridRow <= aisle.gridRow + footprint.rows - 1 &&
+            other.gridRow + otherFootprint.rows - 1 >= aisle.gridRow;
+          if (overlaps) {
+            return res.status(409).json({ error: `Aisle ${aisle.code} overlaps Aisle ${other.code}.` });
+          }
+        }
+      }
+    }
+
+    // 3. Work out what goes, and make sure no stock is orphaned by it.
+    const submittedIds = new Set(submitted.map((aisle) => aisle.id));
+    const removedAisles = dbAisles.filter((aisle) => floorIds.has(aisle.floor_id) && !submittedIds.has(aisle.id));
+    for (const aisle of removedAisles) {
+      if (await aisleHasStock(pool, aisle.code)) {
+        return res.status(409).json({ error: `Aisle ${aisle.code} still holds items. Move them before deleting it.` });
+      }
+    }
+    for (const aisle of submitted) {
+      if (aisle.code !== aisle.saved.code && (await aisleHasStock(pool, aisle.saved.code))) {
+        return res.status(409).json({ error: `Aisle ${aisle.saved.code} still holds items and cannot be renamed.` });
+      }
+      for (let number = aisle.rackCount + 1; number <= aisle.saved.rack_count; number += 1) {
+        const code = rackCode(aisle.saved.code, number);
+        if (await rackHasStock(pool, code)) {
+          return res.status(409).json({ error: `Rack ${code} still holds items. Move them to another rack first.` });
+        }
+      }
+    }
+
+    // 4. Apply everything in one transaction.
+    const moved = submitted.filter(
+      (aisle) => aisle.floorId !== aisle.saved.floor_id || aisle.gridCol !== aisle.saved.grid_col || aisle.gridRow !== aisle.saved.grid_row,
+    );
+    const renamed = submitted.filter((aisle) => aisle.code !== aisle.saved.code);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const aisle of removedAisles) {
+        await connection.query("DELETE FROM aisles WHERE id=?", [aisle.id]);
+      }
+      // Temporary names avoid clashes when two aisles swap names.
+      for (const aisle of renamed) {
+        await connection.query("UPDATE aisles SET code=? WHERE id=?", [`T${aisle.id}`, aisle.id]);
+      }
+      // Park moved aisles on rows below the grid so that swaps cannot collide.
+      for (const [index, aisle] of moved.entries()) {
+        await connection.query("UPDATE aisles SET floor_id=?, grid_col=1, grid_row=? WHERE id=?", [
+          aisle.floorId,
+          100000 + index,
+          aisle.id,
+        ]);
+      }
+      for (const aisle of submitted) {
+        const current = aisle.saved.rack_count;
+        if (aisle.rackCount < current) {
+          await connection.query("DELETE FROM racks WHERE aisle_id=? AND rack_number>?", [aisle.id, aisle.rackCount]);
+        } else if (aisle.rackCount > current) {
+          const [[last]] = await connection.query(
+            "SELECT COALESCE(MAX(rack_number), 0) AS maxNumber FROM racks WHERE aisle_id=?",
+            [aisle.id],
+          );
+          for (let added = 1; added <= aisle.rackCount - current; added += 1) {
+            await connection.query("INSERT INTO racks (aisle_id, rack_number) VALUES (?, ?)", [aisle.id, last.maxNumber + added]);
+          }
+        }
+        await connection.query(
+          "UPDATE aisles SET code=?, category=?, color=?, orientation=?, floor_id=?, grid_col=?, grid_row=? WHERE id=?",
+          [aisle.code, aisle.category, aisle.color, aisle.orientation, aisle.floorId, aisle.gridCol, aisle.gridRow, aisle.id],
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    res.json(await readWarehouseLayout());
+  }),
+);
+
 /* ------------------------ Static files & errors --------------------- */
 
 app.use("/api/uploads", express.static(uploadsDirectory));

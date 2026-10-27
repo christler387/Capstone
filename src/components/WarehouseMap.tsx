@@ -25,6 +25,9 @@ const CATEGORY_LABEL_BY_KEYWORD: Record<string, string> = {
 
 const FLOOR_STORAGE_KEY = 'skyrun_warehouse_floor';
 
+// Rows at or beyond this are off the grid (parked aisles).
+const UNPLACED_ROW = 100;
+
 interface Footprint {
   cols: number;
   rows: number;
@@ -201,6 +204,10 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   // The remembered tab wins; if that floor was deleted, fall back to the first floor.
   const activeFloor = layout.find(floor => floor.id === activeFloorId) ?? layout[0];
   const aisles = activeFloor?.aisles ?? [];
+  // Aisles at or below UNPLACED_ROW are parked off the grid (for example after an interrupted save).
+  // They are listed in a tray instead of stretching the grid.
+  const onGridAisles = aisles.filter(aisle => aisle.gridRow < UNPLACED_ROW);
+  const unplacedAisles = aisles.filter(aisle => aisle.gridRow >= UNPLACED_ROW);
   const analyticsAisles = analyticsScope === 'all' ? layout.flatMap(floor => floor.aisles) : aisles;
 
   // ---- Optimizer ----
@@ -379,7 +386,9 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   // First spot on a floor where the footprint fits, scanning left to right, top to bottom.
   const findFreeCell = (floor: WarehouseFloor | undefined, footprint: Footprint): { gridCol: number; gridRow: number } => {
-    const lastRow = Math.max(1, ...(floor?.aisles ?? []).map(aisle => aisle.gridRow + footprintOf(aisle).rows - 1));
+    const lastRow = Math.max(1, ...(floor?.aisles ?? [])
+      .filter(aisle => aisle.gridRow < UNPLACED_ROW)
+      .map(aisle => aisle.gridRow + footprintOf(aisle).rows - 1));
     for (let gridRow = 1; gridRow <= lastRow + 1; gridRow += 1) {
       for (let gridCol = 1; gridCol <= GRID_COLUMNS; gridCol += 1) {
         if (footprintFits(floor, gridCol, gridRow, footprint)) return { gridCol, gridRow };
@@ -648,91 +657,46 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     setRackRemoval(null);
   };
 
-  // Saves every difference between the draft and the saved layout, in an order the server accepts:
-  // delete aisles, add or remove racks, park moved aisles off the grid, then apply final shapes.
+  // Saves the whole draft in one request. The server checks the full result and applies it in one
+  // transaction, so either every change is saved or none is.
   const saveLayoutEdits = async () => {
     if (!draft) return;
-    const savedAisles = new Map(savedLayout.flatMap(floor => floor.aisles).map(aisle => [aisle.id, aisle] as const));
-    const draftAisles = draft.flatMap(floor => floor.aisles.map(aisle => ({ ...aisle, floorId: floor.id })));
-    const draftIds = new Set(draftAisles.map(aisle => aisle.id));
-    const movedAisles = draftAisles.filter(aisle => {
-      const saved = savedAisles.get(aisle.id);
-      return saved !== undefined && (saved.floorId !== aisle.floorId || saved.gridCol !== aisle.gridCol || saved.gridRow !== aisle.gridRow);
-    });
-
     setIsSavingLayout(true);
     setError(null);
-    let latest: WarehouseLayout = savedLayout;
     try {
-      // 1. Delete aisles that were removed in the draft.
-      for (const saved of savedAisles.values()) {
-        if (!draftIds.has(saved.id)) {
-          latest = await requestLayout('DELETE', `/aisles/${saved.id}`);
-        }
-      }
-
-      // 2. Add or remove racks. Removal goes from the highest number down.
-      for (const aisle of draftAisles) {
-        const saved = savedAisles.get(aisle.id);
-        if (!saved) continue;
-        const difference = aisle.racks.length - saved.racks.length;
-        if (difference < 0) {
-          for (const rack of saved.racks.slice(saved.racks.length + difference).reverse()) {
-            latest = await requestLayout('DELETE', `/racks/${rack.id}`);
-          }
-        }
-        for (let count = 0; count < difference; count += 1) {
-          latest = await requestLayout('POST', `/aisles/${aisle.id}/racks`);
-        }
-      }
-
-      // 3. Park moved aisles on rows below the grid, where they cannot collide with anything.
-      for (const [index, aisle] of movedAisles.entries()) {
-        latest = await requestLayout('PUT', `/aisles/${aisle.id}`, {
-          floorId: aisle.floorId,
-          gridCol: 1,
-          gridRow: 1000 + index,
-        });
-      }
-
-      // 4. Apply the final positions, shapes and names. Shapes that shrink go first, so a growing
-      // aisle never lands on space that is still occupied.
-      const finalChanges: { aisleId: number; patch: Record<string, unknown>; growth: number }[] = [];
-      for (const aisle of draftAisles) {
-        const saved = savedAisles.get(aisle.id);
-        if (!saved) continue;
-        const patch: Record<string, unknown> = {};
-        if (aisle.code !== saved.code) patch.code = aisle.code;
-        if (aisle.orientation !== saved.orientation) patch.orientation = aisle.orientation;
-        if (movedAisles.some(candidate => candidate.id === aisle.id)) {
-          patch.floorId = aisle.floorId;
-          patch.gridCol = aisle.gridCol;
-          patch.gridRow = aisle.gridRow;
-        }
-        if (Object.keys(patch).length > 0) {
-          const now = getFootprint(aisle.orientation, aisle.racks.length);
-          const before = getFootprint(saved.orientation, aisle.racks.length);
-          finalChanges.push({ aisleId: aisle.id, patch, growth: now.cols * now.rows - before.cols * before.rows });
-        }
-      }
-      finalChanges.sort((a, b) => a.growth - b.growth);
-      for (const change of finalChanges) {
-        latest = await requestLayout('PUT', `/aisles/${change.aisleId}`, change.patch);
-      }
-
-      onLayoutChange?.(latest);
+      const updated = await requestLayout('PUT', '', {
+        floors: draft.map(floor => ({
+          id: floor.id,
+          aisles: floor.aisles.map(aisle => ({
+            id: aisle.id,
+            code: aisle.code,
+            category: aisle.category,
+            color: aisle.color,
+            orientation: aisle.orientation,
+            gridCol: aisle.gridCol,
+            gridRow: aisle.gridRow,
+            rackCount: aisle.racks.length,
+          })),
+        })),
+      });
+      onLayoutChange?.(updated);
       leaveEditMode();
     } catch (saveError) {
-      // Some changes may already be saved. Show what the server has and keep editing.
-      onLayoutChange?.(latest);
-      setDraft(cloneLayout(latest));
-      setError(
-        `Some changes could not be saved: ${saveError instanceof Error ? saveError.message : 'unknown error'}. ` +
-        'The map now shows the saved layout; please check it and try again.',
-      );
+      setError(saveError instanceof Error ? saveError.message : 'Could not save the layout.');
     } finally {
       setIsSavingLayout(false);
     }
+  };
+
+  // Puts a parked aisle at the first spot where it fits on the grid.
+  const placeUnplacedAisle = (aisleId: number) => {
+    const floor = getDraftFloor(aisleId);
+    const aisle = getDraftAisle(aisleId);
+    if (!floor || !aisle) return;
+    const cell = findFreeCell(floor, footprintOf(aisle));
+    updateDraft(copy => {
+      placeAisle(copy, aisleId, floor.id, cell.gridCol, cell.gridRow);
+    });
   };
 
   // Converts a pointer position into a grid cell, using the grid's real padding, gaps and track sizes.
@@ -846,7 +810,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   if (isEditing) {
     const covered = new Set<string>();
     let lastRow = 1;
-    aisles.forEach(aisle => {
+    onGridAisles.forEach(aisle => {
       const footprint = footprintOf(aisle);
       lastRow = Math.max(lastRow, aisle.gridRow + footprint.rows - 1);
       for (let row = aisle.gridRow; row < aisle.gridRow + footprint.rows; row += 1) {
@@ -1080,6 +1044,24 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       )}
 
       <div className="warehouse-layout-container">
+        {unplacedAisles.length > 0 && (
+          <div className="unplaced-tray" role="region" aria-label="Aisles not on the grid">
+            <span className="label-micro">Not on the grid</span>
+            {unplacedAisles.map(aisle => (
+              <div key={aisle.id} className="unplaced-chip">
+                <span className="font-mono">Aisle {aisle.code}</span>
+                {isEditing ? (
+                  <button type="button" className="olive-button btn-outline" onClick={() => placeUnplacedAisle(aisle.id)}>
+                    Place on grid
+                  </button>
+                ) : (
+                  <span className="label-micro opacity-70">Open Edit Layout to place it</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="warehouse-map-scroll">
           <div className="warehouse-map-grid" ref={gridRef}>
             {aisles.length === 0 && (
@@ -1096,7 +1078,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
               />
             ))}
 
-            {aisles.map(aisle => {
+            {onGridAisles.map(aisle => {
               const isLandscape = aisle.orientation === 'landscape';
               const footprint = footprintOf(aisle);
               const isSelected = isEditing && aisle.id === selectedAisleId;

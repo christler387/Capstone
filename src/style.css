@@ -2787,7 +2787,7 @@ footer p {
 /* ---------------- Warehouse map: UI polish (cards, headers, racks) ---------------- */
 .warehouse-map-grid {
   --rack-h: 84px;
-  --map-gap: 10px;
+  --map-gap: 16px;
   padding: 0.5rem;
 }
 
@@ -2896,4 +2896,32 @@ footer p {
 
 .warehouse-map-grid .zone-cell {
   border-top-color: var(--aisle-color, var(--line));
+}
+
+/* ---------------- Aisles parked off the grid ---------------- */
+.unplaced-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed var(--accent);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.unplaced-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.unplaced-chip .olive-button {
+  padding: 0.3rem 0.7rem;
+  font-size: 11px;
 }
