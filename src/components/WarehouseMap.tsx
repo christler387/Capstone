@@ -1044,24 +1044,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       )}
 
       <div className="warehouse-layout-container">
-        {unplacedAisles.length > 0 && (
-          <div className="unplaced-tray" role="region" aria-label="Aisles not on the grid">
-            <span className="label-micro">Not on the grid</span>
-            {unplacedAisles.map(aisle => (
-              <div key={aisle.id} className="unplaced-chip">
-                <span className="font-mono">Aisle {aisle.code}</span>
-                {isEditing ? (
-                  <button type="button" className="olive-button btn-outline" onClick={() => placeUnplacedAisle(aisle.id)}>
-                    Place on grid
-                  </button>
-                ) : (
-                  <span className="label-micro opacity-70">Open Edit Layout to place it</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className="warehouse-map-scroll">
           <div className="warehouse-map-grid" ref={gridRef}>
             {aisles.length === 0 && (
