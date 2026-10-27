@@ -3390,3 +3390,50 @@ select.aisle-editor-input {
   color: var(--editor-muted, rgba(32, 48, 71, 0.62));
   text-align: center;
 }
+
+/* ---------------- Floors stacked as levels: each floor header, its map beneath when open ---------------- */
+.floor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.1rem 0 1rem;
+}
+
+.floor-toolbar .layout-edit-bar {
+  margin-left: auto;
+}
+
+.floor-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.floor-stack .floor-tab {
+  width: 100%;
+  justify-content: space-between;
+  min-height: 52px;
+  padding-right: 0.35rem;
+  border-radius: 12px;
+}
+
+.floor-stack .floor-tab-select {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  padding: 0.75rem 1rem;
+  font-size: 13px;
+}
+
+.floor-stack .floor-tab:not(.active) .floor-tab-select {
+  color: var(--ink);
+}
+
+.floor-body {
+  margin-top: 0.25rem;
+}
+
+.floor-stack .floor-tab-menu {
+  padding: 0.5rem 0.5rem;
+}

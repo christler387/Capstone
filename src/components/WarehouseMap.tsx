@@ -1007,108 +1007,9 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     );
   };
 
-  return (
-    <div className="content-section">
-      {error && <div className="dash-card mb-4 border-accent p-3 text-accent label-micro text-center">{error}</div>}
-
-      <div className="floor-tabs" role="tablist" aria-label="Warehouse floors">
-        {layout.map(floor => {
-          const isActive = floor.id === activeFloor?.id;
-          const isMenuOpen = floorMenuId === floor.id;
-          return (
-            <div key={floor.id} className={`floor-tab${isActive ? ' active' : ''}`}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className="floor-tab-select"
-                onClick={() => selectFloor(floor.id)}
-              >
-                <span>{floor.name}</span>
-                <span className="floor-tab-count" title="Aisles on this floor">{floor.aisles.length}</span>
-              </button>
-              {isActive && (
-                <button
-                  type="button"
-                  className="floor-tab-collapse"
-                  aria-expanded={!floorCollapsed}
-                  aria-label={floorCollapsed ? `Show ${floor.name}` : `Hide ${floor.name}`}
-                  title={floorCollapsed ? 'Show this floor' : 'Hide this floor'}
-                  disabled={isEditing}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setFloorCollapsed(collapsed => !collapsed);
-                  }}
-                >
-                  <i className={`bx ${floorCollapsed ? 'bx-chevron-down' : 'bx-chevron-up'}`}></i>
-                </button>
-              )}
-              {isAdmin && (
-                <div className="floor-tab-menu-wrap">
-                  <button
-                    type="button"
-                    className="floor-tab-menu"
-                    aria-label={`Options for ${floor.name}`}
-                    aria-expanded={isMenuOpen}
-                    disabled={isEditing}
-                    onClick={() => setFloorMenuId(isMenuOpen ? null : floor.id)}
-                  >
-                    <i className="bx bx-dots-horizontal-rounded"></i>
-                  </button>
-                  {isMenuOpen && (
-                    <div className="floor-menu" role="menu">
-                      <button type="button" role="menuitem" onClick={() => openRenameFloor(floor)}>
-                        <i className="bx bx-edit-alt"></i> Rename
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="floor-menu-danger"
-                        disabled={layout.length <= 1}
-                        title={layout.length <= 1 ? 'The warehouse needs at least one floor' : undefined}
-                        onClick={() => {
-                          setFloorMenuId(null);
-                          openDeleteFloor(floor.id);
-                        }}
-                      >
-                        <i className="bx bx-trash"></i> Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {isAdmin && !isEditing && (
-          <button type="button" className="floor-tab-add" onClick={openAddFloor}>
-            <i className="bx bx-plus"></i> Add Floor
-          </button>
-        )}
-        {isAdmin && !isEditing && activeFloor && (
-          <button type="button" className="floor-tab-add floor-tab-add-aisle" onClick={openAddAisle}>
-            <i className="bx bx-plus"></i> Add Aisle to {activeFloor.name}
-          </button>
-        )}
-        {isAdmin && (isEditing ? (
-          <div className="layout-edit-bar">
-            <span className={`layout-edit-status${isDirty ? ' is-dirty' : ''}`}>
-              {isDirty ? 'Unsaved changes' : 'No changes yet'}
-            </span>
-            <button type="button" className="olive-button btn-outline" onClick={requestCancelEdit} disabled={isSavingLayout}>
-              Cancel
-            </button>
-            <button type="button" className="olive-button" onClick={saveLayoutEdits} disabled={isSavingLayout || !isDirty}>
-              {isSavingLayout ? 'Saving…' : 'Save Layout'}
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="floor-tab-add" onClick={enterEditMode}>
-            <i className="bx bx-edit-alt"></i> Edit Layout
-          </button>
-        ))}
-      </div>
-
+  // The active floor's panels, map and analytics. They are shown under that floor's header.
+  const floorContent = (
+    <>
       {isEditing && (
         <section className="aisle-editor" aria-label="Aisle settings">
           {selectedAisle ? (
@@ -1398,6 +1299,119 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
         </div>
       </div>
       )}
+
+    </>
+  );
+
+  return (
+    <div className="content-section">
+      {error && <div className="dash-card mb-4 border-accent p-3 text-accent label-micro text-center">{error}</div>}
+
+      <div className="floor-toolbar">
+        {isAdmin && !isEditing && (
+          <button type="button" className="floor-tab-add" onClick={openAddFloor}>
+            <i className="bx bx-plus"></i> Add Floor
+          </button>
+        )}
+        {isAdmin && !isEditing && activeFloor && (
+          <button type="button" className="floor-tab-add floor-tab-add-aisle" onClick={openAddAisle}>
+            <i className="bx bx-plus"></i> Add Aisle to {activeFloor.name}
+          </button>
+        )}
+        {isAdmin && (isEditing ? (
+          <div className="layout-edit-bar">
+            <span className={`layout-edit-status${isDirty ? ' is-dirty' : ''}`}>
+              {isDirty ? 'Unsaved changes' : 'No changes yet'}
+            </span>
+            <button type="button" className="olive-button btn-outline" onClick={requestCancelEdit} disabled={isSavingLayout}>
+              Cancel
+            </button>
+            <button type="button" className="olive-button" onClick={saveLayoutEdits} disabled={isSavingLayout || !isDirty}>
+              {isSavingLayout ? 'Saving…' : 'Save Layout'}
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="floor-tab-add" onClick={enterEditMode}>
+            <i className="bx bx-edit-alt"></i> Edit Layout
+          </button>
+        ))}
+      </div>
+
+      <div className="floor-stack" aria-label="Warehouse floors">
+        {layout.map(floor => {
+          const isActive = floor.id === activeFloor?.id;
+          const isMenuOpen = floorMenuId === floor.id;
+          return (
+            <React.Fragment key={floor.id}>
+            <div className={`floor-tab${isActive ? ' active' : ''}`}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className="floor-tab-select"
+                onClick={() => selectFloor(floor.id)}
+              >
+                <span>{floor.name}</span>
+                <span className="floor-tab-count" title="Aisles on this floor">{floor.aisles.length}</span>
+              </button>
+              {isActive && (
+                <button
+                  type="button"
+                  className="floor-tab-collapse"
+                  aria-expanded={!floorCollapsed}
+                  aria-label={floorCollapsed ? `Show ${floor.name}` : `Hide ${floor.name}`}
+                  title={floorCollapsed ? 'Show this floor' : 'Hide this floor'}
+                  disabled={isEditing}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setFloorCollapsed(collapsed => !collapsed);
+                  }}
+                >
+                  <i className={`bx ${floorCollapsed ? 'bx-chevron-down' : 'bx-chevron-up'}`}></i>
+                </button>
+              )}
+              {isAdmin && (
+                <div className="floor-tab-menu-wrap">
+                  <button
+                    type="button"
+                    className="floor-tab-menu"
+                    aria-label={`Options for ${floor.name}`}
+                    aria-expanded={isMenuOpen}
+                    disabled={isEditing}
+                    onClick={() => setFloorMenuId(isMenuOpen ? null : floor.id)}
+                  >
+                    <i className="bx bx-dots-horizontal-rounded"></i>
+                  </button>
+                  {isMenuOpen && (
+                    <div className="floor-menu" role="menu">
+                      <button type="button" role="menuitem" onClick={() => openRenameFloor(floor)}>
+                        <i className="bx bx-edit-alt"></i> Rename
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="floor-menu-danger"
+                        disabled={layout.length <= 1}
+                        title={layout.length <= 1 ? 'The warehouse needs at least one floor' : undefined}
+                        onClick={() => {
+                          setFloorMenuId(null);
+                          openDeleteFloor(floor.id);
+                        }}
+                      >
+                        <i className="bx bx-trash"></i> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {isActive && (
+              <div className="floor-body">{floorContent}</div>
+            )}
+            </React.Fragment>
+          );
+        })}
+      </div>
 
       <InspectionModal />
 
