@@ -3308,3 +3308,13 @@ select.aisle-editor-input {
 .warehouse-map-grid .grid-empty-cell {
   border: 1px dashed rgba(32, 48, 71, 0.10);
 }
+
+/* Breathing room between the top navigation and the floor tabs */
+.warehouse-map-grid,
+.content-section > .floor-tabs {
+  margin-top: 0;
+}
+
+.content-section > .floor-tabs {
+  padding-top: 1.1rem;
+}
