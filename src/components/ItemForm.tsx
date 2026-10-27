@@ -7,6 +7,8 @@ interface ItemFormProps {
   onSave: (data: Item) => void | Promise<void>;
   onCancel: () => void;
   readOnly?: boolean;
+  // Every rack code in the warehouse layout, for the Rack Location dropdown.
+  rackLocations?: string[];
 }
 
 type ItemFormData = Omit<Partial<Item>, "safetyStock"> & {
@@ -33,17 +35,12 @@ const getImageFileName = (image?: string) => {
   );
 };
 
-const RACK_LOCATIONS = Array.from({ length: 12 }, (_, aisleIndex) =>
-  Array.from({ length: 3 }, (_, rackIndex) =>
-    `${String.fromCharCode(65 + aisleIndex)}-${String(rackIndex + 1).padStart(2, "0")}`,
-  ),
-).flat();
-
 export const ItemForm: React.FC<ItemFormProps> = ({
   item,
   onSave,
   onCancel,
   readOnly = false,
+  rackLocations = [],
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -204,7 +201,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   };
 
   const hasUnlistedRack = Boolean(
-    formData.rack && !RACK_LOCATIONS.includes(formData.rack),
+    formData.rack && !rackLocations.includes(formData.rack),
   );
 
   return (
@@ -463,7 +460,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             {hasUnlistedRack && (
               <option value={formData.rack}>{formData.rack} (current)</option>
             )}
-            {RACK_LOCATIONS.map((rack) => (
+            {rackLocations.map((rack) => (
               <option key={rack} value={rack}>
                 {rack}
               </option>

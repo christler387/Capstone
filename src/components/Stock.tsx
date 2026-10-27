@@ -10,16 +10,19 @@ interface StockProps {
   selectedItemId?: string;
   userRole?: UserRole;
   userName?: string;
+  // Every rack code in the warehouse layout, for the Rack Location dropdown.
+  rackLocations?: string[];
 }
 
 
-export const Stock: React.FC<StockProps> = ({ 
-  inventory, 
-  onAddMovement, 
-  onAddItem, 
-  selectedItemId, 
+export const Stock: React.FC<StockProps> = ({
+  inventory,
+  onAddMovement,
+  onAddItem,
+  selectedItemId,
   userRole = 'staff',
-  userName
+  userName,
+  rackLocations = []
 }) => {
 
 
@@ -237,16 +240,19 @@ export const Stock: React.FC<StockProps> = ({
       {type === 'in' && (
         <div className="form-group">
           <label className="label-micro">Rack Location</label>
-          <input 
-            type="text" 
-            className="form-input" 
-            value={formData.rack} 
+          <select
+            className="form-input font-mono"
+            value={formData.rack}
             onChange={(e) => {
-              const val = e.target.value.toUpperCase();
+              const val = e.target.value;
               setFormData(prev => ({ ...prev, rack: val }));
-            }} 
-            placeholder="e.g. A1" 
-          />
+            }}
+          >
+            <option value="">Select a rack</option>
+            {rackLocations.map(rack => (
+              <option key={rack} value={rack}>{rack}</option>
+            ))}
+          </select>
         </div>
       )}
       <div className="form-group">

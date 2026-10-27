@@ -54,6 +54,7 @@ const App: React.FC = () => {
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [layout, setLayout] = useState<WarehouseLayout>([]);
+  const rackLocations = layout.flatMap(floor => floor.aisles.flatMap(aisle => aisle.racks.map(rack => rack.code)));
 
   // The warehouse layout loads on its own, so a layout problem never blocks the inventory.
   const refreshLayout = () => requestJson<WarehouseLayout>('/layout').then(setLayout);
@@ -465,29 +466,33 @@ Use good lighting and keep the barcode flat and steady.`
       description: `## 1. Overview
 The Warehouse Map tab shows the physical layout of the warehouse. Use it to see which aisles and racks hold stock, spot racks that need attention, inspect what sits on each shelf level, and check whether the layout suits demand.
 
-The screen has three parts:
+The screen has these parts:
 
-- the **aisle map** (12 aisles, A to L)
+- the **floor tabs** (one tab for each floor, such as Floor 1)
+- the **aisle map** for the selected floor
 - the **Rack Inspection** pop-up for a single rack
 - the **Warehouse Layout Optimizer** with Aisle Density Analytics
 
 ## 2. The Aisle Map
-The map shows 12 aisles, labeled **Aisle A** to **Aisle L**. Each aisle holds three racks: **Rack 1**, **Rack 2**, and **Rack 3**.
+The map shows the aisles of the floor whose tab is selected. Each aisle has a name (for example, **Aisle A**) and a category label with its own color, such as **High Demand Only**, **Body & Brakes**, **Electrical & Engine**, **Suspension & Transmission**, or **Misc**. Each aisle has one or more racks, numbered **Rack 1**, **Rack 2**, and so on. An aisle can run **portrait** (racks stacked top to bottom) or **landscape** (racks in a row).
 
-**Aisles**
+**Floors**
+- Click a tab to show that floor. The tab shows how many aisles are on it. The floor you last selected is remembered on this computer.
+- Administrators can add a floor with **+ Add Floor**, and rename or delete one from the ⋯ menu on its tab. A floor can only be deleted when its racks hold no items, and the warehouse always keeps at least one floor.
 
-Designated for:
+**Adding an aisle (administrators)**
+- Click **+ Add Aisle to [floor]**. The next free letter is suggested. Names must be unique across all floors.
+- Pick an existing category (it keeps its color), or choose **Create new category** and pick a color.
+- Choose Portrait or Landscape, and the number of racks (1 to 10, default 3).
 
-**High Demand Only:** A, B, C, D
+**Edit Layout (administrators)**
+- Click **Edit Layout** to change the layout. Each aisle then shows a toolbar with a drag handle, rotate, a rack count (− and +), the aisle name, a floor selector, and delete.
+- Drag an aisle onto an empty spot to move it. Aisles snap to the grid and cannot overlap.
+- Nothing is saved until you click **Save Layout**. **Cancel** throws the changes away, after a confirmation.
+- Removing a rack that holds items asks you to choose the rack to move them to. The items are moved right away.
+- An aisle that holds items cannot be renamed or deleted until its items are moved.
 
-**Body & Brakes:** E, F
-
-**Electrical & Engine:** G, H
-
-**Suspension & Transmission:** I, J
-
-**Misc:** K, L
-
+Staff see the same map, but cannot change the layout.
 
 A rack's code combines its aisle and rack number. For example, **B-02** is Aisle B, Rack 2. The same code appears in the **Location** column on the Inventory tab and in the **Rack Location** field of an item.
 
@@ -508,12 +513,12 @@ A small red dot on a rack means it holds an item that needs attention. Racks wit
 In the sample, rack B-02 has Ceramic Brake Pads (Set) on level L2, with a red dot, and the other three levels are empty.
 
 ## 4. Warehouse Layout Optimizer
-This section sits below the map. It helps you decide whether fast-selling parts are stored in the best places, with high-demand parts in Aisle A and the front slots.
+This section sits below the map. It helps you decide whether fast-selling parts are stored in the best places, with high-demand parts in the High Demand aisles and at the front slots.
 
 ### Aisle Density Analytics
-This panel lists all 12 aisles in two columns. For each aisle you see:
+This panel lists the aisles of the selected floor. Use the **This floor / All floors** switch at the top of the panel to include every floor. For each aisle you see:
 
-- the aisle letter and, in brackets, the number of items stored there (for example, Aisle F (3))
+- the aisle name and, in brackets, the number of items stored there (for example, Aisle F (3))
 - a status tag (the sample shows **Optimal** for every aisle)
 - a bar and a percentage showing how full the aisle is (the sample ranges from 0% to 6%)
 Use it to find crowded aisles and aisles with free space. The item counts add up to your Total Items on the Dashboard.
@@ -811,6 +816,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             selectedItemId={stockToItem}
             userRole={userRole}
             userName={user || undefined}
+            rackLocations={rackLocations}
           />
         );
       case 'warehouse': 
@@ -819,6 +825,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             inventory={inventory}
             movements={movements}
             layout={layout}
+            onLayoutChange={setLayout}
             onEditItem={handleEditItem} 
             onAddItem={handleAddItem}
             onBulkUpdate={bulkUpdateInventory}
@@ -862,7 +869,8 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
           item={editingItem} 
           onSave={handleSaveItem} 
           onCancel={() => setIsItemModalOpen(false)} 
-          readOnly={userRole === 'staff'} 
+          readOnly={userRole === 'staff'}
+          rackLocations={rackLocations}
         />
       </Modal>
   
