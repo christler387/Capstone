@@ -3433,3 +3433,8 @@ select.aisle-editor-input {
 .aisle-group {
   row-gap: 12px;
 }
+
+/* Room for the aisle label above the racks; the frame keeps a clear gap to the aisle below */
+.warehouse-map-grid {
+  --header-gap: 56px;
+}
