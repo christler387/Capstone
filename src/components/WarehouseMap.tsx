@@ -1,27 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Item, Movement } from '../types';
+import { Item, Movement, WarehouseLayout } from '../types';
 import { Modal } from './Modal';
 import { isAtReorderPoint } from '../inventoryMetrics';
 
+// Density uses this capacity for racks that have no capacity set. Three racks make the old 1000 per aisle.
+const DEFAULT_RACK_CAPACITY = 1000 / 3;
 
-const ZONES = [
-  { id: 'A', name: 'AISLE A: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
-  { id: 'B', name: 'AISLE B: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
-  { id: 'C', name: 'AISLE C: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
-  { id: 'D', name: 'AISLE D: High Demand', desc: 'Fast-Moving / High Pick Velocity', racks: 3, color: '#1f9d8b' },
-  { id: 'E', name: 'AISLE E: Body & Brakes', desc: 'BODY & BRAKES categories only', racks: 3, color: '#F59E0B' },
-  { id: 'F', name: 'AISLE F: Body & Brakes', desc: 'BODY & BRAKES categories only', racks: 3, color: '#F59E0B' },
-  { id: 'G', name: 'AISLE G: Electrical & Engine', desc: 'ELECTRICAL & ENGINE categories only', racks: 3, color: '#6366F1' },
-  { id: 'H', name: 'AISLE H: Electrical & Engine', desc: 'ELECTRICAL & ENGINE categories only', racks: 3, color: '#6366F1' },
-  { id: 'I', name: 'AISLE I: Suspension & Transmission', desc: 'SUSPENSION & TRANSMISSION categories only', racks: 3, color: '#0891B2' },
-  { id: 'J', name: 'AISLE J: Suspension & Transmission', desc: 'SUSPENSION & TRANSMISSION categories only', racks: 3, color: '#0891B2' },
-  { id: 'K', name: 'AISLE K: Misc', desc: 'MISC category only', racks: 3, color: '#DB2777' },
-  { id: 'L', name: 'AISLE L: Misc', desc: 'MISC category only', racks: 3, color: '#DB2777' }
-];
+// "AA-01" -> "AA". Works for aisle names of any length.
+const aisleCodeOfRack = (rack: string | undefined): string => {
+  const value = (rack || '').toUpperCase();
+  const dashIndex = value.lastIndexOf('-');
+  return dashIndex > 0 ? value.slice(0, dashIndex) : value;
+};
 
 interface WarehouseMapProps {
   inventory: Item[];
   movements: Movement[];
+  layout: WarehouseLayout;
   onEditItem: (id: string) => void;
   onAddItem: (rack?: string) => void;
   onBulkUpdate: (newInventory: Item[]) => void;
@@ -30,10 +25,11 @@ interface WarehouseMapProps {
   userRole?: 'admin' | 'staff';
 }
 
-export const WarehouseMap: React.FC<WarehouseMapProps> = ({ 
-  inventory, 
-  movements, 
-  onEditItem, 
+export const WarehouseMap: React.FC<WarehouseMapProps> = ({
+  inventory,
+  movements,
+  layout,
+  onEditItem,
   onAddItem, 
   onBulkUpdate, 
   initialRack, 
@@ -172,19 +168,23 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   useEffect(() => {
     if (initialRack) {
-      const zoneId = initialRack.charAt(0).toUpperCase();
+      const zoneId = aisleCodeOfRack(initialRack);
       setSelectedRack({ zoneId, rackId: initialRack });
       if (onClearInitialRack) onClearInitialRack();
     }
   }, [initialRack, onClearInitialRack]);
 
+  // Step 3: the map shows the first floor. Floor tabs replace this in the next step.
+  const activeFloor = layout[0];
+  const aisles = activeFloor?.aisles ?? [];
 
-  const aisleData = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(id => {
-    const aisleItems = inventory.filter(i => (i.rack || '').toUpperCase().startsWith(id));
+  const aisleData = aisles.map(aisle => {
+    const id = aisle.code;
+    const aisleItems = inventory.filter(i => aisleCodeOfRack(i.rack) === id);
     const sizeCapacity = { SMALL: 0.25, MEDIUM: 1, LARGE: 2 } as const;
     const totalQty = aisleItems.reduce((sum, item) => sum + item.quantity * (sizeCapacity[item.size || 'MEDIUM']), 0);
     const uniqueItems = aisleItems.length;
-    const maxCapacity = 1000;
+    const maxCapacity = aisle.racks.reduce((sum, rack) => sum + (rack.capacity ?? DEFAULT_RACK_CAPACITY), 0) || DEFAULT_RACK_CAPACITY;
     const density = Math.min(100, Math.round((totalQty / maxCapacity) * 100));
     let statusClass = 'status-optimal';
     let statusText = 'Optimal';
@@ -249,61 +249,56 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   };
 
 
-  const zoneGridMap: Record<string, { gridColumn: number; gridRow: number }> = {
-    A: { gridColumn: 1, gridRow: 1 }, B: { gridColumn: 2, gridRow: 1 }, C: { gridColumn: 3, gridRow: 1 }, D: { gridColumn: 4, gridRow: 1 },
-    E: { gridColumn: 5, gridRow: 1 }, F: { gridColumn: 6, gridRow: 1 }, G: { gridColumn: 7, gridRow: 1 }, H: { gridColumn: 8, gridRow: 1 },
-    I: { gridColumn: 5, gridRow: 2 }, J: { gridColumn: 6, gridRow: 2 }, K: { gridColumn: 7, gridRow: 2 }, L: { gridColumn: 8, gridRow: 2 }
-  };
-
   return (
     <div className="content-section">
       {error && <div className="dash-card mb-4 border-accent p-3 text-accent label-micro text-center">{error}</div>}
 
       <div className="warehouse-layout-container">
         <div className="warehouse-map-grid">
-          {ZONES.map(zone => {
-             const zoneItems = inventory.filter(i => normalizeRack(i.rack).startsWith(zone.id));
-             const pickingLabelText = zone.id === 'E'
-               ? 'Body & Brakes'
-               : zone.id === 'F'
-                 ? 'Body & Brakes'
-                 : zone.id === 'G'
-                   ? 'Electrical & Engine'
-                 : zone.id === 'H'
-                   ? 'Electrical & Engine'
-                 : zone.id === 'I' || zone.id === 'J'
-                   ? 'Suspension & Transmission'
-                 : zone.id === 'K' || zone.id === 'L'
-                   ? 'Misc'
-               : zone.id === 'A' || zone.id === 'B' || zone.id === 'C' || zone.id === 'D'
-                 ? 'High Demand Only'
-                 : 'Slow Demand Only';
-             const placement = zoneGridMap[zone.id] ?? { gridColumn: 1, gridRow: 1 };
-             return (
-               <div key={zone.id} className="zone-cell" style={{ gridColumn: placement.gridColumn, gridRow: placement.gridRow }}>
-                 <div className="zone-top-header">
-                   <div className="aisle-title">AISLE {zone.id}</div>
-                   <div className={`picking-label${pickingLabelText === 'High Demand Only' ? ' high-demand' : ''}${pickingLabelText === 'Body & Brakes' ? ' body-brakes' : ''}${pickingLabelText === 'Electrical & Engine' ? ' electrical-engine' : ''}${pickingLabelText === 'Suspension & Transmission' ? ' suspension-transmission' : ''}${pickingLabelText === 'Misc' ? ' misc' : ''}`}>
-                     {pickingLabelText}
-                   </div>
-                 </div>
-                 <div className="rack-container">
-                   {Array.from({ length: zone.racks }).map((_, i) => {
-                     const rackId = `${zone.id}-${String(i + 1).padStart(2, '0')}`;
-                     const rackSpecificItems = zoneItems.filter(item => normalizeRack(item.rack) === normalizeRack(rackId));
-                     const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item, movements));
-                     return (
-                       <div key={rackId} className={`rack ${hasLowStock ? 'low-stock-alert' : ''}`} style={{ margin: 0, borderRadius: 12 }} onClick={() => setSelectedRack({ zoneId: zone.id, rackId })}>
-                         <div className="rack-icon">
-                           {[1, 2, 3, 4].map(b => <div key={b} className="rack-bar"></div>)}
-                         </div>
-                         <div className="rack-id">Rack {i + 1}</div>
-                       </div>
-                     );
-                   })}
-                 </div>
-               </div>
-             )
+          {aisles.length === 0 && (
+            <div className="label-micro text-center" style={{ gridColumn: '1 / -1', alignSelf: 'center' }}>
+              The warehouse layout is not available yet.
+            </div>
+          )}
+          {aisles.map(aisle => {
+            const isLandscape = aisle.orientation === 'landscape';
+            const rackCount = Math.max(aisle.racks.length, 1);
+            const rackGridStyle = isLandscape
+              ? { gridTemplateColumns: `repeat(${rackCount}, minmax(72px, 1fr))` }
+              : { gridTemplateRows: `repeat(${rackCount}, 1fr)` };
+            return (
+              <div
+                key={aisle.id}
+                className={`zone-cell${isLandscape ? ' zone-cell-landscape' : ''}`}
+                style={{ gridColumn: aisle.gridCol, gridRow: aisle.gridRow }}
+              >
+                <div className="zone-top-header">
+                  <div className="aisle-title">AISLE {aisle.code}</div>
+                  <div className="picking-label" style={{ color: aisle.color, opacity: 1 }}>
+                    {aisle.category}
+                  </div>
+                </div>
+                <div className={`rack-container${isLandscape ? ' rack-container-landscape' : ''}`} style={rackGridStyle}>
+                  {aisle.racks.map(rack => {
+                    const rackSpecificItems = inventory.filter(item => normalizeRack(item.rack) === normalizeRack(rack.code));
+                    const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item, movements));
+                    return (
+                      <div
+                        key={rack.id}
+                        className={`rack ${hasLowStock ? 'low-stock-alert' : ''}`}
+                        style={{ margin: 0, borderRadius: 12 }}
+                        onClick={() => setSelectedRack({ zoneId: aisle.code, rackId: rack.code })}
+                      >
+                        <div className="rack-icon">
+                          {[1, 2, 3, 4].map(b => <div key={b} className="rack-bar"></div>)}
+                        </div>
+                        <div className="rack-id">Rack {rack.number}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
           })}
         </div>
 

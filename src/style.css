@@ -2161,3 +2161,22 @@ footer p {
     animation: none;
   }
 }
+
+/* ---------------- Warehouse map: data-driven aisles and orientation ---------------- */
+.zone-cell-landscape {
+  min-width: 0;
+}
+
+.rack-container-landscape {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+.rack-container-landscape .rack {
+  max-width: none;
+  width: auto;
+  min-width: 72px;
+  aspect-ratio: 1 / 1.1;
+}

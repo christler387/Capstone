@@ -443,6 +443,34 @@ async function initializeDatabase() {
   // The login route selects display_name, but the column never existed.
   await addColumnIfMissing("users", "display_name", "VARCHAR(100) NULL");
 
+  // Warehouse layout: floors, aisles and racks. inventory.rack keeps the "A-01" style code.
+  await pool.query(`CREATE TABLE IF NOT EXISTS floors (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS aisles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    floor_id INT NOT NULL,
+    code VARCHAR(8) NOT NULL UNIQUE,
+    category VARCHAR(100) NOT NULL,
+    color VARCHAR(16) NOT NULL DEFAULT '#64748b',
+    orientation ENUM('portrait', 'landscape') NOT NULL DEFAULT 'portrait',
+    grid_col INT NOT NULL,
+    grid_row INT NOT NULL,
+    UNIQUE KEY uq_aisle_position (floor_id, grid_col, grid_row),
+    CONSTRAINT fk_aisles_floor FOREIGN KEY (floor_id) REFERENCES floors(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS racks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    aisle_id INT NOT NULL,
+    rack_number INT NOT NULL,
+    capacity INT NULL,
+    UNIQUE KEY uq_rack_number (aisle_id, rack_number),
+    CONSTRAINT fk_racks_aisle FOREIGN KEY (aisle_id) REFERENCES aisles(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await seedWarehouseLayout();
+
   // ---- Seed data ----
   const [[userCount]] = await pool.query("SELECT COUNT(*) AS count FROM users");
   if (userCount.count === 0) {
@@ -1323,6 +1351,474 @@ app.patch(
     } finally {
       connection.release();
     }
+  }),
+);
+
+/* ------------------------- Warehouse layout ------------------------- */
+
+// Matches the aisles, colors and grid positions the map used before the layout moved into the database.
+const defaultLayoutAisles = [
+  { code: "A", category: "High Demand Only", color: "#1f9d8b", gridCol: 1, gridRow: 1 },
+  { code: "B", category: "High Demand Only", color: "#1f9d8b", gridCol: 2, gridRow: 1 },
+  { code: "C", category: "High Demand Only", color: "#1f9d8b", gridCol: 3, gridRow: 1 },
+  { code: "D", category: "High Demand Only", color: "#1f9d8b", gridCol: 4, gridRow: 1 },
+  { code: "E", category: "Body & Brakes", color: "#F59E0B", gridCol: 5, gridRow: 1 },
+  { code: "F", category: "Body & Brakes", color: "#F59E0B", gridCol: 6, gridRow: 1 },
+  { code: "G", category: "Electrical & Engine", color: "#6366F1", gridCol: 7, gridRow: 1 },
+  { code: "H", category: "Electrical & Engine", color: "#6366F1", gridCol: 8, gridRow: 1 },
+  { code: "I", category: "Suspension & Transmission", color: "#0891B2", gridCol: 5, gridRow: 2 },
+  { code: "J", category: "Suspension & Transmission", color: "#0891B2", gridCol: 6, gridRow: 2 },
+  { code: "K", category: "Misc", color: "#DB2777", gridCol: 7, gridRow: 2 },
+  { code: "L", category: "Misc", color: "#DB2777", gridCol: 8, gridRow: 2 },
+];
+
+const DEFAULT_RACKS_PER_AISLE = 3;
+const MAX_RACKS_PER_AISLE = 10;
+const AISLE_ORIENTATIONS = ["portrait", "landscape"];
+
+async function seedWarehouseLayout() {
+  const [[floorCount]] = await pool.query("SELECT COUNT(*) AS count FROM floors");
+  if (floorCount.count > 0) return;
+
+  const [floorResult] = await pool.query(
+    "INSERT INTO floors (name, sort_order) VALUES (?, ?)",
+    ["Floor 1", 1],
+  );
+  for (const aisle of defaultLayoutAisles) {
+    const [aisleResult] = await pool.query(
+      "INSERT INTO aisles (floor_id, code, category, color, orientation, grid_col, grid_row) VALUES (?, ?, ?, ?, 'portrait', ?, ?)",
+      [floorResult.insertId, aisle.code, aisle.category, aisle.color, aisle.gridCol, aisle.gridRow],
+    );
+    for (let number = 1; number <= DEFAULT_RACKS_PER_AISLE; number += 1) {
+      await pool.query(
+        "INSERT INTO racks (aisle_id, rack_number) VALUES (?, ?)",
+        [aisleResult.insertId, number],
+      );
+    }
+  }
+}
+
+function rackCode(aisleCode, rackNumber) {
+  return `${aisleCode}-${String(rackNumber).padStart(2, "0")}`;
+}
+
+// Returns floors → aisles → racks in the shape the frontend uses.
+async function readWarehouseLayout(db = pool) {
+  const [floorRows] = await db.query(
+    "SELECT id, name, sort_order FROM floors ORDER BY sort_order, id",
+  );
+  const [aisleRows] = await db.query(
+    "SELECT id, floor_id, code, category, color, orientation, grid_col, grid_row FROM aisles ORDER BY code",
+  );
+  const [rackRows] = await db.query(
+    "SELECT id, aisle_id, rack_number, capacity FROM racks ORDER BY aisle_id, rack_number",
+  );
+
+  const aisleById = new Map();
+  for (const row of aisleRows) {
+    aisleById.set(row.id, {
+      id: row.id,
+      floorId: row.floor_id,
+      code: row.code,
+      category: row.category,
+      color: row.color,
+      orientation: row.orientation,
+      gridCol: row.grid_col,
+      gridRow: row.grid_row,
+      racks: [],
+    });
+  }
+  for (const row of rackRows) {
+    const aisle = aisleById.get(row.aisle_id);
+    if (!aisle) continue;
+    aisle.racks.push({
+      id: row.id,
+      number: row.rack_number,
+      code: rackCode(aisle.code, row.rack_number),
+      capacity: row.capacity,
+    });
+  }
+
+  return floorRows.map((floor) => ({
+    id: floor.id,
+    name: floor.name,
+    sortOrder: floor.sort_order,
+    aisles: [...aisleById.values()].filter((aisle) => aisle.floorId === floor.id),
+  }));
+}
+
+async function requireAdmin(req, res) {
+  const actor = await getAuthenticatedUser(req);
+  if (!actor || actor.role !== "admin") {
+    res
+      .status(actor ? 403 : 401)
+      .json({ error: "Administrator access is required." });
+    return null;
+  }
+  return actor;
+}
+
+function toPositiveInt(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
+function cleanText(value, maxLength) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+// Items whose rack code is in this aisle (A-01, A-02 …) block changes to the aisle.
+async function aisleHasStock(db, aisleCode) {
+  const [[row]] = await db.query(
+    "SELECT COUNT(*) AS count FROM inventory WHERE rack LIKE ?",
+    [`${aisleCode}-%`],
+  );
+  return row.count > 0;
+}
+
+async function rackHasStock(db, code) {
+  const [[row]] = await db.query(
+    "SELECT COUNT(*) AS count FROM inventory WHERE rack = ?",
+    [code],
+  );
+  return row.count > 0;
+}
+
+async function isGridCellTaken(db, floorId, gridCol, gridRow, exceptAisleId = null) {
+  const [[row]] = await db.query(
+    "SELECT id FROM aisles WHERE floor_id=? AND grid_col=? AND grid_row=? AND id<>? LIMIT 1",
+    [floorId, gridCol, gridRow, exceptAisleId ?? 0],
+  );
+  return Boolean(row);
+}
+
+app.get(
+  "/api/layout",
+  ah(async (_req, res) => {
+    res.json(await readWarehouseLayout());
+  }),
+);
+
+app.post(
+  "/api/layout/floors",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const name = cleanText(req.body?.name, 100);
+    if (!name) return res.status(400).json({ error: "Floor name is required." });
+
+    const [[last]] = await pool.query("SELECT COALESCE(MAX(sort_order), 0) AS maxOrder FROM floors");
+    await pool.query("INSERT INTO floors (name, sort_order) VALUES (?, ?)", [name, last.maxOrder + 1]);
+    res.status(201).json(await readWarehouseLayout());
+  }),
+);
+
+app.put(
+  "/api/layout/floors/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const floorId = toPositiveInt(req.params.id);
+    if (!floorId) return res.status(400).json({ error: "Invalid floor." });
+
+    const [[floor]] = await pool.query("SELECT id FROM floors WHERE id=?", [floorId]);
+    if (!floor) return res.status(404).json({ error: "Floor not found." });
+
+    const updates = [];
+    const values = [];
+    if (req.body?.name !== undefined) {
+      const name = cleanText(req.body.name, 100);
+      if (!name) return res.status(400).json({ error: "Floor name is required." });
+      updates.push("name=?");
+      values.push(name);
+    }
+    if (req.body?.sortOrder !== undefined) {
+      const sortOrder = Number(req.body.sortOrder);
+      if (!Number.isInteger(sortOrder)) return res.status(400).json({ error: "Invalid sort order." });
+      updates.push("sort_order=?");
+      values.push(sortOrder);
+    }
+    if (updates.length > 0) {
+      await pool.query(`UPDATE floors SET ${updates.join(", ")} WHERE id=?`, [...values, floorId]);
+    }
+    res.json(await readWarehouseLayout());
+  }),
+);
+
+app.delete(
+  "/api/layout/floors/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const floorId = toPositiveInt(req.params.id);
+    if (!floorId) return res.status(400).json({ error: "Invalid floor." });
+
+    const [[floorCount]] = await pool.query("SELECT COUNT(*) AS count FROM floors");
+    if (floorCount.count <= 1) {
+      return res.status(400).json({ error: "The warehouse needs at least one floor." });
+    }
+
+    const [aisles] = await pool.query("SELECT code FROM aisles WHERE floor_id=?", [floorId]);
+    for (const aisle of aisles) {
+      if (await aisleHasStock(pool, aisle.code)) {
+        return res.status(409).json({
+          error: `Aisle ${aisle.code} still holds items. Move them before deleting this floor.`,
+        });
+      }
+    }
+
+    await pool.query("DELETE FROM floors WHERE id=?", [floorId]);
+    res.json(await readWarehouseLayout());
+  }),
+);
+
+app.post(
+  "/api/layout/aisles",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const body = req.body || {};
+    const floorId = toPositiveInt(body.floorId);
+    const code = cleanText(body.code, 8).toUpperCase();
+    const category = cleanText(body.category, 100);
+    const color = typeof body.color === "string" ? body.color : "#64748b";
+    const orientation = body.orientation || "portrait";
+    const gridCol = toPositiveInt(body.gridCol);
+    const gridRow = toPositiveInt(body.gridRow);
+    const rackCount = body.rackCount === undefined ? DEFAULT_RACKS_PER_AISLE : toPositiveInt(body.rackCount);
+
+    if (!floorId) return res.status(400).json({ error: "Choose a floor for the aisle." });
+    if (!/^[A-Z0-9]{1,8}$/.test(code)) {
+      return res.status(400).json({ error: "Aisle name must be 1 to 8 letters or numbers." });
+    }
+    if (!category) return res.status(400).json({ error: "Choose a category for the aisle." });
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: "Invalid aisle color." });
+    if (!AISLE_ORIENTATIONS.includes(orientation)) return res.status(400).json({ error: "Invalid orientation." });
+    if (!gridCol || !gridRow) return res.status(400).json({ error: "Choose a position for the aisle." });
+    if (!rackCount || rackCount > MAX_RACKS_PER_AISLE) {
+      return res.status(400).json({ error: `An aisle needs 1 to ${MAX_RACKS_PER_AISLE} racks.` });
+    }
+
+    const [[floor]] = await pool.query("SELECT id FROM floors WHERE id=?", [floorId]);
+    if (!floor) return res.status(404).json({ error: "Floor not found." });
+
+    const [[codeTaken]] = await pool.query("SELECT id FROM aisles WHERE code=?", [code]);
+    if (codeTaken) return res.status(409).json({ error: `Aisle ${code} already exists.` });
+    if (await isGridCellTaken(pool, floorId, gridCol, gridRow)) {
+      return res.status(409).json({ error: "Another aisle already uses that position on this floor." });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [aisleResult] = await connection.query(
+        "INSERT INTO aisles (floor_id, code, category, color, orientation, grid_col, grid_row) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [floorId, code, category, color, orientation, gridCol, gridRow],
+      );
+      for (let number = 1; number <= rackCount; number += 1) {
+        await connection.query(
+          "INSERT INTO racks (aisle_id, rack_number) VALUES (?, ?)",
+          [aisleResult.insertId, number],
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+    res.status(201).json(await readWarehouseLayout());
+  }),
+);
+
+app.put(
+  "/api/layout/aisles/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const aisleId = toPositiveInt(req.params.id);
+    if (!aisleId) return res.status(400).json({ error: "Invalid aisle." });
+
+    const [[aisle]] = await pool.query(
+      "SELECT id, floor_id, code, grid_col, grid_row FROM aisles WHERE id=?",
+      [aisleId],
+    );
+    if (!aisle) return res.status(404).json({ error: "Aisle not found." });
+
+    const body = req.body || {};
+    const next = {
+      floorId: aisle.floor_id,
+      code: aisle.code,
+      category: undefined,
+      color: undefined,
+      orientation: undefined,
+      gridCol: aisle.grid_col,
+      gridRow: aisle.grid_row,
+    };
+
+    if (body.floorId !== undefined) {
+      next.floorId = toPositiveInt(body.floorId);
+      if (!next.floorId) return res.status(400).json({ error: "Invalid floor." });
+    }
+    if (body.code !== undefined) {
+      next.code = cleanText(body.code, 8).toUpperCase();
+      if (!/^[A-Z0-9]{1,8}$/.test(next.code)) {
+        return res.status(400).json({ error: "Aisle name must be 1 to 8 letters or numbers." });
+      }
+      // Rack codes in inventory are built from the aisle name, so a rename would orphan stock.
+      if (next.code !== aisle.code && (await aisleHasStock(pool, aisle.code))) {
+        return res.status(409).json({ error: `Aisle ${aisle.code} still holds items and cannot be renamed.` });
+      }
+      if (next.code !== aisle.code) {
+        const [[codeTaken]] = await pool.query("SELECT id FROM aisles WHERE code=? AND id<>?", [next.code, aisleId]);
+        if (codeTaken) return res.status(409).json({ error: `Aisle ${next.code} already exists.` });
+      }
+    }
+    if (body.category !== undefined) {
+      next.category = cleanText(body.category, 100);
+      if (!next.category) return res.status(400).json({ error: "Choose a category for the aisle." });
+    }
+    if (body.color !== undefined) {
+      if (!/^#[0-9a-fA-F]{6}$/.test(body.color)) return res.status(400).json({ error: "Invalid aisle color." });
+      next.color = body.color;
+    }
+    if (body.orientation !== undefined) {
+      if (!AISLE_ORIENTATIONS.includes(body.orientation)) return res.status(400).json({ error: "Invalid orientation." });
+      next.orientation = body.orientation;
+    }
+    if (body.gridCol !== undefined) {
+      next.gridCol = toPositiveInt(body.gridCol);
+      if (!next.gridCol) return res.status(400).json({ error: "Invalid position." });
+    }
+    if (body.gridRow !== undefined) {
+      next.gridRow = toPositiveInt(body.gridRow);
+      if (!next.gridRow) return res.status(400).json({ error: "Invalid position." });
+    }
+
+    const positionChanged =
+      next.floorId !== aisle.floor_id || next.gridCol !== aisle.grid_col || next.gridRow !== aisle.grid_row;
+    if (positionChanged && (await isGridCellTaken(pool, next.floorId, next.gridCol, next.gridRow, aisleId))) {
+      return res.status(409).json({ error: "Another aisle already uses that position on this floor." });
+    }
+
+    const updates = [];
+    const values = [];
+    const columns = {
+      floorId: "floor_id",
+      code: "code",
+      category: "category",
+      color: "color",
+      orientation: "orientation",
+      gridCol: "grid_col",
+      gridRow: "grid_row",
+    };
+    for (const [key, column] of Object.entries(columns)) {
+      if (body[key] !== undefined) {
+        updates.push(`${column}=?`);
+        values.push(next[key]);
+      }
+    }
+    if (updates.length > 0) {
+      await pool.query(`UPDATE aisles SET ${updates.join(", ")} WHERE id=?`, [...values, aisleId]);
+    }
+    res.json(await readWarehouseLayout());
+  }),
+);
+
+app.delete(
+  "/api/layout/aisles/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const aisleId = toPositiveInt(req.params.id);
+    if (!aisleId) return res.status(400).json({ error: "Invalid aisle." });
+
+    const [[aisle]] = await pool.query("SELECT code FROM aisles WHERE id=?", [aisleId]);
+    if (!aisle) return res.status(404).json({ error: "Aisle not found." });
+    if (await aisleHasStock(pool, aisle.code)) {
+      return res.status(409).json({ error: `Aisle ${aisle.code} still holds items. Move them before deleting it.` });
+    }
+
+    await pool.query("DELETE FROM aisles WHERE id=?", [aisleId]);
+    res.json(await readWarehouseLayout());
+  }),
+);
+
+app.post(
+  "/api/layout/aisles/:id/racks",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const aisleId = toPositiveInt(req.params.id);
+    if (!aisleId) return res.status(400).json({ error: "Invalid aisle." });
+
+    const [[aisle]] = await pool.query("SELECT id FROM aisles WHERE id=?", [aisleId]);
+    if (!aisle) return res.status(404).json({ error: "Aisle not found." });
+
+    const [[counts]] = await pool.query(
+      "SELECT COUNT(*) AS count, COALESCE(MAX(rack_number), 0) AS maxNumber FROM racks WHERE aisle_id=?",
+      [aisleId],
+    );
+    if (counts.count >= MAX_RACKS_PER_AISLE) {
+      return res.status(400).json({ error: `An aisle can have at most ${MAX_RACKS_PER_AISLE} racks.` });
+    }
+    await pool.query(
+      "INSERT INTO racks (aisle_id, rack_number) VALUES (?, ?)",
+      [aisleId, counts.maxNumber + 1],
+    );
+    res.status(201).json(await readWarehouseLayout());
+  }),
+);
+
+app.put(
+  "/api/layout/racks/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const rackId = toPositiveInt(req.params.id);
+    if (!rackId) return res.status(400).json({ error: "Invalid rack." });
+
+    const [[rack]] = await pool.query("SELECT id FROM racks WHERE id=?", [rackId]);
+    if (!rack) return res.status(404).json({ error: "Rack not found." });
+
+    // Only capacity can change; numbers stay sequential. Empty capacity means no limit.
+    const rawCapacity = req.body?.capacity;
+    let capacity = null;
+    if (rawCapacity !== undefined && rawCapacity !== null && rawCapacity !== "") {
+      capacity = toPositiveInt(rawCapacity);
+      if (!capacity) return res.status(400).json({ error: "Capacity must be a positive number." });
+    }
+    await pool.query("UPDATE racks SET capacity=? WHERE id=?", [capacity, rackId]);
+    res.json(await readWarehouseLayout());
+  }),
+);
+
+app.delete(
+  "/api/layout/racks/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const rackId = toPositiveInt(req.params.id);
+    if (!rackId) return res.status(400).json({ error: "Invalid rack." });
+
+    const [[rack]] = await pool.query(
+      `SELECT r.id, r.rack_number, a.code, a.id AS aisle_id
+       FROM racks r JOIN aisles a ON a.id = r.aisle_id WHERE r.id=?`,
+      [rackId],
+    );
+    if (!rack) return res.status(404).json({ error: "Rack not found." });
+
+    const [[counts]] = await pool.query(
+      "SELECT COUNT(*) AS count, MAX(rack_number) AS maxNumber FROM racks WHERE aisle_id=?",
+      [rack.aisle_id],
+    );
+    if (counts.count <= 1) {
+      return res.status(400).json({ error: "An aisle needs at least one rack. Delete the aisle instead." });
+    }
+    // Only the highest-numbered rack can go, so the numbers stay 1..n.
+    if (rack.rack_number !== counts.maxNumber) {
+      return res.status(400).json({ error: "Remove the highest-numbered rack first to keep numbering sequential." });
+    }
+
+    const code = rackCode(rack.code, rack.rack_number);
+    if (await rackHasStock(pool, code)) {
+      return res.status(409).json({ error: `Rack ${code} still holds items. Move them to another rack first.` });
+    }
+
+    await pool.query("DELETE FROM racks WHERE id=?", [rackId]);
+    res.json(await readWarehouseLayout());
   }),
 );
 

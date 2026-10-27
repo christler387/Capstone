@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { InventoryAuditEntry, Item, Movement, UserRole } from './types';
+import { InventoryAuditEntry, Item, Movement, UserRole, WarehouseLayout } from './types';
 import { Modal } from './components/Modal';
 
 const API_BASE = '/api';
@@ -53,6 +53,15 @@ const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>('staff');
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const [layout, setLayout] = useState<WarehouseLayout>([]);
+
+  // The warehouse layout loads on its own, so a layout problem never blocks the inventory.
+  const refreshLayout = () => requestJson<WarehouseLayout>('/layout').then(setLayout);
+
+  useEffect(() => {
+    refreshLayout().catch(() => setLayout([]));
+  }, []);
+
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -806,9 +815,10 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         );
       case 'warehouse': 
         return (
-          <WarehouseMap 
-            inventory={inventory} 
-            movements={movements} 
+          <WarehouseMap
+            inventory={inventory}
+            movements={movements}
+            layout={layout}
             onEditItem={handleEditItem} 
             onAddItem={handleAddItem}
             onBulkUpdate={bulkUpdateInventory}

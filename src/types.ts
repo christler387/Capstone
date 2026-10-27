@@ -37,6 +37,36 @@ export interface Movement {
 
 export type InventoryAuditAction = 'ADD' | 'DELETE';
 
+export type AisleOrientation = 'portrait' | 'landscape';
+
+export interface WarehouseRack {
+  id: number;
+  number: number;
+  code: string;
+  capacity: number | null;
+}
+
+export interface WarehouseAisle {
+  id: number;
+  floorId: number;
+  code: string;
+  category: string;
+  color: string;
+  orientation: AisleOrientation;
+  gridCol: number;
+  gridRow: number;
+  racks: WarehouseRack[];
+}
+
+export interface WarehouseFloor {
+  id: number;
+  name: string;
+  sortOrder: number;
+  aisles: WarehouseAisle[];
+}
+
+export type WarehouseLayout = WarehouseFloor[];
+
 export interface InventoryAuditEntry {
   id: string;
   itemId: string;
