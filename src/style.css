@@ -3318,3 +3318,9 @@ select.aisle-editor-input {
 .content-section > .floor-tabs {
   padding-top: 1.1rem;
 }
+
+/* Warehouse section lines up with the header: same side padding as the logo and user button */
+.content-section:has(> .floor-tabs) {
+  padding-left: var(--gap);
+  padding-right: var(--gap);
+}
