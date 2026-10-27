@@ -1492,8 +1492,8 @@ const GRID_COLUMNS = 8;
 function rackFootprint(orientation, rackCount) {
   const racks = Math.max(rackCount, 1);
   return orientation === "landscape"
-    ? { cols: racks, rows: 2 }
-    : { cols: 1, rows: racks + 1 };
+    ? { cols: racks, rows: 1 }
+    : { cols: 1, rows: racks };
 }
 
 // True when an aisle with this orientation and rack count at this cell would leave the grid

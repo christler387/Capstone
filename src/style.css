@@ -2898,3 +2898,136 @@ footer p {
   border-top-color: var(--aisle-color, var(--line));
 }
 
+
+/* ---------------- Racks define the grid; aisle labels sit in the gap above them ----------------
+   Only racks occupy grid rows/columns: a portrait aisle is one column wide and N rows tall, a
+   landscape aisle is N columns wide and one row tall. The row gap is the label band, so the
+   label never takes a row, and every rack lines up with the racks beside it. */
+.warehouse-map-grid {
+  --header-gap: 36px;
+  --rack-h: 84px;
+  --map-gap: 16px;
+  gap: var(--header-gap) var(--map-gap);
+  padding: calc(var(--header-gap) + 8px) 0.5rem 0.5rem;
+}
+
+.aisle-group {
+  position: relative;
+  display: grid;
+  row-gap: var(--header-gap);
+  column-gap: var(--map-gap);
+  min-width: 0;
+  align-self: start;
+}
+
+.aisle-group .aisle-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * var(--header-gap));
+  height: calc(var(--header-gap) - 4px);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0 0.25rem;
+  pointer-events: auto;
+}
+
+.aisle-group .aisle-label::before {
+  content: '';
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--aisle-color, var(--line));
+}
+
+.aisle-group .aisle-label-code {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.aisle-group .aisle-label-category {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--f-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--aisle-color, var(--ink));
+}
+
+.aisle-group .aisle-drag-handle {
+  flex-shrink: 0;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--line-soft);
+  color: var(--ink);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.aisle-group .rack {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  aspect-ratio: auto;
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(32, 48, 71, 0.05);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.aisle-group:not(.is-editing) .rack:hover {
+  transform: translateY(-1px);
+  border-color: var(--ink);
+  box-shadow: 0 6px 14px rgba(32, 48, 71, 0.10);
+  cursor: pointer;
+}
+
+.aisle-group.is-selected .rack {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.aisle-group.is-selected .aisle-label-code {
+  color: var(--accent);
+}
+
+.aisle-group.is-dragging {
+  opacity: 0.45;
+}
+
+.aisle-group.is-editing .rack {
+  cursor: default;
+}
+
+.aisle-description-input {
+  width: 100%;
+  min-width: 180px;
+  height: 34px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  font-family: var(--f-sans);
+  font-size: 12px;
+}

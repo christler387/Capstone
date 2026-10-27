@@ -38,7 +38,7 @@ interface Footprint {
 // Landscape: one column per rack; a header row, then one rack row.
 const getFootprint = (orientation: AisleOrientation, rackCount: number): Footprint => {
   const racks = Math.max(rackCount, 1);
-  return orientation === 'landscape' ? { cols: racks, rows: 2 } : { cols: 1, rows: racks + 1 };
+  return orientation === 'landscape' ? { cols: racks, rows: 1 } : { cols: 1, rows: racks };
 };
 
 const footprintOf = (aisle: WarehouseAisle): Footprint => getFootprint(aisle.orientation, aisle.racks.length);
@@ -556,6 +556,13 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     });
   };
 
+  const setAisleCategory = (aisleId: number, value: string) => {
+    updateDraft(copy => {
+      const found = findInCopy(copy, aisleId);
+      if (found) found.aisle.category = value;
+    });
+  };
+
   const renameAisle = (aisleId: number, value: string) => {
     const aisle = getDraftAisle(aisleId);
     if (!aisle) return;
@@ -1021,6 +1028,22 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                     ))}
                   </select>
                 </label>
+                <label className="aisle-edit-field">
+                  <span className="label-micro">Description</span>
+                  <input
+                    type="text"
+                    className="aisle-description-input"
+                    list="aisle-category-options"
+                    value={selectedAisle.category}
+                    maxLength={100}
+                    onChange={(event) => setAisleCategory(selectedAisle.id, event.target.value)}
+                  />
+                  <datalist id="aisle-category-options">
+                    {categoryChoices.map(([name]) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                </label>
                 <button
                   type="button"
                   className="aisle-edit-btn danger"
@@ -1063,29 +1086,25 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
             {onGridAisles.map(aisle => {
               const isLandscape = aisle.orientation === 'landscape';
               const footprint = footprintOf(aisle);
+              const rackCount = Math.max(aisle.racks.length, 1);
               const isSelected = isEditing && aisle.id === selectedAisleId;
               const isDragged = pointerDrag?.aisleId === aisle.id;
               return (
                 <div
                   key={aisle.id}
-                  className={`zone-cell${isLandscape ? ' zone-cell-landscape' : ''}${isEditing ? ' is-editing' : ''}${isSelected ? ' is-selected' : ''}${isDragged ? ' is-dragging' : ''}`}
+                  className={`aisle-group${isLandscape ? ' aisle-group-landscape' : ''}${isEditing ? ' is-editing' : ''}${isSelected ? ' is-selected' : ''}${isDragged ? ' is-dragging' : ''}`}
                   style={{
                     gridColumn: `${aisle.gridCol} / span ${footprint.cols}`,
                     gridRow: `${aisle.gridRow} / span ${footprint.rows}`,
+                    gridTemplateColumns: isLandscape ? `repeat(${rackCount}, minmax(0, 1fr))` : undefined,
+                    gridTemplateRows: isLandscape ? 'var(--rack-h)' : `repeat(${rackCount}, var(--rack-h))`,
                     '--aisle-color': aisle.color,
                   } as React.CSSProperties}
                   onClick={isEditing ? () => setSelectedAisleId(aisle.id) : undefined}
                 >
-                  <div className="zone-top-header">
-                    <div className="aisle-heading">
-                      <span className="aisle-title">Aisle {aisle.code}</span>
-                      <span
-                        className="aisle-category-pill"
-                        style={{ color: aisle.color, borderColor: `${aisle.color}55`, background: `${aisle.color}14` }}
-                      >
-                        {aisle.category}
-                      </span>
-                    </div>
+                  <div className="aisle-label" title={`Aisle ${aisle.code} · ${aisle.category}`}>
+                    <span className="aisle-label-code">Aisle {aisle.code}</span>
+                    <span className="aisle-label-category">{aisle.category}</span>
                     {isEditing && (
                       <span
                         className="aisle-drag-handle"
@@ -1103,27 +1122,22 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                       </span>
                     )}
                   </div>
-                  <div
-                    className={`rack-container${isLandscape ? ' rack-container-landscape' : ''}`}
-                    style={isLandscape ? { gridTemplateColumns: `repeat(${aisle.racks.length}, minmax(0, 1fr))` } : undefined}
-                  >
-                    {aisle.racks.map(rack => {
-                      const rackSpecificItems = inventory.filter(item => normalizeRack(item.rack) === normalizeRack(rack.code));
-                      const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item, movements));
-                      return (
-                        <div
-                          key={rack.id}
-                          className={`rack ${hasLowStock ? 'low-stock-alert' : ''}`}
-                          onClick={isEditing ? undefined : () => setSelectedRack({ zoneId: aisle.code, rackId: rack.code })}
-                        >
-                          <div className="rack-icon">
-                            {[1, 2, 3, 4].map(b => <div key={b} className="rack-bar"></div>)}
-                          </div>
-                          <div className="rack-id">Rack {rack.number}</div>
+                  {aisle.racks.map(rack => {
+                    const rackSpecificItems = inventory.filter(item => normalizeRack(item.rack) === normalizeRack(rack.code));
+                    const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item, movements));
+                    return (
+                      <div
+                        key={rack.id}
+                        className={`rack ${hasLowStock ? 'low-stock-alert' : ''}`}
+                        onClick={isEditing ? undefined : () => setSelectedRack({ zoneId: aisle.code, rackId: rack.code })}
+                      >
+                        <div className="rack-icon">
+                          {[1, 2, 3, 4].map(b => <div key={b} className="rack-bar"></div>)}
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="rack-id">Rack {rack.number}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
