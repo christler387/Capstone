@@ -790,23 +790,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     }
   };
 
-  // Moves the selected aisle one grid cell left, right, up or down. Uses the same placement rules as dragging.
-  const nudgeAisle = (aisleId: number, deltaCol: number, deltaRow: number) => {
-    const floor = getDraftFloor(aisleId);
-    const aisle = getDraftAisle(aisleId);
-    if (!floor || !aisle) return;
-    const gridCol = aisle.gridCol + deltaCol;
-    const gridRow = aisle.gridRow + deltaRow;
-    if (!footprintFits(floor, gridCol, gridRow, footprintOf(aisle), aisleId)) {
-      setError(`Aisle ${aisle.code} cannot move that way: the next spot is taken or off the grid.`);
-      return;
-    }
-    setError(null);
-    updateDraft(copy => {
-      placeAisle(copy, aisleId, floor.id, gridCol, gridRow);
-    });
-  };
-
   // Puts a parked aisle at the first spot where it fits on the grid.
   const placeUnplacedAisle = (aisleId: number) => {
     const floor = getDraftFloor(aisleId);
@@ -1209,25 +1192,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                         </button>
                       );
                     })}
-                  </div>
-                </div>
-
-                <div className="aisle-editor-field">
-                  <span className="aisle-editor-label">Move on grid</span>
-                  <div className="aisle-nudge" role="group" aria-label="Move aisle on the grid">
-                    <button type="button" className="aisle-nudge-up" aria-label="Move up" title="Move up" onClick={() => nudgeAisle(selectedAisle.id, 0, -1)}>
-                      <i className="bx bx-chevron-up" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" className="aisle-nudge-left" aria-label="Move left" title="Move left" onClick={() => nudgeAisle(selectedAisle.id, -1, 0)}>
-                      <i className="bx bx-chevron-left" aria-hidden="true"></i>
-                    </button>
-                    <span className="aisle-nudge-center" aria-hidden="true"><i className="bx bx-move"></i></span>
-                    <button type="button" className="aisle-nudge-right" aria-label="Move right" title="Move right" onClick={() => nudgeAisle(selectedAisle.id, 1, 0)}>
-                      <i className="bx bx-chevron-right" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" className="aisle-nudge-down" aria-label="Move down" title="Move down" onClick={() => nudgeAisle(selectedAisle.id, 0, 1)}>
-                      <i className="bx bx-chevron-down" aria-hidden="true"></i>
-                    </button>
                   </div>
                 </div>
 
