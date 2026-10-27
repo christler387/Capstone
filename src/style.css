@@ -2582,3 +2582,8 @@ footer p {
   font-family: var(--f-sans);
   font-size: 11px;
 }
+
+.warehouse-drop-slot.is-valid {
+  border-color: var(--success);
+  background: rgba(31, 157, 139, 0.08);
+}

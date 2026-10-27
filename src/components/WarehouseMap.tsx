@@ -6,6 +6,29 @@ import { isAtReorderPoint } from '../inventoryMetrics';
 // Density uses this capacity for racks that have no capacity set. Three racks make the old 1000 per aisle.
 const DEFAULT_RACK_CAPACITY = 1000 / 3;
 
+// The floor grid has this many columns. A landscape aisle is two columns wide and one row tall.
+const GRID_COLUMNS = 8;
+
+const aisleSpan = (orientation: AisleOrientation): number => (orientation === 'landscape' ? 2 : 1);
+
+// True when an aisle of this orientation fits at this cell and overlaps no other aisle on the floor.
+const footprintFree = (
+  floor: WarehouseFloor | undefined,
+  gridCol: number,
+  gridRow: number,
+  orientation: AisleOrientation,
+  exceptAisleId: number | null = null,
+): boolean => {
+  const span = aisleSpan(orientation);
+  if (!floor || gridCol < 1 || gridRow < 1 || gridCol + span - 1 > GRID_COLUMNS) return false;
+  return !floor.aisles.some(other =>
+    other.id !== exceptAisleId &&
+    other.gridRow === gridRow &&
+    other.gridCol <= gridCol + span - 1 &&
+    other.gridCol + aisleSpan(other.orientation) - 1 >= gridCol,
+  );
+};
+
 // "AA-01" -> "AA". Works for aisle names of any length.
 const aisleCodeOfRack = (rack: string | undefined): string => {
   const value = (rack || '').toUpperCase();
@@ -288,7 +311,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     }
   };
 
-  const GRID_COLUMNS = 8;
   const CODE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const NEW_CATEGORY = '__new__';
   const MAX_RACKS = 10;
@@ -311,14 +333,15 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     new Map(layout.flatMap(floor => floor.aisles).map(aisle => [aisle.category, aisle.color])).entries(),
   );
 
-  // First empty grid cell on a floor, scanning left to right, top to bottom.
-  const findFreeCell = (floor: WarehouseFloor | undefined = activeFloor): { gridCol: number; gridRow: number } => {
-    const aislesOnFloor = floor?.aisles ?? [];
-    const taken = new Set(aislesOnFloor.map(aisle => `${aisle.gridCol}-${aisle.gridRow}`));
-    const lastRow = Math.max(1, ...aislesOnFloor.map(aisle => aisle.gridRow));
+  // First spot on a floor where an aisle of this orientation fits, scanning left to right, top to bottom.
+  const findFreeCell = (
+    floor: WarehouseFloor | undefined = activeFloor,
+    orientation: AisleOrientation = 'portrait',
+  ): { gridCol: number; gridRow: number } => {
+    const lastRow = Math.max(1, ...(floor?.aisles ?? []).map(aisle => aisle.gridRow));
     for (let gridRow = 1; gridRow <= lastRow + 1; gridRow += 1) {
       for (let gridCol = 1; gridCol <= GRID_COLUMNS; gridCol += 1) {
-        if (!taken.has(`${gridCol}-${gridRow}`)) return { gridCol, gridRow };
+        if (footprintFree(floor, gridCol, gridRow, orientation)) return { gridCol, gridRow };
       }
     }
     return { gridCol: 1, gridRow: lastRow + 1 };
@@ -368,7 +391,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     setIsSavingFloor(true);
     setError(null);
     try {
-      const cell = findFreeCell();
+      const cell = findFreeCell(activeFloor, aisleDraft.orientation);
       const updated = await requestLayout('POST', '/aisles', {
         floorId: activeFloor.id,
         code,
@@ -449,10 +472,10 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     const source = copy.find(floor => floor.aisles.some(aisle => aisle.id === aisleId));
     const target = copy.find(floor => floor.id === floorId);
     if (!source || !target) return false;
-    const occupied = target.aisles.some(aisle => aisle.id !== aisleId && aisle.gridCol === gridCol && aisle.gridRow === gridRow);
-    if (occupied) return false;
-
     const index = source.aisles.findIndex(aisle => aisle.id === aisleId);
+    const movingAisle = source.aisles[index];
+    if (!movingAisle || !footprintFree(target, gridCol, gridRow, movingAisle.orientation, aisleId)) return false;
+
     const [aisle] = source.aisles.splice(index, 1);
     aisle.floorId = floorId;
     aisle.gridCol = gridCol;
@@ -471,19 +494,26 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   const moveAisleToFloor = (aisleId: number, floorId: number) => {
     const targetFloor = draft?.find(floor => floor.id === floorId);
-    if (!targetFloor) return;
-    const cell = findFreeCell(targetFloor);
+    const aisle = getDraftAisle(aisleId);
+    if (!targetFloor || !aisle) return;
+    const cell = findFreeCell(targetFloor, aisle.orientation);
     updateDraft(copy => {
       placeAisle(copy, aisleId, floorId, cell.gridCol, cell.gridRow);
     });
   };
 
   const rotateAisle = (aisleId: number) => {
+    const floor = draft?.find(candidate => candidate.aisles.some(aisle => aisle.id === aisleId));
+    const aisle = getDraftAisle(aisleId);
+    if (!floor || !aisle) return;
+    const nextOrientation: AisleOrientation = aisle.orientation === 'portrait' ? 'landscape' : 'portrait';
+    if (!footprintFree(floor, aisle.gridCol, aisle.gridRow, nextOrientation, aisleId)) {
+      setError(`Not enough free space on ${floor.name} to turn Aisle ${aisle.code}. Move the neighbouring aisle first.`);
+      return;
+    }
     updateDraft(copy => {
       const found = findInCopy(copy, aisleId);
-      if (found) {
-        found.aisle.orientation = found.aisle.orientation === 'portrait' ? 'landscape' : 'portrait';
-      }
+      if (found) found.aisle.orientation = nextOrientation;
     });
   };
 
@@ -605,12 +635,14 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       for (const [index, aisle] of movedAisles.entries()) {
         latest = await requestLayout('PUT', `/aisles/${aisle.id}`, {
           floorId: aisle.floorId,
-          gridCol: 1000 + index,
-          gridRow: 1000,
+          gridCol: 1,
+          gridRow: 1000 + index,
         });
       }
 
-      // 3. Apply the final positions, orientation and names.
+      // 3. Apply the final positions, orientation and names. Aisles that shrink go first, so a
+      // growing aisle never lands on space that is still occupied.
+      const finalChanges: { aisleId: number; patch: Record<string, unknown>; growth: number }[] = [];
       for (const aisle of draftAisles) {
         const saved = savedAisles.get(aisle.id);
         if (!saved) continue;
@@ -625,8 +657,16 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           patch.gridRow = aisle.gridRow;
         }
         if (Object.keys(patch).length > 0) {
-          latest = await requestLayout('PUT', `/aisles/${aisle.id}`, patch);
+          finalChanges.push({
+            aisleId: aisle.id,
+            patch,
+            growth: aisleSpan(aisle.orientation) - aisleSpan(saved.orientation),
+          });
         }
+      }
+      finalChanges.sort((a, b) => a.growth - b.growth);
+      for (const change of finalChanges) {
+        latest = await requestLayout('PUT', `/aisles/${change.aisleId}`, change.patch);
       }
 
       // 4. Add or remove racks. Removal goes from the highest number down.
@@ -749,14 +789,27 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   };
 
 
-  // Empty grid cells on the active floor, where an aisle can be dropped while editing.
-  const dropSlots: { gridCol: number; gridRow: number }[] = [];
+  // Grid cells on the active floor that no other aisle covers, where the dragged aisle can be dropped.
+  // A slot is valid only if the dragged aisle fits there, so nothing overhangs the grid or overlaps.
+  const dropSlots: { gridCol: number; gridRow: number; valid: boolean }[] = [];
+  const draggedAisle = dragAisleId !== null ? aisles.find(aisle => aisle.id === dragAisleId) : undefined;
   if (isEditing && activeFloor) {
-    const occupied = new Set(aisles.map(aisle => `${aisle.gridCol}-${aisle.gridRow}`));
+    const covered = new Set<string>();
+    aisles
+      .filter(aisle => aisle.id !== dragAisleId)
+      .forEach(aisle => {
+        for (let col = aisle.gridCol; col < aisle.gridCol + aisleSpan(aisle.orientation); col += 1) {
+          covered.add(`${col}-${aisle.gridRow}`);
+        }
+      });
     const lastRow = Math.max(1, ...aisles.map(aisle => aisle.gridRow));
     for (let gridRow = 1; gridRow <= lastRow + 1; gridRow += 1) {
       for (let gridCol = 1; gridCol <= GRID_COLUMNS; gridCol += 1) {
-        if (!occupied.has(`${gridCol}-${gridRow}`)) dropSlots.push({ gridCol, gridRow });
+        if (covered.has(`${gridCol}-${gridRow}`)) continue;
+        const valid = draggedAisle
+          ? footprintFree(activeFloor, gridCol, gridRow, draggedAisle.orientation, draggedAisle.id)
+          : false;
+        dropSlots.push({ gridCol, gridRow, valid });
       }
     }
   }
@@ -864,14 +917,14 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           {isEditing && dropSlots.map(slot => (
             <div
               key={`slot-${slot.gridCol}-${slot.gridRow}`}
-              className={`warehouse-drop-slot${dragAisleId !== null ? ' is-active' : ''}`}
+              className={`warehouse-drop-slot${dragAisleId !== null ? ' is-active' : ''}${slot.valid ? ' is-valid' : ''}`}
               style={{ gridColumn: slot.gridCol, gridRow: slot.gridRow }}
               onDragOver={(event) => {
-                if (dragAisleId !== null) event.preventDefault();
+                if (dragAisleId !== null && slot.valid) event.preventDefault();
               }}
               onDrop={(event) => {
                 event.preventDefault();
-                if (dragAisleId !== null) dropAisleAt(dragAisleId, slot.gridCol, slot.gridRow);
+                if (dragAisleId !== null && slot.valid) dropAisleAt(dragAisleId, slot.gridCol, slot.gridRow);
                 setDragAisleId(null);
               }}
             />
@@ -887,7 +940,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
               <div
                 key={aisle.id}
                 className={`zone-cell${isLandscape ? ' zone-cell-landscape' : ''}${isEditing ? ' is-editing' : ''}${dragAisleId === aisle.id ? ' is-dragging' : ''}`}
-                style={{ gridColumn: aisle.gridCol, gridRow: aisle.gridRow }}
+                style={{ gridColumn: `${aisle.gridCol} / span ${aisleSpan(aisle.orientation)}`, gridRow: aisle.gridRow }}
                 draggable={isEditing}
                 onDragStart={(event) => {
                   if (!isEditing) return;

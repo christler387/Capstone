@@ -1484,12 +1484,27 @@ async function rackHasStock(db, code) {
   return row.count > 0;
 }
 
-async function isGridCellTaken(db, floorId, gridCol, gridRow, exceptAisleId = null) {
-  const [[row]] = await db.query(
-    "SELECT id FROM aisles WHERE floor_id=? AND grid_col=? AND grid_row=? AND id<>? LIMIT 1",
-    [floorId, gridCol, gridRow, exceptAisleId ?? 0],
+// The floor grid has this many columns. A landscape aisle is two columns wide and one row tall;
+// a portrait aisle is one column wide.
+const GRID_COLUMNS = 8;
+
+function aisleSpan(orientation) {
+  return orientation === "landscape" ? 2 : 1;
+}
+
+// True when an aisle of this orientation at this cell would leave the grid or overlap another aisle.
+async function isFootprintBlocked(db, floorId, gridCol, gridRow, orientation, exceptAisleId = null) {
+  const span = aisleSpan(orientation);
+  if (gridCol < 1 || gridRow < 1 || gridCol + span - 1 > GRID_COLUMNS) return true;
+
+  const [others] = await db.query(
+    "SELECT id, grid_col, orientation FROM aisles WHERE floor_id=? AND grid_row=? AND id<>?",
+    [floorId, gridRow, exceptAisleId ?? 0],
   );
-  return Boolean(row);
+  return others.some((other) => {
+    const otherEnd = other.grid_col + aisleSpan(other.orientation) - 1;
+    return other.grid_col <= gridCol + span - 1 && otherEnd >= gridCol;
+  });
 }
 
 app.get(
@@ -1600,8 +1615,8 @@ app.post(
 
     const [[codeTaken]] = await pool.query("SELECT id FROM aisles WHERE code=?", [code]);
     if (codeTaken) return res.status(409).json({ error: `Aisle ${code} already exists.` });
-    if (await isGridCellTaken(pool, floorId, gridCol, gridRow)) {
-      return res.status(409).json({ error: "Another aisle already uses that position on this floor." });
+    if (await isFootprintBlocked(pool, floorId, gridCol, gridRow, orientation)) {
+      return res.status(409).json({ error: "That spot is taken or does not fit on this floor." });
     }
 
     const connection = await pool.getConnection();
@@ -1636,7 +1651,7 @@ app.put(
     if (!aisleId) return res.status(400).json({ error: "Invalid aisle." });
 
     const [[aisle]] = await pool.query(
-      "SELECT id, floor_id, code, grid_col, grid_row FROM aisles WHERE id=?",
+      "SELECT id, floor_id, code, orientation, grid_col, grid_row FROM aisles WHERE id=?",
       [aisleId],
     );
     if (!aisle) return res.status(404).json({ error: "Aisle not found." });
@@ -1647,7 +1662,7 @@ app.put(
       code: aisle.code,
       category: undefined,
       color: undefined,
-      orientation: undefined,
+      orientation: aisle.orientation,
       gridCol: aisle.grid_col,
       gridRow: aisle.grid_row,
     };
@@ -1691,10 +1706,16 @@ app.put(
       if (!next.gridRow) return res.status(400).json({ error: "Invalid position." });
     }
 
-    const positionChanged =
-      next.floorId !== aisle.floor_id || next.gridCol !== aisle.grid_col || next.gridRow !== aisle.grid_row;
-    if (positionChanged && (await isGridCellTaken(pool, next.floorId, next.gridCol, next.gridRow, aisleId))) {
-      return res.status(409).json({ error: "Another aisle already uses that position on this floor." });
+    const shapeChanged =
+      next.floorId !== aisle.floor_id ||
+      next.gridCol !== aisle.grid_col ||
+      next.gridRow !== aisle.grid_row ||
+      next.orientation !== aisle.orientation;
+    if (
+      shapeChanged &&
+      (await isFootprintBlocked(pool, next.floorId, next.gridCol, next.gridRow, next.orientation, aisleId))
+    ) {
+      return res.status(409).json({ error: "That spot is taken or does not fit on this floor." });
     }
 
     const updates = [];
