@@ -3438,3 +3438,9 @@ select.aisle-editor-input {
 .warehouse-map-grid {
   --header-gap: 56px;
 }
+
+/* Option 2: racks share one grid. Racks inside an aisle use the same spacing as the gap between
+   aisles, so every rack lines up with the racks above and below it, and the label sits above. */
+.aisle-group {
+  row-gap: var(--header-gap);
+}
