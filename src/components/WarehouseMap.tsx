@@ -889,6 +889,12 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [isDirty]);
 
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+
   // Forget a half-typed new category when a different aisle is selected.
   useEffect(() => {
     setCreatingCategory(false);
@@ -1007,7 +1013,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   return (
     <div className="content-section">
-      {error && <div className="dash-card mb-4 border-accent p-3 text-accent label-micro text-center">{error}</div>}
 
       <div className="floor-tabs" role="tablist" aria-label="Warehouse floors">
         {layout.map(floor => {
@@ -1389,6 +1394,16 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
         </div>
       </div>
 
+      {error && (
+        <div className="map-toast" role="alert" aria-live="assertive">
+          <i className="bx bx-error-circle" aria-hidden="true"></i>
+          <span>{error}</span>
+          <button type="button" className="map-toast-close" aria-label="Dismiss message" onClick={() => setError(null)}>
+            <i className="bx bx-x" aria-hidden="true"></i>
+          </button>
+        </div>
+      )}
+
       <InspectionModal />
 
       {floorDialog && (
@@ -1421,7 +1436,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
               }}
             />
           </div>
-          {error && <div className="label-micro text-accent mt-2">{error}</div>}
+          
         </Modal>
       )}
 
@@ -1542,7 +1557,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
             </div>
           </div>
 
-          {error && <div className="label-micro text-accent mt-2">{error}</div>}
+          
         </Modal>
       )}
 
@@ -1642,7 +1657,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
             {cannotMove && (
               <p className="label-micro text-accent mt-2">There is no other rack to move these items to. Add a rack elsewhere first.</p>
             )}
-            {error && <div className="label-micro text-accent mt-2">{error}</div>}
+            
           </Modal>
         );
       })()}

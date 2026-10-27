@@ -3464,3 +3464,70 @@ select.aisle-editor-input {
 .aisle-editor-header-bare {
   justify-content: flex-end;
 }
+
+/* ---------------- Warnings and errors: one message at the bottom center ---------------- */
+.map-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 0.75rem 0.7rem 0.75rem 1rem;
+  border-radius: 14px;
+  background: #203047;
+  color: #ffffff;
+  font-family: var(--f-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 16px 40px rgba(20, 28, 40, 0.28);
+  animation: map-toast-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.map-toast > i:first-child {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  color: #ff8a80;
+}
+
+.map-toast > span {
+  min-width: 0;
+}
+
+.map-toast-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.map-toast-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.map-toast-close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+@keyframes map-toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-toast { animation: none; }
+}
