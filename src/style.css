@@ -3438,3 +3438,44 @@ select.aisle-editor-input {
 .warehouse-map-grid {
   --header-gap: 56px;
 }
+
+/* ---------------- Move an aisle one cell at a time ---------------- */
+.aisle-nudge {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+  gap: 4px;
+  width: max-content;
+}
+
+.aisle-nudge button,
+.aisle-nudge-center {
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 1.1rem;
+}
+
+.aisle-nudge button {
+  border: 1px solid rgba(32, 48, 71, 0.12);
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.aisle-nudge button:hover {
+  background: #f1eee7;
+  border-color: var(--button);
+}
+
+.aisle-nudge button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56, 103, 168, 0.22);
+}
+
+.aisle-nudge-up { grid-column: 2; grid-row: 1; }
+.aisle-nudge-left { grid-column: 1; grid-row: 2; }
+.aisle-nudge-center { grid-column: 2; grid-row: 2; color: rgba(32, 48, 71, 0.45); }
+.aisle-nudge-right { grid-column: 3; grid-row: 2; }
+.aisle-nudge-down { grid-column: 2; grid-row: 3; }
