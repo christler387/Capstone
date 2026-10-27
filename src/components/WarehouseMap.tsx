@@ -658,11 +658,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     if (!aisle) return;
     const newCode = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
     if (newCode === aisle.code) return;
-    // Items are stored by rack code, so an aisle with stock cannot be renamed.
-    if (aisleItemCount(aisle.code) > 0) {
-      setError(`Aisle ${aisle.code} still holds items. Move them before renaming it.`);
-      return;
-    }
     updateDraft(copy => {
       const found = findInCopy(copy, aisleId);
       if (!found) return;
@@ -766,6 +761,27 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     setIsSavingLayout(true);
     setError(null);
     try {
+      // Renamed aisles: their items move to the new rack codes first, so no stock is left on an old name.
+      const savedCodes = new Map(savedLayout.flatMap(floor => floor.aisles).map(aisle => [aisle.id, aisle.code] as const));
+      const draftCodes = draft.flatMap(floor => floor.aisles.map(aisle => aisle.code));
+      if (new Set(draftCodes).size !== draftCodes.length) {
+        throw new Error('Two aisles cannot have the same name. Rename one of them first.');
+      }
+      const renames = draft
+        .flatMap(floor => floor.aisles)
+        .filter(aisle => savedCodes.has(aisle.id) && savedCodes.get(aisle.id) !== aisle.code)
+        .map(aisle => ({ from: savedCodes.get(aisle.id) as string, to: aisle.code }));
+      if (renames.length > 0) {
+        const movedInventory = inventory.map(item => {
+          const rename = renames.find(candidate => aisleCodeOfRack(item.rack) === candidate.from);
+          if (!rename) return item;
+          return { ...item, rack: `${rename.to}${(item.rack || '').slice(rename.from.length)}` };
+        });
+        if (movedInventory.some((item, index) => item !== inventory[index])) {
+          await onBulkUpdate(movedInventory);
+        }
+      }
+
       const updated = await requestLayout('PUT', '', {
         floors: draft.map(floor => ({
           id: floor.id,
