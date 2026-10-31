@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { SMTPClient } from "emailjs";
+import jwt from "jsonwebtoken";
 import mysql from "mysql2/promise";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
@@ -23,6 +25,70 @@ const DB_CONFIG = {
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "",
 };
+const passwordResetCodes = new Map();
+const passwordResetRateLimits = new Map();
+const PASSWORD_RESET_CODE_TTL_MS = 10 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_TTL_SECONDS = 5 * 60;
+const PASSWORD_RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000;
+const PASSWORD_RESET_CODE_WINDOW_MS = 10 * 60 * 1000;
+
+function getPasswordResetSecret() {
+  const secret = process.env.JWT_RESET_SECRET;
+  if (!secret || Buffer.byteLength(secret) < 32) {
+    return null;
+  }
+  return secret;
+}
+
+function getPasswordResetMailClient() {
+  const { SMTP_HOST, SMTP_FROM } = process.env;
+  if (!SMTP_HOST || !SMTP_FROM) return null;
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("SMTP_PORT must be a valid port number.");
+  }
+  if (Boolean(process.env.SMTP_USER) !== Boolean(process.env.SMTP_PASSWORD)) {
+    throw new Error("SMTP_USER and SMTP_PASSWORD must be configured together.");
+  }
+
+  const ssl = process.env.SMTP_SECURE === "true" || port === 465;
+  return new SMTPClient({
+    host: SMTP_HOST,
+    port,
+    ssl,
+    tls: !ssl,
+    user: process.env.SMTP_USER,
+    password: process.env.SMTP_PASSWORD,
+  });
+}
+
+function hashPasswordResetCode(code, secret) {
+  return crypto.createHmac("sha256", secret).update(code).digest();
+}
+
+function isPasswordResetRateLimited(req, action, limit, windowMs) {
+  const key = `${action}:${req.ip || "unknown"}`;
+  const now = Date.now();
+  const recent = (passwordResetRateLimits.get(key) || []).filter(
+    (timestamp) => timestamp > now - windowMs,
+  );
+  if (recent.length >= limit) {
+    passwordResetRateLimits.set(key, recent);
+    return true;
+  }
+
+  recent.push(now);
+  passwordResetRateLimits.set(key, recent);
+  if (passwordResetRateLimits.size > 5000) {
+    for (const [storedKey, timestamps] of passwordResetRateLimits) {
+      if (!timestamps.some((timestamp) => timestamp > now - windowMs)) {
+        passwordResetRateLimits.delete(storedKey);
+      }
+    }
+  }
+  return false;
+}
 
 export const pool = mysql.createPool({
   ...DB_CONFIG,
@@ -438,10 +504,17 @@ async function initializeDatabase() {
     username VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(128) NOT NULL,
     role ENUM('admin', 'staff') NOT NULL,
+    email VARCHAR(254) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   // The login route selects display_name, but the column never existed.
   await addColumnIfMissing("users", "display_name", "VARCHAR(100) NULL");
+  await addColumnIfMissing("users", "email", "VARCHAR(254) NULL");
+  await pool.query(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    jwt_id CHAR(36) PRIMARY KEY,
+    expires_at DATETIME NOT NULL,
+    INDEX password_reset_tokens_expiry_idx (expires_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
 
   // Warehouse layout: floors, aisles and racks. inventory.rack keeps the "A-01" style code.
   await pool.query(`CREATE TABLE IF NOT EXISTS floors (
@@ -616,7 +689,7 @@ app.get(
         .json({ error: "Administrator access is required." });
     }
     const [rows] = await pool.query(
-      "SELECT id, username, role FROM users ORDER BY username",
+      "SELECT id, username, role, email FROM users ORDER BY username",
     );
     res.json(rows);
   }),
@@ -632,7 +705,7 @@ app.post(
         .json({ error: "Administrator access is required." });
     }
 
-    const { username, password, role } = req.body || {};
+    const { username, password, role, email } = req.body || {};
 
     if (!username || !password) {
       return res
@@ -655,6 +728,16 @@ app.post(
         .json({ error: "Password must be at least 4 characters long." });
     }
 
+    const emailValue = String(email || "").trim();
+    const normalizedEmail = emailValue ? emailValue.toLowerCase() : null;
+    if (
+      normalizedEmail &&
+      (normalizedEmail.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))
+    ) {
+      return res.status(400).json({ error: "Enter a valid recovery email." });
+    }
+
     const [[existing]] = await pool.query(
       "SELECT COUNT(*) AS count FROM users WHERE LOWER(username)=LOWER(?)",
       [normalizedUsername],
@@ -664,16 +747,56 @@ app.post(
     }
 
     await pool.query(
-      "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-      [normalizedUsername, hashPassword(normalizedPassword), safeRole],
+      "INSERT INTO users (username, password_hash, role, email) VALUES (?, ?, ?, ?)",
+      [
+        normalizedUsername,
+        hashPassword(normalizedPassword),
+        safeRole,
+        normalizedEmail,
+      ],
     );
 
     res.status(201).json({ ok: true, username: normalizedUsername });
   }),
 );
 
-// NOTE: these two fixed-path routes MUST be declared before "/api/users/:id",
-// otherwise Express matches ":id" = "change-password" and returns a 400.
+// Fixed-path user routes must be declared before "/api/users/:id".
+app.put(
+  "/api/users/recovery-email",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) {
+      return res.status(401).json({ error: "Sign in to update your recovery email." });
+    }
+
+    const currentPassword = String(req.body?.currentPassword || "");
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!currentPassword || !email) {
+      return res.status(400).json({
+        error: "Current password and recovery email are required.",
+      });
+    }
+    if (
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ) {
+      return res.status(400).json({ error: "Enter a valid recovery email." });
+    }
+
+    const [[account]] = await pool.query(
+      "SELECT id, password_hash FROM users WHERE id=? LIMIT 1",
+      [actor.id],
+    );
+    if (!account || account.password_hash !== hashPassword(currentPassword)) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    await pool.query("UPDATE users SET email=? WHERE id=?", [email, actor.id]);
+    passwordResetCodes.delete(actor.id);
+    res.json({ ok: true });
+  }),
+);
+
 app.put(
   "/api/users/change-password",
   ah(async (req, res) => {
@@ -775,7 +898,7 @@ app.put(
 app.put(
   "/api/users/:id",
   ah(async (req, res) => {
-    const { username, password, role } = req.body || {};
+    const { username, password, role, email } = req.body || {};
     const userId = Number(req.params.id);
     const actor = await getAuthenticatedUser(req);
 
@@ -808,6 +931,17 @@ app.put(
       return res
         .status(400)
         .json({ error: "Password must be at least 4 characters long." });
+    }
+
+    const emailValue = String(email || "").trim();
+    const normalizedEmail = emailValue ? emailValue.toLowerCase() : null;
+    if (
+      email !== undefined &&
+      normalizedEmail &&
+      (normalizedEmail.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))
+    ) {
+      return res.status(400).json({ error: "Enter a valid recovery email." });
     }
 
     const connection = await pool.getConnection();
@@ -865,6 +999,10 @@ app.put(
 
       const updates = ["username=?", "role=?"];
       const values = [normalizedUsername, normalizedRole];
+      if (email !== undefined) {
+        updates.push("email=?");
+        values.push(normalizedEmail);
+      }
       if (password !== undefined && String(password).trim()) {
         updates.push("password_hash=?");
         values.push(hashPassword(String(password).trim()));
@@ -875,6 +1013,9 @@ app.put(
         values,
       );
       await connection.commit();
+      if (email !== undefined || (password !== undefined && String(password).trim())) {
+        passwordResetCodes.delete(userId);
+      }
       if (password !== undefined && String(password).trim()) {
         for (const [token, session] of userSessions) {
           if (session.userId === userId) userSessions.delete(token);
@@ -954,6 +1095,256 @@ app.delete(
     } finally {
       connection.release();
     }
+  }),
+);
+
+app.post(
+  "/api/password-reset/request",
+  ah(async (req, res) => {
+    const username = String(req.body?.username || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!username || !email || username.length > 64 || email.length > 254) {
+      return res.status(400).json({ error: "Enter your username and recovery email." });
+    }
+
+    if (
+      isPasswordResetRateLimited(
+        req,
+        "request",
+        3,
+        PASSWORD_RESET_REQUEST_WINDOW_MS,
+      )
+    ) {
+      return res.status(429).json({
+        error: "Too many recovery requests. Please try again later.",
+      });
+    }
+
+    const secret = getPasswordResetSecret();
+    if (!secret) {
+      return res.status(503).json({
+        error: "Password recovery is not configured. Contact your administrator.",
+      });
+    }
+
+    let mailClient;
+    try {
+      mailClient = getPasswordResetMailClient();
+    } catch (error) {
+      console.error("Password recovery SMTP configuration is invalid:", error);
+      return res.status(503).json({
+        error: "Password recovery email is misconfigured. Contact your administrator.",
+      });
+    }
+    if (!mailClient) {
+      return res.status(503).json({
+        error: "Password recovery email is not configured. Contact your administrator.",
+      });
+    }
+
+    const [[account]] = await pool.query(
+      `SELECT id, username, email FROM users
+       WHERE LOWER(username)=LOWER(?) AND LOWER(email)=LOWER(?)
+       LIMIT 1`,
+      [username, email],
+    );
+
+    if (account) {
+      const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+      passwordResetCodes.delete(account.id);
+      let emailSent = true;
+      try {
+        await mailClient.sendAsync({
+          from: process.env.SMTP_FROM,
+          to: account.email,
+          subject: "Your AutoSupply password reset code",
+          text: `Your password reset code is ${code}. It expires in 10 minutes. If you did not request a password reset, ignore this email.`,
+        });
+      } catch (error) {
+        emailSent = false;
+        console.error("Password recovery email delivery failed:", error);
+      } finally {
+        mailClient.smtp.close();
+      }
+
+      if (emailSent) {
+        passwordResetCodes.set(account.id, {
+          codeHash: hashPasswordResetCode(code, secret),
+          expiresAt: Date.now() + PASSWORD_RESET_CODE_TTL_MS,
+          attempts: 0,
+        });
+      }
+    } else {
+      mailClient.smtp.close();
+    }
+
+    res.json({
+      message:
+        "If the username and recovery email match an account, a verification code has been sent.",
+    });
+  }),
+);
+
+app.post(
+  "/api/password-reset/verify-code",
+  ah(async (req, res) => {
+    const username = String(req.body?.username || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const code = String(req.body?.code || "").trim();
+    if (!username || !email || !/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: "Enter your username, email, and 6-digit code." });
+    }
+
+    if (
+      isPasswordResetRateLimited(
+        req,
+        "verify",
+        10,
+        PASSWORD_RESET_CODE_WINDOW_MS,
+      )
+    ) {
+      return res.status(429).json({
+        error: "Too many code attempts. Request a new code and try again.",
+      });
+    }
+
+    const secret = getPasswordResetSecret();
+    if (!secret) {
+      return res.status(503).json({
+        error: "Password recovery is not configured. Contact your administrator.",
+      });
+    }
+
+    const [[account]] = await pool.query(
+      `SELECT id FROM users
+       WHERE LOWER(username)=LOWER(?) AND LOWER(email)=LOWER(?)
+       LIMIT 1`,
+      [username, email],
+    );
+    const resetCode = account ? passwordResetCodes.get(account.id) : null;
+    if (
+      !resetCode ||
+      resetCode.expiresAt <= Date.now() ||
+      resetCode.attempts >= 5
+    ) {
+      if (account) passwordResetCodes.delete(account.id);
+      return res.status(400).json({
+        error: "The code is invalid or expired. Request a new code.",
+      });
+    }
+
+    resetCode.attempts += 1;
+    const submittedHash = hashPasswordResetCode(code, secret);
+    if (!crypto.timingSafeEqual(resetCode.codeHash, submittedHash)) {
+      if (resetCode.attempts >= 5) passwordResetCodes.delete(account.id);
+      return res.status(400).json({
+        error: "The code is invalid or expired. Request a new code.",
+      });
+    }
+    passwordResetCodes.delete(account.id);
+
+    const resetToken = jwt.sign(
+      { purpose: "password_reset" },
+      secret,
+      {
+        algorithm: "HS256",
+        subject: String(account.id),
+        issuer: "autosupply",
+        audience: "autosupply-password-reset",
+        expiresIn: PASSWORD_RESET_TOKEN_TTL_SECONDS,
+        jwtid: crypto.randomUUID(),
+      },
+    );
+    res.json({ resetToken, expiresIn: PASSWORD_RESET_TOKEN_TTL_SECONDS });
+  }),
+);
+
+app.post(
+  "/api/password-reset/reset",
+  ah(async (req, res) => {
+    const authorization = String(req.headers.authorization || "");
+    const resetToken = authorization.match(/^Bearer\s+(\S+)$/i)?.[1] || "";
+    const newPassword = String(req.body?.newPassword || "").trim();
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ error: "Reset token and new password are required." });
+    }
+    if (newPassword.length < 4) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 4 characters long." });
+    }
+
+    const secret = getPasswordResetSecret();
+    if (!secret) {
+      return res.status(503).json({
+        error: "Password recovery is not configured. Contact your administrator.",
+      });
+    }
+
+    let claims;
+    try {
+      claims = jwt.verify(resetToken, secret, {
+        algorithms: ["HS256"],
+        issuer: "autosupply",
+        audience: "autosupply-password-reset",
+      });
+    } catch {
+      return res.status(401).json({
+        error: "The reset token is invalid or expired. Verify your code again.",
+      });
+    }
+    if (
+      typeof claims !== "object" ||
+      claims.purpose !== "password_reset" ||
+      !/^\d+$/.test(claims.sub || "") ||
+      !claims.jti ||
+      !claims.exp
+    ) {
+      return res.status(401).json({ error: "Invalid password reset token." });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(
+        "DELETE FROM password_reset_tokens WHERE expires_at <= NOW()",
+      );
+      try {
+        await connection.query(
+          "INSERT INTO password_reset_tokens (jwt_id, expires_at) VALUES (?, ?)",
+          [claims.jti, new Date(claims.exp * 1000)],
+        );
+      } catch (error) {
+        if (error?.code === "ER_DUP_ENTRY") {
+          await connection.rollback();
+          return res.status(401).json({
+            error: "This reset token has already been used. Verify your code again.",
+          });
+        }
+        throw error;
+      }
+
+      const [result] = await connection.query(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        [hashPassword(newPassword), Number(claims.sub)],
+      );
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "User account no longer exists." });
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    passwordResetCodes.delete(Number(claims.sub));
+    for (const [sessionToken, session] of userSessions) {
+      if (session.userId === Number(claims.sub)) userSessions.delete(sessionToken);
+    }
+    res.json({ ok: true });
   }),
 );
 

@@ -137,10 +137,42 @@ body {
   font-family: var(--f-mono);
 }
 
+.login-success {
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(22, 101, 52, 0.25);
+  border-radius: 10px;
+  background: rgba(22, 101, 52, 0.06);
+  color: #166534;
+  font-size: 0.75rem;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+}
+
+.recovery-help {
+  margin: 0;
+  color: rgba(31, 36, 48, 0.75);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.forgot-password-link {
+  align-self: flex-end;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #0d3a60;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.forgot-password-link:hover {
+  text-decoration: underline;
 }
 
 .input-block {

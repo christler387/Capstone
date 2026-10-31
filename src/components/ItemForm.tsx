@@ -123,7 +123,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         (existingItem.barcode ?? "").trim() === barcode,
     );
     if (duplicateBarcode) {
-      return false;
+       return false;
     }
 
     setFormData((prev) => ({

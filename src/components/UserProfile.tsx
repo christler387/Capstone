@@ -24,6 +24,7 @@ interface UserProfileProps {
     username: string,
     password: string,
     role: UserRole,
+    email?: string,
   ) => Promise<void>;
 }
 
@@ -31,6 +32,7 @@ interface ManagedUser {
   id: number;
   username: string;
   role: UserRole;
+  email: string | null;
 }
 
 async function requestUserApi<T>(
@@ -75,6 +77,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [isManageUsersModalOpen, setIsManageUsersModalOpen] = useState(false);
+  const [isRecoveryEmailModalOpen, setIsRecoveryEmailModalOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -83,6 +86,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [createUserName, setCreateUserName] = useState("");
   const [createUserPassword, setCreateUserPassword] = useState("");
   const [createUserRole, setCreateUserRole] = useState<UserRole>("staff");
+  const [createUserEmail, setCreateUserEmail] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryEmailPassword, setRecoveryEmailPassword] = useState("");
+  const [recoveryEmailFeedback, setRecoveryEmailFeedback] = useState<{
+    type: "error" | "success";
+    message: string;
+  } | null>(null);
   const [passwordFeedback, setPasswordFeedback] = useState<{
     type: "error" | "success";
     message: string;
@@ -103,6 +113,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [editingUsername, setEditingUsername] = useState("");
   const [editingRole, setEditingRole] = useState<UserRole>("staff");
   const [editingPassword, setEditingPassword] = useState("");
+  const [editingUserEmail, setEditingUserEmail] = useState("");
 
   const displayName =
     role === "staff" && user.toLowerCase().includes("admin")
@@ -188,7 +199,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setCreateUserName("");
     setCreateUserPassword("");
     setCreateUserRole("staff");
+    setCreateUserEmail("");
     setCreateUserFeedback(null);
+  };
+
+  const clearRecoveryEmailForm = () => {
+    setRecoveryEmail("");
+    setRecoveryEmailPassword("");
+    setRecoveryEmailFeedback(null);
   };
 
   const loadManagedUsers = async () => {
@@ -217,6 +235,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           username: editingUsername,
           role: editingRole,
           password: editingPassword,
+          email: editingUserEmail,
         }),
       });
       setEditingUserId(null);
@@ -365,6 +384,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
     const username = createUserName.trim();
     const password = createUserPassword.trim();
+    const email = createUserEmail.trim();
 
     if (!username || !password) {
       setCreateUserFeedback({
@@ -395,9 +415,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         username,
         password,
         createUserRole,
-        username,
-        undefined,
-        undefined,
+        email,
       );
       setCreateUserFeedback({
         type: "success",
@@ -409,6 +427,33 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       const message =
         error instanceof Error ? error.message : "Unable to create user.";
       setCreateUserFeedback({ type: "error", message: message });
+    }
+  };
+
+  const handleRecoveryEmailSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setRecoveryEmailFeedback(null);
+    try {
+      await requestUserApi("/users/recovery-email", {
+        method: "PUT",
+        body: JSON.stringify({
+          email: recoveryEmail.trim(),
+          currentPassword: recoveryEmailPassword,
+        }),
+      });
+      setRecoveryEmailFeedback({
+        type: "success",
+        message: "Recovery email updated successfully.",
+      });
+      setRecoveryEmailPassword("");
+    } catch (error) {
+      setRecoveryEmailFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to update recovery email.",
+      });
     }
   };
 
@@ -491,6 +536,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 className="flex-col-gap"
                 style={{ gap: "0.5rem", marginTop: "auto" }}
               >
+                <button
+                  className="olive-button btn-outline w-full"
+                  onClick={() => {
+                    clearRecoveryEmailForm();
+                    setIsRecoveryEmailModalOpen(true);
+                  }}
+                >
+                  <i className="bx bx-envelope" style={{ marginRight: "6px" }}></i>{" "}
+                  Set Recovery Email
+                </button>
                 {role === "admin" && (
                   <>
                     <div
@@ -1088,6 +1143,18 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 <option value="admin">Admin</option>
               </select>
             </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="createUserEmail">Recovery Email (optional)</label>
+              <input
+                id="createUserEmail"
+                className="form-input"
+                type="email"
+                autoComplete="email"
+                value={createUserEmail}
+                onChange={(e) => setCreateUserEmail(e.target.value)}
+                placeholder="name@example.com"
+              />
+            </div>
 
             {createUserFeedback && (
               <p
@@ -1172,6 +1239,17 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       placeholder="New password (optional)"
                       aria-label="New password"
                     />
+                    <input
+                      className="form-input"
+                      type="email"
+                      autoComplete="email"
+                      value={editingUserEmail}
+                      onChange={(event) =>
+                        setEditingUserEmail(event.target.value)
+                      }
+                      placeholder="Recovery email (optional)"
+                      aria-label="Recovery email"
+                    />
                     <div className="flex-row-gap">
                       <button
                         className="olive-button"
@@ -1201,6 +1279,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                           setEditingUsername(account.username);
                           setEditingRole(account.role);
                           setEditingPassword("");
+                          setEditingUserEmail(account.email || "");
                         }}
                       >
                         Edit
@@ -1223,6 +1302,81 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               <p className="label-micro text-accent">{managedUsersFeedback}</p>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className={`modal-overlay ${isRecoveryEmailModalOpen ? "active" : ""}`}>
+        <div className="modal-content mini">
+          <div className="modal-header">
+            <span className="label-micro">Recovery Email</span>
+            <button
+              className="close-modal"
+              onClick={() => {
+                clearRecoveryEmailForm();
+                setIsRecoveryEmailModalOpen(false);
+              }}
+            >
+              <i className="bx bx-x"></i>
+            </button>
+          </div>
+          <form
+            onSubmit={handleRecoveryEmailSubmit}
+            className="modal-body"
+            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          >
+            <p className="label-micro" style={{ margin: 0, textTransform: "none" }}>
+              This email address will receive password reset codes.
+            </p>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="accountRecoveryEmail">Recovery Email</label>
+              <input
+                id="accountRecoveryEmail"
+                className="form-input"
+                type="email"
+                autoComplete="email"
+                value={recoveryEmail}
+                onChange={(e) => setRecoveryEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="recoveryEmailCurrentPassword">Current Password</label>
+              <input
+                id="recoveryEmailCurrentPassword"
+                className="form-input"
+                type="password"
+                autoComplete="current-password"
+                value={recoveryEmailPassword}
+                onChange={(e) => setRecoveryEmailPassword(e.target.value)}
+                required
+              />
+            </div>
+            {recoveryEmailFeedback && (
+              <p
+                className={`label-micro ${recoveryEmailFeedback.type === "error" ? "text-accent" : "text-success"}`}
+                style={{ margin: 0 }}
+                role="status"
+              >
+                {recoveryEmailFeedback.message}
+              </p>
+            )}
+            <div className="flex-row-gap" style={{ width: "100%" }}>
+              <button
+                type="button"
+                className="olive-button btn-outline"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  clearRecoveryEmailForm();
+                  setIsRecoveryEmailModalOpen(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="olive-button" style={{ flex: 1 }}>
+                Save Email
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 

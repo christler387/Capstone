@@ -143,10 +143,10 @@ const App: React.FC = () => {
     setUser(updatedUser.username);
   };
 
-  const handleCreateUser = async (username: string, password: string, role: UserRole) => {
+  const handleCreateUser = async (username: string, password: string, role: UserRole, email?: string) => {
     await requestJson<{ ok: boolean; username: string }>('/users', {
       method: 'POST',
-      body: JSON.stringify({ username, password, role }),
+      body: JSON.stringify({ username, password, role, email }),
     });
   };
   
