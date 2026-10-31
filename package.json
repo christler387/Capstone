@@ -7,7 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "vite --configLoader runner",
+    "dev": "concurrently -k -n API,WEB \"node server.js\" \"vite --configLoader runner\"",
     "build": "vite build --configLoader runner",
     "server": "node server.js",
     "start": "node server.js",
