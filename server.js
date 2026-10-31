@@ -10,7 +10,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, ".env") });
+const { parsed: projectEnv } = dotenv.config({
+  path: path.join(__dirname, ".env"),
+});
+for (const name of [
+  "JWT_RESET_SECRET",
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_SECURE",
+  "SMTP_FROM",
+  "SMTP_USER",
+  "SMTP_PASSWORD",
+]) {
+  const shouldUseProjectValue =
+    !process.env[name]?.trim() ||
+    (name === "JWT_RESET_SECRET" &&
+      Buffer.byteLength(process.env[name]) < 32);
+  if (shouldUseProjectValue && projectEnv?.[name]?.trim()) {
+    process.env[name] = projectEnv[name];
+  }
+}
 const uploadsDirectory =
   process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, "uploads");
 
@@ -2507,6 +2526,18 @@ app.use((error, _req, res, _next) => {
 // run the entry file as `node server.js`, so the server listens first and the
 // database setup runs in the background.
 export function startServer() {
+  if (!getPasswordResetSecret()) {
+    console.error(
+      "Password recovery is disabled: JWT_RESET_SECRET is missing or shorter than 32 bytes.",
+    );
+  } else if (!process.env.SMTP_HOST || !process.env.SMTP_FROM) {
+    console.error(
+      "Password recovery is disabled: SMTP_HOST and SMTP_FROM must be configured.",
+    );
+  } else {
+    console.log("Password recovery configuration loaded.");
+  }
+
   app.listen(port, () =>
     console.log(`API listening on http://localhost:${port}`),
   );
