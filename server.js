@@ -1,4 +1,4 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import { SMTPClient } from "emailjs";
@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
 const uploadsDirectory =
   process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, "uploads");
 
