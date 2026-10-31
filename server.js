@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { SMTPClient } from "emailjs";
@@ -10,7 +10,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, ".env") });
 const uploadsDirectory =
   process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, "uploads");
 
@@ -1173,6 +1172,7 @@ app.post(
     if (account) {
       const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
       passwordResetCodes.delete(account.id);
+      let emailSent = true;
       try {
         await mailClient.sendAsync({
           from: process.env.SMTP_FROM,
@@ -1181,19 +1181,19 @@ app.post(
           text: `Your password reset code is ${code}. It expires in 10 minutes. If you did not request a password reset, ignore this email.`,
         });
       } catch (error) {
+        emailSent = false;
         console.error("Password recovery email delivery failed:", error);
+      } finally {
         mailClient.smtp.close();
-        return res.status(502).json({
-          error: "Unable to send a verification code. Check the email server settings and try again.",
+      }
+
+      if (emailSent) {
+        passwordResetCodes.set(account.id, {
+          codeHash: hashPasswordResetCode(code, secret),
+          expiresAt: Date.now() + PASSWORD_RESET_CODE_TTL_MS,
+          attempts: 0,
         });
       }
-      mailClient.smtp.close();
-
-      passwordResetCodes.set(account.id, {
-        codeHash: hashPasswordResetCode(code, secret),
-        expiresAt: Date.now() + PASSWORD_RESET_CODE_TTL_MS,
-        attempts: 0,
-      });
     } else {
       mailClient.smtp.close();
     }
