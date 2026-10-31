@@ -3600,3 +3600,233 @@ select.aisle-editor-input {
   padding: 12px 10px 18px;
   box-sizing: border-box;
 }
+
+/* ==========================================================================
+   Responsive layer: phones, tablets and desktops
+   Breakpoints: <=520px phone, <=640px small phone/large phone, <=767px phone,
+   768-1023px tablet, >=1024px desktop. Desktop layout is unchanged.
+   ========================================================================== */
+
+/* Base sizing */
+@media (max-width: 520px) {
+  :root { font-size: 100%; }
+}
+
+@media (max-width: 1023px) {
+  :root { --gap: 1.25rem; }
+}
+
+@media (max-width: 640px) {
+  :root { --gap: 1rem; }
+}
+
+/* Text fields: 16px stops phones from zooming in when a field is tapped */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* Header and navigation: the menu row scrolls sideways on phones instead of wrapping into many lines */
+@media (max-width: 767px) {
+  .title-main {
+    font-size: 1.6rem;
+  }
+
+  header {
+    min-height: 0;
+    gap: 0.75rem;
+  }
+
+  .top-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .top-nav > * {
+    flex: 0 0 auto;
+  }
+}
+
+/* Dashboards and stat cards */
+@media (max-width: 767px) {
+  .stats-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-box {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stat-box:nth-child(2n) {
+    border-right: none;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Two- and three-column form rows stack on small screens, including rows with inline column sizes */
+@media (max-width: 640px) {
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Tables: the table scrolls sideways inside its own box, the page does not */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023px) {
+  .table-container > * {
+    min-width: 760px;
+  }
+}
+
+/* Modals fit the screen */
+.modal-content {
+  max-width: min(500px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+}
+
+.modal-content.wide {
+  max-width: min(900px, calc(100vw - 24px));
+}
+
+.clean-modal .modal-content {
+  max-width: calc(100vw - 24px);
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-footer > div,
+  .modal-footer .flex-row-gap {
+    flex-wrap: wrap;
+  }
+
+  .modal-footer .olive-button {
+    flex: 1 1 100%;
+  }
+}
+
+/* Warehouse map: toolbar, editor and frames fit small screens */
+@media (max-width: 767px) {
+  .floor-toolbar {
+    gap: 0.4rem;
+  }
+
+  .floor-toolbar .floor-tab-add {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .layout-edit-bar {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .aisle-editor {
+    padding: 0.9rem;
+  }
+
+  .aisle-editor-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aisle-editor-header .layout-edit-bar {
+    width: 100%;
+  }
+
+  .aisle-editor-row {
+    flex-wrap: wrap;
+  }
+
+  .aisle-editor-row > select,
+  .aisle-editor-row > input[type='text'] {
+    flex: 1 1 100%;
+  }
+
+  .move-items-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Touch screens: larger tap targets */
+@media (pointer: coarse) {
+  button,
+  .olive-button,
+  .nav-btn,
+  .floor-tab-select,
+  .floor-tab-add,
+  .aisle-edit-btn,
+  .aisle-stepper button,
+  .aisle-nudge button,
+  .rack-count-stepper button,
+  .analytics-scope-toggle {
+    min-height: 44px;
+  }
+
+  .close-modal,
+  .close-preview-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .aisle-drag-handle {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Login: the artwork moves above the form on small screens */
+@media (max-width: 900px) {
+  .login-shell {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem 1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .login-art {
+    display: none;
+  }
+
+  .login-panel {
+    width: 100%;
+  }
+}
+
+/* Images never run past their container */
+img {
+  max-width: 100%;
+  height: auto;
+}
