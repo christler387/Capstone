@@ -761,6 +761,26 @@ app.post(
 );
 
 // Fixed-path user routes must be declared before "/api/users/:id".
+app.get(
+  "/api/users/recovery-email",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) {
+      return res.status(401).json({ error: "Sign in to view your recovery email." });
+    }
+
+    const [[account]] = await pool.query(
+      "SELECT email FROM users WHERE id=? LIMIT 1",
+      [actor.id],
+    );
+    if (!account) {
+      return res.status(404).json({ error: "User account not found." });
+    }
+
+    res.json({ email: account.email });
+  }),
+);
+
 app.put(
   "/api/users/recovery-email",
   ah(async (req, res) => {
@@ -793,7 +813,7 @@ app.put(
 
     await pool.query("UPDATE users SET email=? WHERE id=?", [email, actor.id]);
     passwordResetCodes.delete(actor.id);
-    res.json({ ok: true });
+    res.json({ ok: true, email });
   }),
 );
 

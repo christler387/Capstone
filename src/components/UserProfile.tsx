@@ -209,6 +209,25 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setRecoveryEmailFeedback(null);
   };
 
+  const openRecoveryEmailForm = async () => {
+    clearRecoveryEmailForm();
+    setIsRecoveryEmailModalOpen(true);
+    try {
+      const { email } = await requestUserApi<{ email: string | null }>(
+        "/users/recovery-email",
+      );
+      setRecoveryEmail(email || "");
+    } catch (error) {
+      setRecoveryEmailFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to load recovery email.",
+      });
+    }
+  };
+
   const loadManagedUsers = async () => {
     try {
       const users = await requestUserApi<ManagedUser[]>("/users");
@@ -434,13 +453,17 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     event.preventDefault();
     setRecoveryEmailFeedback(null);
     try {
-      await requestUserApi("/users/recovery-email", {
-        method: "PUT",
-        body: JSON.stringify({
-          email: recoveryEmail.trim(),
-          currentPassword: recoveryEmailPassword,
-        }),
-      });
+      const result = await requestUserApi<{ ok: boolean; email: string }>(
+        "/users/recovery-email",
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            email: recoveryEmail.trim(),
+            currentPassword: recoveryEmailPassword,
+          }),
+        },
+      );
+      setRecoveryEmail(result.email);
       setRecoveryEmailFeedback({
         type: "success",
         message: "Recovery email updated successfully.",
@@ -538,10 +561,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               >
                 <button
                   className="olive-button btn-outline w-full"
-                  onClick={() => {
-                    clearRecoveryEmailForm();
-                    setIsRecoveryEmailModalOpen(true);
-                  }}
+                  onClick={openRecoveryEmailForm}
                 >
                   <i className="bx bx-envelope" style={{ marginRight: "6px" }}></i>{" "}
                   Set Recovery Email
