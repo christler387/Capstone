@@ -2002,6 +2002,131 @@ footer p {
   font-size: 13px;
 }
 
+/* Audit row undo: button and confirm panel */
+.audit-undo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 4px 10px;
+  border: 1px solid rgba(175, 4, 4, 0.2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--f-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.audit-undo-btn:hover {
+  border-color: rgba(175, 4, 4, 0.4);
+  background: rgba(175, 4, 4, 0.06);
+}
+
+.audit-undo-btn:focus-visible,
+.audit-undo-cancel:focus-visible,
+.audit-undo-confirm-btn:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+.audit-undo-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(32, 48, 71, 0.1);
+}
+
+.audit-undo-amount {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.audit-undo-label {
+  font-family: var(--f-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(32, 48, 71, 0.7);
+}
+
+.audit-undo-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.audit-undo-input {
+  width: 64px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  text-align: center;
+}
+
+.audit-undo-input:focus {
+  outline: none;
+  border-color: var(--button);
+  box-shadow: 0 0 0 3px rgba(56, 103, 168, 0.15);
+}
+
+.audit-undo-max {
+  font-family: var(--f-sans);
+  font-size: 11px;
+  color: rgba(32, 48, 71, 0.55);
+}
+
+.audit-undo-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.audit-undo-cancel,
+.audit-undo-confirm-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: var(--f-sans);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.audit-undo-cancel {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.audit-undo-cancel:hover {
+  background: var(--line-soft);
+}
+
+.audit-undo-confirm-btn {
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.audit-undo-confirm-btn:hover:not(:disabled) {
+  background: #8f0303;
+}
+
+.audit-undo-confirm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .account-management-intro {
   margin: 0 0 0.25rem;
   font-family: var(--f-sans);

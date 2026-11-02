@@ -725,84 +725,55 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                             ((isMovement && onUndoMovement) ||
                               (!isMovement && onUndoInventoryAudit)) &&
                             (isConfirmingThis ? (
-                              isMovement ? (
-                                <div
-                                  className="flex-row-center"
-                                  style={{ gap: "4px" }}
-                                >
-                                  <input
-                                    type="number"
-                                    className="undo-quantity-input"
-                                    min="1"
-                                    max={m.qty}
-                                    value={undoQuantity}
-                                    onChange={(e) =>
-                                      setUndoQuantity(e.target.value)
+                              <div
+                                className="audit-undo-confirm"
+                                role="group"
+                                aria-label="Confirm undo"
+                              >
+                                {isMovement ? (
+                                  <label className="audit-undo-amount">
+                                    <span className="audit-undo-label">Undo amount</span>
+                                    <span className="audit-undo-input-wrap">
+                                      <input
+                                        type="number"
+                                        className="audit-undo-input"
+                                        min="1"
+                                        max={m.qty}
+                                        value={undoQuantity}
+                                        onChange={(e) => setUndoQuantity(e.target.value)}
+                                        aria-label={`Amount to undo for ${"itemName" in m ? m.itemName : item?.name || m.itemId}`}
+                                      />
+                                      <span className="audit-undo-max">of {m.qty}</span>
+                                    </span>
+                                  </label>
+                                ) : (
+                                  <span className="audit-undo-label">Undo this entry?</span>
+                                )}
+                                <div className="audit-undo-actions">
+                                  <button
+                                    type="button"
+                                    className="audit-undo-cancel"
+                                    onClick={() => setConfirmUndoId(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="audit-undo-confirm-btn"
+                                    disabled={isMovement && !isUndoQuantityValid}
+                                    onClick={() =>
+                                      isMovement ? handleUndo(m) : void handleAuditUndo(m.id)
                                     }
-                                    aria-label={`Amount to undo for ${"itemName" in m ? m.itemName : item?.name || m.itemId}`}
-                                    style={{
-                                      width: "48px",
-                                      padding: "2px 4px",
-                                      fontSize: "10px",
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => handleUndo(m)}
-                                    disabled={!isUndoQuantityValid}
-                                    title="Confirm Undo"
-                                    className="olive-button btn-danger label-micro"
-                                    style={{
-                                      padding: "2px 6px",
-                                      fontSize: "9px",
-                                      textTransform: "none",
-                                    }}
                                   >
-                                    Confirm
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmUndoId(null)}
-                                    className="olive-button btn-outline label-micro undo-cancel-button"
-                                    style={{
-                                      padding: "2px 6px",
-                                      fontSize: "9px",
-                                      textTransform: "none",
-                                    }}
-                                  >
-                                    Cancel
+                                    Undo
                                   </button>
                                 </div>
-                              ) : (
-                                <div
-                                  className="flex-row-center"
-                                  style={{ gap: "4px" }}
-                                >
-                                  <button
-                                    onClick={() => void handleAuditUndo(m.id)}
-                                    title="Confirm Undo"
-                                    className="olive-button btn-danger label-micro"
-                                    style={{
-                                      padding: "2px 6px",
-                                      fontSize: "9px",
-                                      textTransform: "none",
-                                    }}
-                                  >
-                                    Confirm
-                                  </button>
-                                  <button
-                                    onClick={() => setConfirmUndoId(null)}
-                                    className="olive-button btn-outline label-micro undo-cancel-button"
-                                    style={{
-                                      padding: "2px 6px",
-                                      fontSize: "9px",
-                                      textTransform: "none",
-                                    }}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              )
+                              </div>
                             ) : (
                               <button
+                                type="button"
+                                className="audit-undo-btn"
+                                title="Undo transaction"
                                 onClick={() => {
                                   if (isMovement) {
                                     setConfirmUndoId(m.id);
@@ -811,46 +782,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                     setConfirmUndoId(m.id);
                                   }
                                 }}
-                                title="Undo Transaction"
-                                style={{
-                                  background: "rgba(239, 68, 68, 0.05)",
-                                  border: "1px solid rgba(239, 68, 68, 0.15)",
-                                  borderRadius: "3px",
-                                  padding: "4px 8px",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "3px",
-                                  color: "var(--accent)",
-                                  transition: "all 0.15s ease",
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background =
-                                    "rgba(239, 68, 68, 0.12)";
-                                  e.currentTarget.style.borderColor =
-                                    "rgba(239, 68, 68, 0.3)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background =
-                                    "rgba(239, 68, 68, 0.05)";
-                                  e.currentTarget.style.borderColor =
-                                    "rgba(239, 68, 68, 0.15)";
-                                }}
                               >
-                                <i
-                                  className="bx bx-undo"
-                                  style={{ fontSize: "12px" }}
-                                ></i>
-                                <span
-                                  className="label-micro"
-                                  style={{
-                                    fontSize: "9px",
-                                    textTransform: "none",
-                                    color: "inherit",
-                                  }}
-                                >
-                                  Undo
-                                </span>
+                                <i className="bx bx-undo" aria-hidden="true"></i>
+                                Undo
                               </button>
                             ))}
                         </div>
