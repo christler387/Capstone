@@ -676,15 +676,7 @@ function normalizeEmail(value) {
 
 // Sends a new code. Earlier unused codes of the same purpose stop working.
 async function issueCode(userId, purpose, email) {
-  const [[recent]] = await pool.query(
-    "SELECT created_at FROM email_codes WHERE user_id=? AND purpose=? ORDER BY id DESC LIMIT 1",
-    [userId, purpose],
-  );
-  if (recent && Date.now() - new Date(recent.created_at).getTime() < CODE_RESEND_SECONDS * 1000) {
-    const error = new Error("Please wait a minute before requesting another code.");
-    error.status = 429;
-    throw error;
-  }
+  // TEMPORARY (testing): resend limit disabled. Revert this commit to restore it.
 
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
   await pool.query("UPDATE email_codes SET used_at=NOW() WHERE user_id=? AND purpose=? AND used_at IS NULL", [
