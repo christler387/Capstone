@@ -2373,6 +2373,10 @@ app.get(/^\/(?!api\/).*/, (_req, res) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
+  // Malformed requests (for example invalid JSON) are client errors, not server errors.
+  if (error?.status >= 400 && error.status < 500) {
+    return res.status(error.status).json({ error: "The request could not be read." });
+  }
   if (error?.code === "ER_DUP_ENTRY") {
     return res
       .status(409)
