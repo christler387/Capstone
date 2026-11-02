@@ -4007,3 +4007,158 @@ img {
   font-size: 12px;
   color: rgba(32, 48, 71, 0.62);
 }
+
+/* Password reset: progress steps, password checks and success state */
+.recovery-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  font-family: var(--f-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(32, 48, 71, 0.55);
+}
+
+.recovery-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.recovery-step + .recovery-step::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  margin-right: 0.5rem;
+  background: var(--line);
+}
+
+.recovery-step-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #ffffff;
+  font-size: 11px;
+}
+
+.recovery-step.is-active {
+  color: var(--ink);
+}
+
+.recovery-step.is-active .recovery-step-dot {
+  border-color: var(--button);
+  background: var(--button);
+  color: #ffffff;
+}
+
+.recovery-step.is-done {
+  color: #137a6b;
+}
+
+.recovery-step.is-done .recovery-step-dot {
+  border-color: var(--success);
+  background: rgba(31, 157, 139, 0.14);
+  color: #137a6b;
+}
+
+.recovery-password-wrap {
+  position: relative;
+}
+
+.recovery-password-wrap .form-input {
+  padding-right: 2.75rem;
+}
+
+.recovery-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  transform: translateY(-50%);
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: rgba(32, 48, 71, 0.6);
+  cursor: pointer;
+}
+
+.recovery-toggle:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.recovery-toggle:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+.recovery-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-family: var(--f-sans);
+  font-size: 12px;
+  color: rgba(32, 48, 71, 0.62);
+}
+
+.recovery-rules li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.recovery-rules li.is-met {
+  color: #137a6b;
+}
+
+.recovery-rules i {
+  font-size: 14px;
+}
+
+.recovery-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem 0.5rem;
+  text-align: center;
+}
+
+.recovery-success-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 0.25rem;
+  border-radius: 50%;
+  background: rgba(31, 157, 139, 0.14);
+  color: #137a6b;
+  font-size: 28px;
+}
+
+.recovery-success h3 {
+  margin: 0;
+  font-family: var(--f-sans);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.recovery-success p {
+  margin: 0;
+  font-family: var(--f-sans);
+  font-size: 13px;
+  color: rgba(32, 48, 71, 0.72);
+}

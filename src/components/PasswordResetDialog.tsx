@@ -12,20 +12,31 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+const STEP_LABELS = ['Email', 'Code', 'Done'];
+const MIN_PASSWORD_LENGTH = 8;
+
+type Step = 'email' | 'reset' | 'done';
+
+const stepNumber = (step: Step) => (step === 'email' ? 0 : step === 'reset' ? 1 : 2);
+
 interface PasswordResetDialogProps {
   onClose: () => void;
 }
 
 // Forgot password: the user asks for a code to their verified recovery email, then sets a new password.
 export const PasswordResetDialog: React.FC<PasswordResetDialogProps> = ({ onClose }) => {
-  const [step, setStep] = useState<'email' | 'reset' | 'done'>('email');
+  const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const longEnough = newPassword.length >= MIN_PASSWORD_LENGTH;
+  const passwordsMatch = confirmPassword.length > 0 && confirmPassword === newPassword;
 
   const requestCode = async () => {
     setError(null);
@@ -35,6 +46,7 @@ export const PasswordResetDialog: React.FC<PasswordResetDialogProps> = ({ onClos
     try {
       const result = await postJson<{ message: string }>('/password/forgot', { email: email.trim() });
       setMessage(result.message);
+      setCode('');
       setStep('reset');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Could not send the code.');
@@ -46,11 +58,13 @@ export const PasswordResetDialog: React.FC<PasswordResetDialogProps> = ({ onClos
   const resetPassword = async () => {
     setError(null);
     if (!/^\d{6}$/.test(code.trim())) return setError('Enter the 6-digit code from the email.');
-    if (newPassword.length < 8) return setError('The new password must be at least 8 characters long.');
-    if (newPassword !== confirmPassword) return setError('The two passwords do not match.');
+    if (!longEnough) return setError(`The new password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+    if (!passwordsMatch) return setError('The two passwords do not match.');
     setBusy(true);
     try {
       await postJson('/password/reset', { email: email.trim(), code: code.trim(), newPassword });
+      setNewPassword('');
+      setConfirmPassword('');
       setStep('done');
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Could not reset the password.');
@@ -59,31 +73,53 @@ export const PasswordResetDialog: React.FC<PasswordResetDialogProps> = ({ onClos
     }
   };
 
+  const backToEmail = () => {
+    setError(null);
+    setMessage(null);
+    setStep('email');
+  };
+
+  const footer = (
+    <div className="flex-row-gap">
+      {step !== 'done' && (
+        <button className="olive-button btn-outline" onClick={onClose}>Cancel</button>
+      )}
+      {step === 'done' && (
+        <button className="olive-button" onClick={onClose}>Back to sign in</button>
+      )}
+      {step === 'email' && (
+        <button className="olive-button" onClick={requestCode} disabled={busy}>
+          {busy ? 'Sending…' : 'Send Code'}
+        </button>
+      )}
+      {step === 'reset' && (
+        <button className="olive-button" onClick={resetPassword} disabled={busy}>
+          {busy ? 'Saving…' : 'Set New Password'}
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <Modal
-      isOpen={true}
-      onClose={onClose}
-      title="Reset Password"
-      type="mini"
-      footer={
-        <div className="flex-row-gap">
-          <button className="olive-button btn-outline" onClick={onClose}>
-            {step === 'done' ? 'Back to sign in' : 'Cancel'}
-          </button>
-          {step === 'email' && (
-            <button className="olive-button" onClick={requestCode} disabled={busy}>
-              {busy ? 'Sending…' : 'Send Code'}
-            </button>
-          )}
-          {step === 'reset' && (
-            <button className="olive-button" onClick={resetPassword} disabled={busy}>
-              {busy ? 'Saving…' : 'Set New Password'}
-            </button>
-          )}
-        </div>
-      }
-    >
+    <Modal isOpen={true} onClose={onClose} title="Reset Password" type="mini" footer={footer}>
       <div className="recovery-dialog">
+        {step !== 'done' && (
+          <ol className="recovery-steps" aria-label="Progress">
+            {STEP_LABELS.map((label, index) => {
+              const current = stepNumber(step);
+              const state = index < current ? 'is-done' : index === current ? 'is-active' : '';
+              return (
+                <li key={label} className={`recovery-step ${state}`} aria-current={index === current ? 'step' : undefined}>
+                  <span className="recovery-step-dot">
+                    {index < current ? <i className="bx bx-check" aria-hidden="true"></i> : index + 1}
+                  </span>
+                  {label}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
         {step === 'email' && (
           <>
             <p className="recovery-dialog-intro">
@@ -97,6 +133,7 @@ export const PasswordResetDialog: React.FC<PasswordResetDialogProps> = ({ onClos
                 className="form-input"
                 value={email}
                 autoComplete="email"
+                autoFocus
                 onChange={(event) => setEmail(event.target.value)}
               />
             </div>
@@ -116,41 +153,69 @@ export const PasswordResetDialog: React.FC<PasswordResetDialogProps> = ({ onClos
                 className="form-input recovery-code-input"
                 value={code}
                 maxLength={6}
+                autoFocus
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
               />
             </div>
             <div className="form-group">
               <label className="label-micro" htmlFor="reset-new-password">New password</label>
-              <input
-                id="reset-new-password"
-                type="password"
-                className="form-input"
-                value={newPassword}
-                autoComplete="new-password"
-                onChange={(event) => setNewPassword(event.target.value)}
-              />
+              <div className="recovery-password-wrap">
+                <input
+                  id="reset-new-password"
+                  type={showPassword ? 'text' : 'password'}
+                  className="form-input"
+                  value={newPassword}
+                  autoComplete="new-password"
+                  onChange={(event) => setNewPassword(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="recovery-toggle"
+                  onClick={() => setShowPassword((shown) => !shown)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <i className={`bx ${showPassword ? 'bx-hide' : 'bx-show'}`} aria-hidden="true"></i>
+                </button>
+              </div>
             </div>
             <div className="form-group">
               <label className="label-micro" htmlFor="reset-confirm-password">Confirm new password</label>
               <input
                 id="reset-confirm-password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 className="form-input"
                 value={confirmPassword}
                 autoComplete="new-password"
                 onChange={(event) => setConfirmPassword(event.target.value)}
               />
             </div>
-            <button type="button" className="recovery-resend" onClick={() => { setStep('email'); setError(null); }}>
-              Send a new code
-            </button>
+            <ul className="recovery-rules">
+              <li className={longEnough ? 'is-met' : ''}>
+                <i className={`bx ${longEnough ? 'bx-check-circle' : 'bx-circle'}`} aria-hidden="true"></i>
+                At least {MIN_PASSWORD_LENGTH} characters
+              </li>
+              <li className={passwordsMatch ? 'is-met' : ''}>
+                <i className={`bx ${passwordsMatch ? 'bx-check-circle' : 'bx-circle'}`} aria-hidden="true"></i>
+                Passwords match
+              </li>
+            </ul>
+            <div className="recovery-resend-row">
+              <span className="recovery-hint">Didn&apos;t get it? Check your spam folder.</span>
+              <button type="button" className="recovery-link" onClick={backToEmail}>
+                Send a new code
+              </button>
+            </div>
           </>
         )}
 
         {step === 'done' && (
-          <p className="recovery-message is-success" role="status">
-            Your password has been changed. You can sign in with the new password.
-          </p>
+          <div className="recovery-success" role="status">
+            <span className="recovery-success-icon">
+              <i className="bx bx-check" aria-hidden="true"></i>
+            </span>
+            <h3>Password changed</h3>
+            <p>You can now sign in with your new password.</p>
+          </div>
         )}
 
         {error && <p className="recovery-message is-error" role="alert">{error}</p>}
