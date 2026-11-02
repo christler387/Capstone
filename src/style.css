@@ -3779,3 +3779,97 @@ img {
   max-width: 100%;
   height: auto;
 }
+
+/* ---------------- Recovery email and password reset dialogs ---------------- */
+.recovery-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.recovery-dialog-intro {
+  margin: 0 0 0.75rem;
+  font-family: var(--f-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(32, 48, 71, 0.72);
+}
+
+.recovery-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  font-family: var(--f-sans);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.recovery-status.is-verified {
+  background: rgba(31, 157, 139, 0.12);
+  color: #137a6b;
+}
+
+.recovery-status.is-pending {
+  background: rgba(224, 165, 47, 0.16);
+  color: #8a5a00;
+}
+
+.recovery-code-input {
+  letter-spacing: 0.4em;
+  font-family: var(--f-mono);
+  font-size: 20px;
+  text-align: center;
+}
+
+.recovery-resend {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--button);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.recovery-message {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  font-family: var(--f-sans);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.recovery-message.is-success {
+  background: rgba(31, 157, 139, 0.12);
+  color: #137a6b;
+}
+
+.recovery-message.is-error {
+  background: rgba(175, 4, 4, 0.08);
+  color: var(--accent);
+}
+
+.login-forgot {
+  align-self: flex-end;
+  margin: -0.25rem 0 0.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--button);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-forgot:hover {
+  text-decoration: underline;
+}

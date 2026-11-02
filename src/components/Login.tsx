@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import skyrunLogo from '../assets/Skyrun.png';
 import { SessionNoticeDialog } from './SessionNoticeDialog';
+import { PasswordResetDialog } from './PasswordResetDialog';
 
 interface LoginProps {
   onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string, phone?: string) => void;
@@ -12,6 +13,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isResetOpen, setIsResetOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(Boolean(notice));
   const [isLoading, setIsLoading] = useState(false);
   const closeNotice = useCallback(() => setIsNoticeOpen(false), []);
@@ -58,6 +60,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
 
   return (
     <div className="login-shell">
+      {isResetOpen && <PasswordResetDialog onClose={() => setIsResetOpen(false)} />}
       <div className="login-panel">
         <div className="brand-lockup" aria-label="Skyrun brand">
           <span className="brand-wordmark">SKYRUN</span>
@@ -120,6 +123,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
               </button>
             </div>
           </div>
+
+          <button type="button" className="login-forgot" onClick={() => setIsResetOpen(true)}>
+            Forgot password?
+          </button>
 
           <button type="submit" className="login-button" disabled={isLoading}>
             {isLoading ? (

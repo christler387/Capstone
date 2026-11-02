@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
 import crypto from "node:crypto";
+import nodemailer from "nodemailer";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -442,6 +443,22 @@ async function initializeDatabase() {
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   // The login route selects display_name, but the column never existed.
   await addColumnIfMissing("users", "display_name", "VARCHAR(100) NULL");
+  await addColumnIfMissing("users", "email", "VARCHAR(255) NULL");
+  await addColumnIfMissing("users", "email_verified_at", "DATETIME NULL");
+  await addColumnIfMissing("users", "password_updated_at", "DATETIME NULL");
+  await pool.query(`CREATE TABLE IF NOT EXISTS email_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    purpose VARCHAR(32) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    code_hash VARCHAR(128) NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_email_codes_lookup (user_id, purpose, id),
+    CONSTRAINT fk_email_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
 
   // Warehouse layout: floors, aisles and racks. inventory.rack keeps the "A-01" style code.
   await pool.query(`CREATE TABLE IF NOT EXISTS floors (
@@ -563,9 +580,145 @@ function toInventoryAudit(row) {
   };
 }
 
+// ---- Passwords ----
+// New passwords are stored as "scrypt$<salt>$<hash>" with a random salt per password. Older
+// accounts still have an unsalted SHA-256 hash (64 hex characters); they are upgraded on sign-in.
+const SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1 };
+
 function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
+  const salt = crypto.randomBytes(16);
+  const derived = crypto.scryptSync(String(password), salt, 64, SCRYPT_OPTIONS);
+  return `scrypt$${salt.toString("base64")}$${derived.toString("base64")}`;
 }
+
+function isLegacyPasswordHash(stored) {
+  return /^[a-f0-9]{64}$/i.test(stored || "");
+}
+
+function verifyPassword(stored, password) {
+  if (!stored) return false;
+  if (isLegacyPasswordHash(stored)) {
+    const legacy = crypto.createHash("sha256").update(String(password)).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(stored.toLowerCase()), Buffer.from(legacy));
+  }
+  const [scheme, saltB64, hashB64] = stored.split("$");
+  if (scheme !== "scrypt" || !saltB64 || !hashB64) return false;
+  const expected = Buffer.from(hashB64, "base64");
+  const actual = crypto.scryptSync(String(password), Buffer.from(saltB64, "base64"), expected.length, SCRYPT_OPTIONS);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+// ---- Email ----
+// Settings come from the environment (.env locally, site environment variables on Hostinger).
+function getMailer() {
+  const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASSWORD) {
+    throw new Error("Email is not configured on the server.");
+  }
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT || 587),
+    secure: SMTP_SECURE === "true",
+    auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
+  });
+}
+
+async function sendMail({ to, subject, text }) {
+  const mailer = getMailer();
+  await mailer.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject,
+    text,
+  });
+}
+
+// ---- One-time codes (email verification and password reset) ----
+const CODE_TTL_MINUTES = 15;
+const CODE_MAX_ATTEMPTS = 5;
+const CODE_RESEND_SECONDS = 60;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function codeSecret() {
+  if (!process.env.JWT_RESET_SECRET) {
+    throw new Error("JWT_RESET_SECRET is not set on the server.");
+  }
+  return process.env.JWT_RESET_SECRET;
+}
+
+function hashCode(code) {
+  return crypto.createHmac("sha256", codeSecret()).update(code).digest("hex");
+}
+
+function normalizeEmail(value) {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return email.length <= 255 && EMAIL_PATTERN.test(email) ? email : null;
+}
+
+// Sends a new code. Earlier unused codes of the same purpose stop working.
+async function issueCode(userId, purpose, email) {
+  const [[recent]] = await pool.query(
+    "SELECT created_at FROM email_codes WHERE user_id=? AND purpose=? ORDER BY id DESC LIMIT 1",
+    [userId, purpose],
+  );
+  if (recent && Date.now() - new Date(recent.created_at).getTime() < CODE_RESEND_SECONDS * 1000) {
+    const error = new Error("Please wait a minute before requesting another code.");
+    error.status = 429;
+    throw error;
+  }
+
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+  await pool.query("UPDATE email_codes SET used_at=NOW() WHERE user_id=? AND purpose=? AND used_at IS NULL", [
+    userId,
+    purpose,
+  ]);
+  await pool.query(
+    "INSERT INTO email_codes (user_id, purpose, email, code_hash, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))",
+    [userId, purpose, email, hashCode(code), CODE_TTL_MINUTES],
+  );
+
+  const subject = purpose === "verify_email" ? "Verify your AutoSupply recovery email" : "Your AutoSupply password reset code";
+  const intro = purpose === "verify_email"
+    ? "Use this code to confirm this recovery email address:"
+    : "Use this code to reset your AutoSupply password:";
+  await sendMail({
+    to: email,
+    subject,
+    text: `${intro}\n\n${code}\n\nThe code expires in ${CODE_TTL_MINUTES} minutes. If you did not ask for it, you can ignore this email.`,
+  });
+}
+
+// Returns true once, and only for the latest unused code sent to this email.
+async function checkCode(userId, purpose, email, code) {
+  const [[row]] = await pool.query(
+    "SELECT id, code_hash, attempts, expires_at, email FROM email_codes WHERE user_id=? AND purpose=? AND used_at IS NULL ORDER BY id DESC LIMIT 1",
+    [userId, purpose],
+  );
+  if (!row || row.email !== email) return { ok: false, message: "The code is incorrect or has expired." };
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    return { ok: false, message: "The code has expired. Request a new one." };
+  }
+  if (row.attempts >= CODE_MAX_ATTEMPTS) {
+    return { ok: false, message: "Too many wrong attempts. Request a new code." };
+  }
+
+  const given = Buffer.from(hashCode(String(code || "").trim()));
+  const expected = Buffer.from(row.code_hash);
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+    await pool.query("UPDATE email_codes SET attempts = attempts + 1 WHERE id=?", [row.id]);
+    return { ok: false, message: "The code is incorrect or has expired." };
+  }
+
+  await pool.query("UPDATE email_codes SET used_at=NOW() WHERE id=?", [row.id]);
+  return { ok: true };
+}
+
+function sendFailure(res, error, fallback) {
+  if (error?.status) return res.status(error.status).json({ error: error.message });
+  console.error(fallback, error?.message || error);
+  return res.status(502).json({ error: "Could not send the email. Check the email settings on the server." });
+}
+
 
 function normalizeItemId(value) {
   const id = String(value ?? "").trim();
@@ -706,7 +859,7 @@ app.put(
     }
 
     const user = rows[0];
-    if (user.password_hash !== hashPassword(String(currentPassword))) {
+    if (!verifyPassword(user.password_hash, String(currentPassword))) {
       return res.status(401).json({ error: "Current password is incorrect." });
     }
 
@@ -750,7 +903,7 @@ app.put(
     }
 
     const user = existingRows[0];
-    if (user.password_hash !== hashPassword(String(currentPassword))) {
+    if (!verifyPassword(user.password_hash, String(currentPassword))) {
       return res.status(401).json({ error: "Current password is incorrect." });
     }
 
@@ -968,28 +1121,157 @@ app.post(
         .json({ error: "Username and password are required." });
     }
 
+    // Find the account by username (case-insensitive), then check the password in code, so
+    // older hashes and the new salted hashes are both handled.
     const [rows] = await pool.query(
-      `SELECT id, username, role, display_name
+      `SELECT id, username, role, display_name, email, email_verified_at, password_hash
        FROM users
        WHERE LOWER(username) = LOWER(?)
-         AND password_hash = ?
        LIMIT 1`,
-      [String(username).trim(), hashPassword(String(password))],
+      [String(username).trim()],
     );
-
-    if (rows.length === 0) {
+    const user = rows[0];
+    if (!user || !verifyPassword(user.password_hash, String(password))) {
       return res.status(401).json({ error: "Invalid login details." });
     }
+    if (isLegacyPasswordHash(user.password_hash)) {
+      await pool.query("UPDATE users SET password_hash=? WHERE id=?", [hashPassword(String(password)), user.id]);
+    }
 
-    const user = rows[0];
     setUserSession(req, res, user.id);
     res.json({
       username: user.username,
       role: user.role,
       displayName: user.display_name || user.username,
-      email: "",
+      email: user.email || "",
+      emailVerified: Boolean(user.email_verified_at),
       phone: "",
     });
+  }),
+);
+
+// ---- Recovery email and password reset ----
+
+// Current recovery email and whether it has been verified.
+app.get(
+  "/api/account/recovery-email",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) return res.status(401).json({ error: "Sign in to see your recovery email." });
+    const [[user]] = await pool.query("SELECT email, email_verified_at FROM users WHERE id=? LIMIT 1", [actor.id]);
+    if (!user) return res.status(404).json({ error: "User not found." });
+    res.json({ email: user.email || "", emailVerified: Boolean(user.email_verified_at) });
+  }),
+);
+
+// Sets the recovery email for the signed-in user. It stays unverified until the code is entered.
+app.put(
+  "/api/account/recovery-email",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) return res.status(401).json({ error: "Sign in to change your recovery email." });
+
+    const { currentPassword, email: rawEmail } = req.body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email) return res.status(400).json({ error: "Enter a valid email address." });
+    if (!currentPassword) return res.status(400).json({ error: "Enter your current password." });
+
+    const [[user]] = await pool.query("SELECT id, password_hash FROM users WHERE id=? LIMIT 1", [actor.id]);
+    if (!user) return res.status(404).json({ error: "User not found." });
+    if (!verifyPassword(user.password_hash, String(currentPassword))) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const [[taken]] = await pool.query(
+      "SELECT COUNT(*) AS count FROM users WHERE LOWER(email)=? AND id<>? AND email_verified_at IS NOT NULL",
+      [email, user.id],
+    );
+    if (taken.count > 0) {
+      return res.status(409).json({ error: "That email is already used by another account." });
+    }
+
+    await pool.query("UPDATE users SET email=?, email_verified_at=NULL WHERE id=?", [email, user.id]);
+    try {
+      await issueCode(user.id, "verify_email", email);
+    } catch (error) {
+      return sendFailure(res, error, "Sending the verification email failed:");
+    }
+    res.json({ ok: true, email, emailVerified: false });
+  }),
+);
+
+// Confirms the recovery email with the code that was emailed to it.
+app.post(
+  "/api/account/recovery-email/verify",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) return res.status(401).json({ error: "Sign in to verify your recovery email." });
+
+    const [[user]] = await pool.query("SELECT id, email FROM users WHERE id=? LIMIT 1", [actor.id]);
+    if (!user || !user.email) return res.status(400).json({ error: "Add a recovery email first." });
+
+    const result = await checkCode(user.id, "verify_email", user.email, req.body?.code);
+    if (!result.ok) return res.status(400).json({ error: result.message });
+
+    await pool.query("UPDATE users SET email_verified_at=NOW() WHERE id=?", [user.id]);
+    res.json({ ok: true, email: user.email, emailVerified: true });
+  }),
+);
+
+// Sends a reset code to a verified recovery email. The answer is the same whether or not
+// the email belongs to an account, so the form cannot be used to find accounts.
+app.post(
+  "/api/password/forgot",
+  ah(async (req, res) => {
+    const generic = { ok: true, message: "If that email belongs to an account, a code has been sent." };
+    const email = normalizeEmail(req.body?.email);
+    if (!email) return res.json(generic);
+
+    const [[user]] = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email)=? AND email_verified_at IS NOT NULL LIMIT 1",
+      [email],
+    );
+    if (user) {
+      try {
+        await issueCode(user.id, "reset_password", email);
+      } catch (error) {
+        if (error?.status) return res.status(error.status).json({ error: error.message });
+        console.error("Sending the reset code failed:", error?.message || error);
+      }
+    }
+    res.json(generic);
+  }),
+);
+
+// Sets a new password with the emailed code, and signs the account out everywhere.
+app.post(
+  "/api/password/reset",
+  ah(async (req, res) => {
+    const email = normalizeEmail(req.body?.email);
+    const code = req.body?.code;
+    const newPassword = String(req.body?.newPassword || "").trim();
+    if (!email || !code) return res.status(400).json({ error: "Enter the email and the code we sent you." });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "The new password must be at least 8 characters long." });
+    }
+
+    const [[user]] = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email)=? AND email_verified_at IS NOT NULL LIMIT 1",
+      [email],
+    );
+    if (!user) return res.status(400).json({ error: "The code is incorrect or has expired." });
+
+    const result = await checkCode(user.id, "reset_password", email, code);
+    if (!result.ok) return res.status(400).json({ error: result.message });
+
+    await pool.query("UPDATE users SET password_hash=?, password_updated_at=NOW() WHERE id=?", [
+      hashPassword(newPassword),
+      user.id,
+    ]);
+    for (const [token, session] of userSessions) {
+      if (session.userId === user.id) userSessions.delete(token);
+    }
+    res.json({ ok: true });
   }),
 );
 

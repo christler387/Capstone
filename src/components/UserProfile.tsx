@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { InventoryAuditEntry, Movement, Item, UserRole } from "../types";
+import { RecoveryEmailDialog } from "./RecoveryEmailDialog";
 
 interface UserProfileProps {
   user: string;
@@ -72,6 +73,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [undoQuantity, setUndoQuantity] = useState("");
   const [undoError, setUndoError] = useState<string | null>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [isManageUsersModalOpen, setIsManageUsersModalOpen] = useState(false);
@@ -391,14 +393,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }
 
     try {
-      await onCreateUser(
-        username,
-        password,
-        createUserRole,
-        username,
-        undefined,
-        undefined,
-      );
+      await onCreateUser(username, password, createUserRole);
       setCreateUserFeedback({
         type: "success",
         message: "User created successfully.",
@@ -526,6 +521,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                         Change Password
                       </button>
                     </div>
+                    <button
+                      className="olive-button btn-outline w-full"
+                      onClick={() => setIsRecoveryModalOpen(true)}
+                    >
+                      <i className="bx bx-envelope" style={{ marginRight: "6px" }}></i>{" "}
+                      Recovery Email
+                    </button>
                     <button
                       className="olive-button btn-outline w-full"
                       onClick={() => {
@@ -693,7 +695,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     const isUndoQuantityValid =
                       Number.isInteger(parsedUndoQuantity) &&
                       parsedUndoQuantity >= 1 &&
-                      parsedUndoQuantity <= m.qty;
+                      parsedUndoQuantity <= ("qty" in m ? m.qty : 0);
                     const auditActor =
                       "createdBy" in m
                         ? m.createdBy ||
@@ -1311,6 +1313,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           </form>
         </div>
       </div>
+      {isRecoveryModalOpen && <RecoveryEmailDialog onClose={() => setIsRecoveryModalOpen(false)} />}
     </>
   );
 };
