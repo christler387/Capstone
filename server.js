@@ -788,9 +788,17 @@ app.get(
         .json({ error: "Administrator access is required." });
     }
     const [rows] = await pool.query(
-      "SELECT id, username, role FROM users ORDER BY username",
+      "SELECT id, username, role, email, email_verified_at FROM users ORDER BY username",
     );
-    res.json(rows);
+    res.json(
+      rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        role: row.role,
+        email: row.email || "",
+        emailVerified: Boolean(row.email_verified_at),
+      })),
+    );
   }),
 );
 
@@ -947,7 +955,7 @@ app.put(
 app.put(
   "/api/users/:id",
   ah(async (req, res) => {
-    const { username, password, role } = req.body || {};
+    const { username, password, role, email } = req.body || {};
     const userId = Number(req.params.id);
     const actor = await getAuthenticatedUser(req);
 
@@ -982,6 +990,13 @@ app.put(
         .json({ error: "Password must be at least 4 characters long." });
     }
 
+    // An empty email clears the recovery email. Any other value must be a valid address.
+    const emailInput = email === undefined ? undefined : String(email).trim();
+    const normalizedEmail = emailInput ? normalizeEmail(emailInput) : null;
+    if (emailInput && !normalizedEmail) {
+      return res.status(400).json({ error: "Enter a valid email address." });
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -989,7 +1004,7 @@ app.put(
         "SELECT id FROM users WHERE role='admin' FOR UPDATE",
       );
       const [[targetUser]] = await connection.query(
-        "SELECT id, role FROM users WHERE id=? LIMIT 1 FOR UPDATE",
+        "SELECT id, role, email FROM users WHERE id=? LIMIT 1 FOR UPDATE",
         [userId],
       );
       if (!targetUser) {
@@ -1035,11 +1050,29 @@ app.put(
           .json({ error: "That username is already in use." });
       }
 
+      const emailChanged =
+        emailInput !== undefined && (normalizedEmail || "") !== (targetUser.email || "").toLowerCase();
+      if (emailChanged && normalizedEmail) {
+        const [[emailTaken]] = await connection.query(
+          "SELECT id FROM users WHERE LOWER(email)=? AND id<>? AND email_verified_at IS NOT NULL LIMIT 1",
+          [normalizedEmail, userId],
+        );
+        if (emailTaken) {
+          await connection.rollback();
+          return res.status(409).json({ error: "That email is already used by another account." });
+        }
+      }
+
       const updates = ["username=?", "role=?"];
       const values = [normalizedUsername, normalizedRole];
       if (password !== undefined && String(password).trim()) {
         updates.push("password_hash=?");
         values.push(hashPassword(String(password).trim()));
+      }
+      if (emailChanged) {
+        // A new address must be confirmed again, so it starts unverified.
+        updates.push("email=?", "email_verified_at=NULL");
+        values.push(normalizedEmail);
       }
       values.push(userId);
       await connection.query(
@@ -1052,7 +1085,23 @@ app.put(
           if (session.userId === userId) userSessions.delete(token);
         }
       }
-      res.json({ ok: true, username: normalizedUsername });
+
+      // Send the confirmation code to the new address. The user confirms it from their Recovery Email dialog.
+      let codeSent = false;
+      if (emailChanged && normalizedEmail) {
+        try {
+          await issueCode(userId, "verify_email", normalizedEmail);
+          codeSent = true;
+        } catch (error) {
+          console.error("Sending the verification email failed:", error?.message || error);
+        }
+      }
+      res.json({
+        ok: true,
+        username: normalizedUsername,
+        emailChanged: emailChanged && Boolean(normalizedEmail),
+        codeSent,
+      });
     } catch (error) {
       await connection.rollback();
       throw error;

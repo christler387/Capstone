@@ -32,7 +32,28 @@ interface ManagedUser {
   id: number;
   username: string;
   role: UserRole;
+  email: string;
+  emailVerified: boolean;
 }
+
+// One row in the profile action list: icon, label, and a short line explaining what it does.
+const ProfileAction: React.FC<{
+  icon: string;
+  label: string;
+  detail: string;
+  onClick: () => void;
+}> = ({ icon, label, detail, onClick }) => (
+  <button type="button" className="profile-action" onClick={onClick}>
+    <span className="profile-action-icon" aria-hidden="true">
+      <i className={`bx ${icon}`}></i>
+    </span>
+    <span className="profile-action-text">
+      <span className="profile-action-label">{label}</span>
+      <span className="profile-action-detail">{detail}</span>
+    </span>
+    <i className="bx bx-chevron-right profile-action-chevron" aria-hidden="true"></i>
+  </button>
+);
 
 async function requestUserApi<T>(
   path: string,
@@ -105,6 +126,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [editingUsername, setEditingUsername] = useState("");
   const [editingRole, setEditingRole] = useState<UserRole>("staff");
   const [editingPassword, setEditingPassword] = useState("");
+  const [editingEmail, setEditingEmail] = useState("");
 
   const displayName =
     role === "staff" && user.toLowerCase().includes("admin")
@@ -213,17 +235,27 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
   const saveManagedUser = async (account: ManagedUser) => {
     try {
-      await requestUserApi(`/users/${account.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          username: editingUsername,
-          role: editingRole,
-          password: editingPassword,
-        }),
-      });
+      const result = await requestUserApi<{ emailChanged?: boolean; codeSent?: boolean }>(
+        `/users/${account.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            username: editingUsername,
+            role: editingRole,
+            password: editingPassword,
+            email: editingEmail,
+          }),
+        },
+      );
       setEditingUserId(null);
       setEditingPassword("");
+      setEditingEmail("");
       await loadManagedUsers();
+      if (result.emailChanged && !result.codeSent) {
+        setManagedUsersFeedback(
+          "Saved, but the confirmation code could not be sent to the new address. Check the email settings on the server.",
+        );
+      }
     } catch (error) {
       setManagedUsersFeedback(
         error instanceof Error
@@ -419,154 +451,76 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           }}
         >
           <div className="flex-col-gap" style={{ height: "100%" }}>
-            <div
-              className="dash-card"
-              style={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                minHeight: "480px",
-              }}
-            >
-              <div>
-                <span
-                  className="label-micro"
-                  style={{
-                    display: "block",
-                    textAlign: "center",
-                    opacity: 0.6,
-                  }}
-                >
-                  Active Session Profile
+            <div className="dash-card profile-card">
+              <div className="profile-hero">
+                <span className="profile-avatar" aria-hidden="true">
+                  <i className="bx bx-user"></i>
                 </span>
-
-                <div
-                  className="flex-col-center"
-                  style={{ margin: "2.5rem 0", textAlign: "center" }}
-                >
-                  <div
-                    style={{
-                      width: "96px",
-                      height: "96px",
-                      borderRadius: "50%",
-                      background: "var(--item-bg)",
-                      border: "1px solid var(--line-soft)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginBottom: "1rem",
-                    }}
-                  >
-                    <i
-                      className="bx bx-user"
-                      style={{ fontSize: "3rem", opacity: 0.7 }}
-                    ></i>
-                  </div>
-                  <h2
-                    className="title-main"
-                    style={{
-                      fontSize: "1.75rem",
-                      textTransform: "none",
-                      margin: "0",
-                    }}
-                  >
-                    {displayName}
-                  </h2>
-                  <span
-                    className={`velocity-badge ${role === "staff" ? "velocity-low" : "velocity-medium"}`}
-                    style={{ marginTop: "0.75rem", letterSpacing: "0.05em" }}
-                  >
-                    {userRole}
-                  </span>
-                </div>
+                <span className="profile-eyebrow">Signed in as</span>
+                <h2 className="profile-name">{displayName}</h2>
+                <span className={`profile-role ${role === "admin" ? "is-admin" : "is-staff"}`}>
+                  {userRole}
+                </span>
               </div>
 
-              <div
-                className="flex-col-gap"
-                style={{ gap: "0.5rem", marginTop: "auto" }}
-              >
-                {role === "admin" && (
-                  <>
-                    <div
-                      className="flex-row-gap"
-                      style={{ width: "100%", gap: "0.5rem" }}
-                    >
-                      <button
-                        className="olive-button btn-outline"
-                        style={{ flex: 1 }}
-                        onClick={() => {
-                          clearUsernameForm();
-                          setIsUsernameModalOpen(true);
-                        }}
-                      >
-                        <i
-                          className="bx bx-user-circle"
-                          style={{ marginRight: "6px" }}
-                        ></i>{" "}
-                        Change Username
-                      </button>
-                      <button
-                        className="olive-button btn-outline"
-                        style={{ flex: 1 }}
-                        onClick={() => {
-                          clearPasswordForm();
-                          setIsPasswordModalOpen(true);
-                        }}
-                      >
-                        <i
-                          className="bx bx-lock-alt"
-                          style={{ marginRight: "6px" }}
-                        ></i>{" "}
-                        Change Password
-                      </button>
-                    </div>
-                    <button
-                      className="olive-button btn-outline w-full"
+              {role === "admin" && (
+                <div className="profile-action-groups">
+                  <div className="profile-action-group">
+                    <span className="profile-group-label">Your account</span>
+                    <ProfileAction
+                      icon="bx-user-circle"
+                      label="Change username"
+                      detail="The name you sign in with"
+                      onClick={() => {
+                        clearUsernameForm();
+                        setIsUsernameModalOpen(true);
+                      }}
+                    />
+                    <ProfileAction
+                      icon="bx-lock-alt"
+                      label="Change password"
+                      detail="Update your sign-in password"
+                      onClick={() => {
+                        clearPasswordForm();
+                        setIsPasswordModalOpen(true);
+                      }}
+                    />
+                    <ProfileAction
+                      icon="bx-envelope"
+                      label="Recovery email"
+                      detail="Used for password reset codes"
                       onClick={() => setIsRecoveryModalOpen(true)}
-                    >
-                      <i className="bx bx-envelope" style={{ marginRight: "6px" }}></i>{" "}
-                      Recovery Email
-                    </button>
-                    <button
-                      className="olive-button btn-outline w-full"
+                    />
+                  </div>
+
+                  <div className="profile-action-group">
+                    <span className="profile-group-label">Administration</span>
+                    <ProfileAction
+                      icon="bx-user-plus"
+                      label="Add new user"
+                      detail="Create a staff or admin login"
                       onClick={() => {
                         clearCreateUserForm();
                         setIsCreateUserModalOpen(true);
                       }}
-                    >
-                      <i
-                        className="bx bx-user-plus"
-                        style={{ marginRight: "6px" }}
-                      ></i>{" "}
-                      Add New User
-                    </button>
-                    <button
-                      className="olive-button btn-outline w-full"
+                    />
+                    <ProfileAction
+                      icon="bx-group"
+                      label="Manage accounts"
+                      detail="Edit or remove other accounts"
                       onClick={async () => {
                         await loadManagedUsers();
                         setIsManageUsersModalOpen(true);
                       }}
-                    >
-                      <i
-                        className="bx bx-group"
-                        style={{ marginRight: "6px" }}
-                      ></i>{" "}
-                      Manage Accounts
-                    </button>
-                  </>
-                )}
-                <button
-                  className="olive-button btn-danger w-full"
-                  onClick={onLogout}
-                >
-                  <i
-                    className="bx bx-log-out"
-                    style={{ marginRight: "6px" }}
-                  ></i>{" "}
-                  Log Out Operator
-                </button>
-              </div>
+                    />
+                  </div>
+                </div>
+              )}
+
+              <button type="button" className="profile-logout" onClick={onLogout}>
+                <i className="bx bx-log-out" aria-hidden="true"></i>
+                Log out
+              </button>
             </div>
           </div>
 
@@ -580,74 +534,46 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 minHeight: "480px",
               }}
             >
-              <div
-                className="flex-row-between mb-3"
-                style={{ flexWrap: "wrap", gap: "0.75rem" }}
-              >
-                <div className="flex-row-center" style={{ gap: "0.5rem" }}>
-                  <i
-                    className="bx bx-history"
-                    style={{ fontSize: "1.25rem" }}
-                  ></i>
-                  <span className="label-micro" style={{ fontSize: "12px" }}>
-                    Session Audit History ({filteredMovements.length})
-                  </span>
+              <div className="audit-header">
+                <div className="audit-title">
+                  <i className="bx bx-history" aria-hidden="true"></i>
+                  <div>
+                    <h3 className="audit-title-text">Session activity</h3>
+                    <span className="audit-count">
+                      {filteredMovements.length} {filteredMovements.length === 1 ? "entry" : "entries"}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex-row-gap" style={{ gap: "4px" }}>
-                  <button
-                    className={`olive-button btn-outline label-micro ${filterType === "ALL" ? "active" : ""}`}
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: "9px",
-                      textTransform: "none",
-                      background:
-                        filterType === "ALL" ? "var(--ink)" : "transparent",
-                      color: filterType === "ALL" ? "var(--bg)" : "inherit",
-                    }}
-                    onClick={() => setFilterType("ALL")}
-                  >
-                    All ({totalActions})
-                  </button>
-                  <button
-                    className={`olive-button btn-outline label-micro ${filterType === "IN" ? "active" : ""}`}
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: "9px",
-                      textTransform: "none",
-                      background:
-                        filterType === "IN" ? "var(--success)" : "transparent",
-                      color: filterType === "IN" ? "#fff" : "inherit",
-                    }}
-                    onClick={() => setFilterType("IN")}
-                  >
-                    Stock In ({inCount})
-                  </button>
-                  <button
-                    className={`olive-button btn-outline label-micro ${filterType === "OUT" ? "active" : ""}`}
-                    style={{
-                      padding: "4px 8px",
-                      fontSize: "9px",
-                      textTransform: "none",
-                      background:
-                        filterType === "OUT" ? "var(--accent)" : "transparent",
-                      color: filterType === "OUT" ? "#fff" : "inherit",
-                    }}
-                    onClick={() => setFilterType("OUT")}
-                  >
-                    Stock Out ({outCount})
-                  </button>
+                <div className="audit-segmented" role="group" aria-label="Filter by movement type">
+                  {[
+                    { key: "ALL", label: "All", count: totalActions },
+                    { key: "IN", label: "In", count: inCount },
+                    { key: "OUT", label: "Out", count: outCount },
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      className={`audit-segment ${filterType === option.key ? "is-active" : ""} ${option.key === "IN" ? "is-in" : option.key === "OUT" ? "is-out" : ""}`}
+                      aria-pressed={filterType === option.key}
+                      onClick={() => setFilterType(option.key as typeof filterType)}
+                    >
+                      {option.label}
+                      <span className="audit-segment-count">{option.count}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="form-group mb-3">
+              <div className="audit-search">
+                <i className="bx bx-search" aria-hidden="true"></i>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Search audit entries by item name or ID..."
+                  placeholder="Search by item name or ID"
+                  aria-label="Search audit entries"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ fontSize: "12px", padding: "0.5rem 0.75rem" }}
                 />
               </div>
               {undoError && (
@@ -1161,6 +1087,18 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       <span className={`account-role-pill is-${account.role}`}>
                         {account.role === "admin" ? "Admin" : "Staff"}
                       </span>
+                      <span className="account-email">
+                        {account.email ? (
+                          <>
+                            {account.email}
+                            <span className={`account-email-status ${account.emailVerified ? "is-verified" : "is-pending"}`}>
+                              {account.emailVerified ? "Verified" : "Not verified"}
+                            </span>
+                          </>
+                        ) : (
+                          "No recovery email"
+                        )}
+                      </span>
                     </div>
                     {!isEditing && (
                       <div className="account-card-actions">
@@ -1174,6 +1112,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                             setEditingUsername(account.username);
                             setEditingRole(account.role);
                             setEditingPassword("");
+                            setEditingEmail(account.email);
                           }}
                         >
                           <i className="bx bx-edit-alt" aria-hidden="true"></i>
@@ -1220,6 +1159,23 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                             <option value="admin">Admin</option>
                           </select>
                         </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="label-micro" htmlFor={`account-email-${account.id}`}>
+                          Recovery email
+                        </label>
+                        <input
+                          id={`account-email-${account.id}`}
+                          className="form-input"
+                          type="email"
+                          value={editingEmail}
+                          autoComplete="off"
+                          placeholder="Leave blank to remove"
+                          onChange={(event) => setEditingEmail(event.target.value)}
+                        />
+                        <span className="account-hint">
+                          Changing this sends a confirmation code to the new address. The user enters it from their Recovery Email dialog.
+                        </span>
                       </div>
                       <div className="form-group">
                         <label className="label-micro" htmlFor={`account-password-${account.id}`}>
