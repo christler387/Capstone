@@ -8,23 +8,31 @@ interface BarcodeScannerProps {
 
 export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, onScanFailure }) => {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const callbacksRef = useRef({ onScanSuccess, onScanFailure });
+  callbacksRef.current = { onScanSuccess, onScanFailure };
 
   useEffect(() => {
     const timer = setTimeout(() => {
       const scanner = new Html5QrcodeScanner(
         "reader",
         { 
-          fps: 10, 
-          qrbox: { width: 260, height: 120 },
-          aspectRatio: 1.777778,
+          fps: 15,
+          qrbox: (viewfinderWidth, viewfinderHeight) => ({
+            width: Math.min(viewfinderWidth * 0.9, 440),
+            height: Math.min(viewfinderHeight * 0.55, 220),
+          }),
           supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
           formatsToSupport: [
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
             Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.CODABAR,
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.PDF_417,
+            Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E,
           ]
@@ -35,12 +43,10 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
       scanner.render((decodedText) => {
         const normalizedValue = decodedText.trim();
         if (normalizedValue) {
-          onScanSuccess(normalizedValue);
+          callbacksRef.current.onScanSuccess(normalizedValue);
         }
       }, (error) => {
-        if (onScanFailure) {
-          onScanFailure(error);
-        }
+        callbacksRef.current.onScanFailure?.(error);
       });
 
       scannerRef.current = scanner;
@@ -54,7 +60,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
         });
       }
     };
-  }, [onScanSuccess, onScanFailure]);
+  }, []);
 
   return (
     <div id="reader" style={{ width: '100%', maxWidth: '480px', margin: '0 auto', border: '1px solid var(--line-soft)', borderRadius: '8px', overflow: 'hidden' }}></div>

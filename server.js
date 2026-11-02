@@ -1,4 +1,4 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
@@ -9,6 +9,25 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Read .env from the project folder, whatever folder the server is started from.
+const { parsed: projectEnv } = dotenv.config({ path: path.join(__dirname, ".env") });
+for (const name of [
+  "JWT_RESET_SECRET",
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_SECURE",
+  "SMTP_FROM",
+  "SMTP_USER",
+  "SMTP_PASSWORD",
+]) {
+  const useProjectValue =
+    !process.env[name]?.trim() ||
+    (name === "JWT_RESET_SECRET" && Buffer.byteLength(process.env[name]) < 32);
+  if (useProjectValue && projectEnv?.[name]?.trim()) {
+    process.env[name] = projectEnv[name];
+  }
+}
 const uploadsDirectory =
   process.env.AUTOSUPPLY_UPLOAD_DIR || path.join(__dirname, "uploads");
 
@@ -1333,6 +1352,16 @@ app.post(
     if (!itemId) {
       return res.status(400).json({ error: "Item ID is required." });
     }
+    const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
+    if (barcode) {
+      const [[existingItem]] = await pool.query(
+        "SELECT id FROM inventory WHERE TRIM(barcode)=? LIMIT 1",
+        [barcode],
+      );
+      if (existingItem) {
+        return res.status(409).json({ error: "That barcode is already registered to another item." });
+      }
+    }
     const createdBy = item.createdBy || "Unknown";
 
     await pool.query(
@@ -1365,6 +1394,16 @@ app.put(
     };
     const itemId = normalizeItemId(req.params.id);
     const submittedItemId = normalizeItemId(item.id || itemId);
+    const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
+    if (barcode) {
+      const [[existingItem]] = await pool.query(
+        "SELECT id FROM inventory WHERE TRIM(barcode)=? AND id<>? LIMIT 1",
+        [barcode, itemId],
+      );
+      if (existingItem) {
+        return res.status(409).json({ error: "That barcode is already registered to another item." });
+      }
+    }
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
     const [result] = await pool.query(
       `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`,
