@@ -45,6 +45,8 @@ function clearStoredSession() {
   sessionStorage.removeItem('skyrun_session_user');
   sessionStorage.removeItem('skyrun_session_role');
   sessionStorage.removeItem(SESSION_ACTIVITY_KEY);
+  sessionStorage.removeItem('skyrun_session_email');
+  sessionStorage.removeItem('skyrun_session_email_verified');
 }
 
 const App: React.FC = () => {
@@ -88,9 +90,12 @@ const App: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const handleLoginSuccess = (username: string, role: UserRole, _email?: string, _phone?: string) => {
+  const handleLoginSuccess = (username: string, role: UserRole, email?: string, _phone?: string, emailVerified?: boolean) => {
     sessionStorage.setItem('skyrun_session_user', username);
     sessionStorage.setItem('skyrun_session_role', role);
+    // The recovery email comes with the sign-in response, so the profile does not need to ask the server for it.
+    sessionStorage.setItem('skyrun_session_email', email || '');
+    sessionStorage.setItem('skyrun_session_email_verified', emailVerified ? '1' : '0');
     sessionStorage.setItem(SESSION_ACTIVITY_KEY, String(Date.now()));
     setSessionNotice(null);
     setUser(username);
