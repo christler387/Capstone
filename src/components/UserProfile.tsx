@@ -1141,88 +1141,125 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             </button>
           </div>
           <div className="modal-body account-management-list">
-            {managedUsers.map((account) => (
-              <div key={account.id} className="account-management-row">
-                {editingUserId === account.id ? (
-                  <div className="account-management-edit">
-                    <input
-                      className="form-input"
-                      value={editingUsername}
-                      onChange={(event) =>
-                        setEditingUsername(event.target.value)
-                      }
-                      aria-label="Username"
-                    />
-                    <select
-                      className="form-input"
-                      value={editingRole}
-                      onChange={(event) =>
-                        setEditingRole(event.target.value as UserRole)
-                      }
-                      aria-label="Role"
-                    >
-                      <option value="staff">Staff</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                    <input
-                      className="form-input"
-                      type="password"
-                      value={editingPassword}
-                      onChange={(event) =>
-                        setEditingPassword(event.target.value)
-                      }
-                      placeholder="New password (optional)"
-                      aria-label="New password"
-                    />
-                    <div className="flex-row-gap">
-                      <button
-                        className="olive-button"
-                        onClick={() => saveManagedUser(account)}
-                      >
-                        Save
-                      </button>
-                      <button
-                        className="olive-button btn-outline"
-                        onClick={() => setEditingUserId(null)}
-                      >
-                        Cancel
-                      </button>
+            <p className="account-management-intro">
+              Update each account's username, role, or password.
+            </p>
+            {managedUsers.map((account) => {
+              const isSelf = account.username.toLowerCase() === user.toLowerCase();
+              const isEditing = editingUserId === account.id;
+              return (
+                <div key={account.id} className={`account-card ${isEditing ? "is-editing" : ""}`}>
+                  <div className="account-card-main">
+                    <span className="account-avatar" aria-hidden="true">
+                      {account.username.charAt(0).toUpperCase()}
+                    </span>
+                    <div className="account-card-info">
+                      <strong className="account-card-name">
+                        {account.username}
+                        {isSelf && <span className="account-you">You</span>}
+                      </strong>
+                      <span className={`account-role-pill is-${account.role}`}>
+                        {account.role === "admin" ? "Admin" : "Staff"}
+                      </span>
                     </div>
+                    {!isEditing && (
+                      <div className="account-card-actions">
+                        <button
+                          type="button"
+                          className="account-icon-btn"
+                          aria-label={`Edit ${account.username}`}
+                          title="Edit account"
+                          onClick={() => {
+                            setEditingUserId(account.id);
+                            setEditingUsername(account.username);
+                            setEditingRole(account.role);
+                            setEditingPassword("");
+                          }}
+                        >
+                          <i className="bx bx-edit-alt" aria-hidden="true"></i>
+                        </button>
+                        <button
+                          type="button"
+                          className="account-icon-btn is-danger"
+                          aria-label={`Delete ${account.username}`}
+                          title={isSelf ? "You can't delete your own account" : "Delete account"}
+                          disabled={isSelf}
+                          onClick={() => deleteManagedUser(account)}
+                        >
+                          <i className="bx bx-trash" aria-hidden="true"></i>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <div className="account-management-summary">
-                      <strong>{account.username}</strong>
-                      <span className="label-micro">{account.role}</span>
+
+                  {isEditing && (
+                    <div className="account-edit-form">
+                      <div className="account-edit-grid">
+                        <div className="form-group">
+                          <label className="label-micro" htmlFor={`account-name-${account.id}`}>
+                            Username
+                          </label>
+                          <input
+                            id={`account-name-${account.id}`}
+                            className="form-input"
+                            value={editingUsername}
+                            onChange={(event) => setEditingUsername(event.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="label-micro" htmlFor={`account-role-${account.id}`}>
+                            Role
+                          </label>
+                          <select
+                            id={`account-role-${account.id}`}
+                            className="form-input"
+                            value={editingRole}
+                            onChange={(event) => setEditingRole(event.target.value as UserRole)}
+                          >
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="label-micro" htmlFor={`account-password-${account.id}`}>
+                          New password
+                        </label>
+                        <input
+                          id={`account-password-${account.id}`}
+                          className="form-input"
+                          type="password"
+                          value={editingPassword}
+                          autoComplete="new-password"
+                          placeholder="Leave blank to keep the current password"
+                          onChange={(event) => setEditingPassword(event.target.value)}
+                        />
+                      </div>
+                      <div className="account-edit-actions">
+                        <button
+                          type="button"
+                          className="olive-button btn-outline"
+                          onClick={() => setEditingUserId(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="olive-button"
+                          onClick={() => saveManagedUser(account)}
+                        >
+                          Save changes
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex-row-gap">
-                      <button
-                        className="olive-button btn-outline btn-mini"
-                        onClick={() => {
-                          setEditingUserId(account.id);
-                          setEditingUsername(account.username);
-                          setEditingRole(account.role);
-                          setEditingPassword("");
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="olive-button btn-danger btn-mini"
-                        disabled={
-                          account.username.toLowerCase() === user.toLowerCase()
-                        }
-                        onClick={() => deleteManagedUser(account)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
             {managedUsersFeedback && (
-              <p className="label-micro text-accent">{managedUsersFeedback}</p>
+              <p className="account-feedback" role="status">
+                {managedUsersFeedback}
+              </p>
             )}
           </div>
         </div>
