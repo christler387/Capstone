@@ -1,8 +1,7 @@
-import React, { useEffect,useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { getReorderQuantity, isAtReorderPoint } from '../inventoryMetrics';
-
 
 interface InventoryProps {
   inventory: Item[];
@@ -16,16 +15,22 @@ interface InventoryProps {
   userRole?: UserRole;
 }
 
-export const Inventory: React.FC<InventoryProps> = ({ 
-  inventory, 
-  movements = [], 
-  onEditItem, 
-  onDeleteItem, 
+const CATEGORIES = ['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION'];
+const PAGE_SIZE = 10;
+
+const formatPeso = (value: number) =>
+  `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export const Inventory: React.FC<InventoryProps> = ({
+  inventory,
+  movements = [],
+  onEditItem,
+  onDeleteItem,
   onGoToStock,
-  onAddItem, 
-  onZoomImage, 
-  onLocateOnMap, 
-  userRole = 'staff' 
+  onAddItem,
+  onZoomImage,
+  onLocateOnMap,
+  userRole = 'staff'
 }) => {
 
   const [search, setSearch] = useState('');
@@ -35,8 +40,6 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState(String(currentPage));
-  const pageSize = 10;
-
 
   const handleToggleSort = (field: keyof Item) => {
     if (sortField === field) {
@@ -59,7 +62,6 @@ export const Inventory: React.FC<InventoryProps> = ({
     return rack;
   };
 
-
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
   const lowCount = inventory.filter(i => isAtReorderPoint(i, movements)).length;
@@ -76,247 +78,324 @@ export const Inventory: React.FC<InventoryProps> = ({
       return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
 
-  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / PAGE_SIZE));
   const displayedPage = Math.min(currentPage, totalPages);
-    useEffect(() => {
-      setPageInput(String(displayedPage));
-    }, [displayedPage]);
+  useEffect(() => {
+    setPageInput(String(displayedPage));
+  }, [displayedPage]);
   const pageItems = filteredInventory.slice(
-    (displayedPage - 1) * pageSize,
-    displayedPage * pageSize
+    (displayedPage - 1) * PAGE_SIZE,
+    displayedPage * PAGE_SIZE
   );
 
-
-  const renderFilterSection = () => (
-    <div className="flex-row-gap px-6 mb-4 overflow-x-auto no-scrollbar" style={{ padding: '0 var(--gap)' }}>
-      {['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION'].map(cat => (
-        <button 
-          key={cat}
-          className={`nav-btn ${categoryFilter === cat ? 'active' : ''}`}
-          onClick={() => {
-            setCategoryFilter(cat);
-            setCurrentPage(1);
-          }}
-        >
-          {cat.charAt(0) + cat.slice(1).toLowerCase()}
-        </button>
-      ))}
-    </div>
-  );
+  const isAdmin = userRole === 'admin';
 
   const renderScannerDrawer = () => (
-    <div className="scanner-container-inline mb-6 p-4 border-soft" style={{ background: 'var(--bg-card)' }}>
-      <BarcodeScanner 
+    <div className="inv-scanner">
+      <BarcodeScanner
         onScanSuccess={(val) => {
           setSearch(val);
           setCurrentPage(1);
           setIsScannerOpen(false);
-        }} 
+        }}
       />
     </div>
   );
 
-  
   return (
-    <div className="content-section">
-      <div className="actions-bar flex-row-between">
-        <div className="flex-row-gap">
-          <p className="label-micro opacity-50">Inventory Ledger</p>
-          <div className="search-wrapper">
-            <i className="bx bx-search search-icon-small opacity-50"></i>
-            <input 
-              type="text" 
-              className="form-input search-input-small" 
-              placeholder="Search items or scan..." 
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-            <button 
-              className={`barcode-scan-toggle ${isScannerOpen ? 'active' : ''}`}
-              onClick={() => setIsScannerOpen(!isScannerOpen)}
-              title="Toggle Barcode Scanner"
-            >
-              <i className={`bx ${isScannerOpen ? 'bx-x' : 'bx-barcode-reader'}`}></i>
-            </button>
-          </div>
+    <div className="content-section inv-page">
+      <header className="inv-header">
+        <div>
+          <h2 className="inv-title">Inventory</h2>
+          <p className="inv-subtitle">
+            {totalItems} {totalItems === 1 ? 'item' : 'items'} on record
+          </p>
         </div>
-        {userRole === 'admin' ? (
-          <button className="olive-button" onClick={onAddItem}>+ Add Item</button>
+        {isAdmin ? (
+          <button className="olive-button inv-add" onClick={onAddItem}>
+            <i className="bx bx-plus" aria-hidden="true"></i>
+            Add item
+          </button>
         ) : (
-          <span className="label-micro opacity-50" style={{ fontSize: '10px', alignSelf: 'center' }}>
-            <i className="bx bx-lock-alt mr-1"></i> Read Only (Staff)
+          <span className="inv-readonly">
+            <i className="bx bx-lock-alt" aria-hidden="true"></i>
+            Read only
           </span>
         )}
+      </header>
+
+      <section className="inv-stats" aria-label="Summary">
+        <div className="inv-stat">
+          <span className="inv-stat-label">Items</span>
+          <strong className="inv-stat-value">{totalItems}</strong>
+        </div>
+        <div className="inv-stat">
+          <span className="inv-stat-label">Value on hand</span>
+          <strong className="inv-stat-value">{formatPeso(totalValue)}</strong>
+        </div>
+        <div className={`inv-stat ${lowCount > 0 ? 'is-alert' : ''}`}>
+          <span className="inv-stat-label">Need reorder</span>
+          <strong className="inv-stat-value">{lowCount}</strong>
+        </div>
+      </section>
+
+      <div className="inv-toolbar">
+        <div className="inv-search">
+          <i className="bx bx-search" aria-hidden="true"></i>
+          <input
+            type="text"
+            placeholder="Search by name, ID, category, barcode or vehicle"
+            aria-label="Search inventory"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+          />
+          {search && (
+            <button
+              type="button"
+              className="inv-icon-btn"
+              aria-label="Clear search"
+              onClick={() => {
+                setSearch('');
+                setCurrentPage(1);
+              }}
+            >
+              <i className="bx bx-x" aria-hidden="true"></i>
+            </button>
+          )}
+          <button
+            type="button"
+            className={`inv-icon-btn ${isScannerOpen ? 'is-active' : ''}`}
+            onClick={() => setIsScannerOpen(!isScannerOpen)}
+            title="Toggle barcode scanner"
+            aria-label="Toggle barcode scanner"
+            aria-pressed={isScannerOpen}
+          >
+            <i className={`bx ${isScannerOpen ? 'bx-x' : 'bx-barcode-reader'}`} aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div className="inv-chips" role="group" aria-label="Filter by category">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              type="button"
+              className={`inv-chip ${categoryFilter === cat ? 'is-active' : ''}`}
+              aria-pressed={categoryFilter === cat}
+              onClick={() => {
+                setCategoryFilter(cat);
+                setCurrentPage(1);
+              }}
+            >
+              {cat.charAt(0) + cat.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isScannerOpen && renderScannerDrawer()}
-      
-      {renderFilterSection()}
 
-      <main>
-        <div className="table-container">
-          <div className="table-header table-grid inventory-grid">
-            <span className="label-table">Img</span>
-            <span className="label-table sortable" onClick={() => handleToggleSort('name')}>
-              Part Name
-              <i className={`bx bx-chevron-${sortDirection === 'asc' ? 'down' : 'up'} sort-icon-inner ${sortField === 'name' ? '' : 'hidden'}`}></i>
-            </span>
-            <span className="label-table">Category</span>
-            <span className="label-table">Location</span>
-            <span className="label-table text-right">Qty</span>
-            <span className="label-table text-right">Reorder Qty</span>
-            <span className="label-table text-right">Price</span>
-            <span className="label-table text-right">{userRole === 'admin' ? 'Actions' : 'Locate'}</span>
+      <main className="inv-table-wrap">
+        <div className="inv-table" role="table" aria-label="Inventory items">
+          <div className="inv-row inv-head" role="row">
+            <span role="columnheader">Picture</span>
+            <button
+              type="button"
+              role="columnheader"
+              className="inv-sort"
+              onClick={() => handleToggleSort('name')}
+            >
+              Part name
+              <i
+                className={`bx bx-chevron-${sortDirection === 'asc' ? 'down' : 'up'} ${sortField === 'name' ? '' : 'is-hidden'}`}
+                aria-hidden="true"
+              ></i>
+            </button>
+            <span role="columnheader">Category</span>
+            <span role="columnheader">Location</span>
+            <span role="columnheader" className="num">Qty</span>
+            <span role="columnheader" className="num">Reorder qty</span>
+            <span role="columnheader" className="num">Price</span>
+            <span role="columnheader" className="num">{isAdmin ? 'Actions' : 'Locate'}</span>
           </div>
 
-          <div className="table-body">
-            {pageItems.map(i => {
-              const isLow = isAtReorderPoint(i, movements);
-              const reorderQuantity = getReorderQuantity(i, movements);
-              const needsReorder = isAtReorderPoint(i, movements);
-              return (
-                <div 
-                  key={i.id} 
-                  className="table-row table-grid inventory-grid" 
-                  style={{ cursor: 'pointer' }} 
-                  onClick={() => onEditItem(i.id)}
-                >
-                  <span className="img-cell">
-                    {i.image ? (
-                      <img src={i.image} className="inventory-image" onClick={(e) => { e.stopPropagation(); onZoomImage(i.image!, i.name); }} referrerPolicy="no-referrer" alt={i.name} />
-                    ) : (
-                      <span className="inventory-image placeholder-img"></span>
-                    )}
-                  </span>
-                  
-                  <div className="name-cell flex-col" style={{ gap: '2px' }}>
-                    <span style={{ fontWeight: 600 }}>{i.name}</span>
-                    {i.compatibleVehicles && (
-                      <span className="text-success compatibility-line" style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <i className="bx bxs-car"></i> Fits: {i.compatibleVehicles}
-                      </span>
-                    )}
-                    <div className="flex-row items-center gap-2 opacity-50 meta-row" style={{ display: 'flex' }}>
-                      <span>ID: {i.id}</span>
-                      <span>•</span>
-                      <span style={{ fontFamily: 'var(--f-sans)' }}>BC: {i.barcode || '---'}</span>
-                    </div>
-                  </div>
+          {pageItems.length === 0 && (
+            <div className="inv-empty">
+              <i className="bx bx-package" aria-hidden="true"></i>
+              <p>{inventory.length === 0 ? 'No items yet.' : 'No items match your search.'}</p>
+            </div>
+          )}
 
-                  <span className="cat-cell">{i.category}</span>
-                  
-                  <div className="location-cell-flex flex-row items-center gap-2">
-                    <div className="flex-col items-start gap-1">
-                      <span className="location-badge" onClick={(e) => { e.stopPropagation(); onLocateOnMap(i.rack); }}>
-                        {formatLocation(i.rack)}
-                      </span>
-                      {i.level && (
-                        <span className="id-cell" style={{ fontSize: '9px', opacity: 0.6, textTransform: 'none' }}>Level: {i.level}</span>
-                      )}
-                    </div>
-                  </div>
+          {pageItems.map(i => {
+            const needsReorder = isAtReorderPoint(i, movements);
+            const reorderQuantity = getReorderQuantity(i, movements);
+            return (
+              <div
+                key={i.id}
+                className={`inv-row inv-item ${needsReorder ? 'is-low' : ''}`}
+                role="row"
+                tabIndex={0}
+                onClick={() => onEditItem(i.id)}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    onEditItem(i.id);
+                  }
+                }}
+              >
+                <span className="inv-picture" role="cell">
+                  {i.image ? (
+                    <img
+                      src={i.image}
+                      className="inv-thumb"
+                      onClick={(e) => { e.stopPropagation(); onZoomImage(i.image!, i.name); }}
+                      referrerPolicy="no-referrer"
+                      alt={i.name}
+                      title="View picture"
+                    />
+                  ) : (
+                    <span className="inv-thumb is-empty" aria-label="No picture">
+                      <i className="bx bx-image" aria-hidden="true"></i>
+                    </span>
+                  )}
+                </span>
 
-                  <span className={`qty-cell ${isLow ? 'alert-text' : ''}`}>{String(i.quantity).padStart(3, '0')}</span>
-                  <span
-                    className={`price-cell ${needsReorder ? 'alert-text' : ''}`}
-                    title="Open stock-in for this item"
-                    onClick={(event) => { event.stopPropagation(); onGoToStock(i.id); }}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {String(reorderQuantity).padStart(2, '0')}
-                  </span>
-                  <span className="price-cell">₱{i.price.toFixed(2)}</span>
-                  
-                  <span className="actions-cell text-right">
-                    {userRole === 'admin' ? (
-                      <button className="receipt-btn text-accent" onClick={(e) => { e.stopPropagation(); onDeleteItem(i.id); }}>
-                        <i className="bx bx-trash"></i>
-                      </button>
-                    ) : (
-                      <button className="receipt-btn" onClick={(e) => { e.stopPropagation(); onLocateOnMap(i.rack); }} title="Locate on map">
-                        <i className="bx bx-map-pin"></i>
-                      </button>
-                    )}
+                <div className="inv-name" role="cell">
+                  <span className="inv-name-text">{i.name}</span>
+                  {i.compatibleVehicles && (
+                    <span className="inv-fits">
+                      <i className="bx bxs-car" aria-hidden="true"></i>
+                      {i.compatibleVehicles}
+                    </span>
+                  )}
+                  <span className="inv-meta">
+                    ID {i.id}
+                    <span aria-hidden="true"> · </span>
+                    BC {i.barcode || '---'}
                   </span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-{/* ---- Pagination ---- */}
+                <span className="inv-category" role="cell">{i.category}</span>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto 1fr',
-            alignItems: 'center',
-            marginTop: 'var(--gap)',
-          }}
-        >
-          <span className="label-micro opacity-50">
-            {filteredInventory.length === 0
-              ? 'No items'
-              : `Showing ${(displayedPage - 1) * pageSize + 1}-${Math.min(displayedPage * pageSize, filteredInventory.length)} of ${filteredInventory.length}`}
-          </span>
-          <div className="flex-row-gap">
-            <button
-              className="olive-button btn-outline"
-              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-              disabled={displayedPage === 1}
-            >
-              {"<"}
-            </button>
+                <div className="inv-location" role="cell">
+                  <button
+                    type="button"
+                    className="inv-location-btn"
+                    onClick={(e) => { e.stopPropagation(); onLocateOnMap(i.rack); }}
+                    title="Show on warehouse map"
+                  >
+                    <i className="bx bx-map-pin" aria-hidden="true"></i>
+                    {formatLocation(i.rack)}
+                  </button>
+                  {i.level && <span className="inv-level">Level {i.level}</span>}
+                </div>
 
-{/* ---- page number input ---- */}
+                <span className={`inv-num inv-qty ${needsReorder ? 'is-alert' : ''}`} role="cell">
+                  {String(i.quantity).padStart(3, '0')}
+                </span>
 
-            <span className="label-micro opacity-50" style={{ alignSelf: 'center' }}>
-              <label className="label-micro opacity-50" style={{ justifySelf: 'center' }}>
-                Page{' '}
+                <button
+                  type="button"
+                  className={`inv-num inv-reorder ${needsReorder ? 'is-alert' : ''}`}
+                  role="cell"
+                  title="Open stock-in for this item"
+                  onClick={(event) => { event.stopPropagation(); onGoToStock(i.id); }}
+                >
+                  {String(reorderQuantity).padStart(2, '0')}
+                </button>
 
-                <input
-                  className="page-number-input"
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={pageInput}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setPageInput(value);
-                    
-                    if (value === '') return;
+                <span className="inv-num inv-price" role="cell">{formatPeso(i.price)}</span>
 
-                    const page = Number(value);
-                    if (Number.isInteger(page) && page >= 1 && page <= totalPages) {
-                      setCurrentPage(page);
-                    }
-                  }}
-                  onBlur={() => {
-                    const page = Number(pageInput);
-                    if (!pageInput || page < 1 || page > totalPages) {
-                      setPageInput(String(displayedPage));
-                    }
-                  }}
-                  style={{ width: '2em', alignSelf: 'center' }}
-                />{' '}
-
-                of {totalPages}
-            </label>
-            </span>
-            <button
-              className="olive-button btn-outline"
-              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-              disabled={displayedPage === totalPages}
-            >
-              {">"}
-            </button>
-          </div>
-          <span aria-hidden="true"/>
+                <span className="inv-actions" role="cell">
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      className="inv-icon-btn is-danger"
+                      title="Delete item"
+                      aria-label={`Delete ${i.name}`}
+                      onClick={(e) => { e.stopPropagation(); onDeleteItem(i.id); }}
+                    >
+                      <i className="bx bx-trash" aria-hidden="true"></i>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="inv-icon-btn"
+                      title="Locate on map"
+                      aria-label={`Locate ${i.name} on map`}
+                      onClick={(e) => { e.stopPropagation(); onLocateOnMap(i.rack); }}
+                    >
+                      <i className="bx bx-map-pin" aria-hidden="true"></i>
+                    </button>
+                  )}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </main>
+
+      <footer className="inv-pager">
+        <span className="inv-pager-summary">
+          {filteredInventory.length === 0
+            ? 'No items'
+            : `Showing ${(displayedPage - 1) * PAGE_SIZE + 1}–${Math.min(displayedPage * PAGE_SIZE, filteredInventory.length)} of ${filteredInventory.length}`}
+        </span>
+
+        <div className="inv-pager-controls">
+          <button
+            type="button"
+            className="inv-icon-btn"
+            aria-label="Previous page"
+            onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+            disabled={displayedPage === 1}
+          >
+            <i className="bx bx-chevron-left" aria-hidden="true"></i>
+          </button>
+
+          <label className="inv-page-label">
+            Page
+            <input
+              className="inv-page-input"
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              aria-label="Page number"
+              onChange={(event) => {
+                const value = event.target.value;
+                setPageInput(value);
+
+                if (value === '') return;
+
+                const page = Number(value);
+                if (Number.isInteger(page) && page >= 1 && page <= totalPages) {
+                  setCurrentPage(page);
+                }
+              }}
+              onBlur={() => {
+                const page = Number(pageInput);
+                if (!pageInput || page < 1 || page > totalPages) {
+                  setPageInput(String(displayedPage));
+                }
+              }}
+            />
+            of {totalPages}
+          </label>
+
+          <button
+            type="button"
+            className="inv-icon-btn"
+            aria-label="Next page"
+            onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+            disabled={displayedPage === totalPages}
+          >
+            <i className="bx bx-chevron-right" aria-hidden="true"></i>
+          </button>
+        </div>
+      </footer>
     </div>
   );
 };
