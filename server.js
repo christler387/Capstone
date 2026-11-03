@@ -2503,6 +2503,24 @@ app.put(
 
 /* ------------------------ Static files & errors --------------------- */
 
+// Saves a picture as soon as it is chosen, and returns its web address for the item form.
+app.post(
+  "/api/uploads",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor || actor.role !== "admin") {
+      return res.status(actor ? 403 : 401).json({ error: "Administrator access is required." });
+    }
+    try {
+      const url = await storeItemImage(req.body?.image, req.body?.imageFileName);
+      if (!url) return res.status(400).json({ error: "No picture was received." });
+      res.json({ url });
+    } catch (error) {
+      res.status(400).json({ error: error.message || "The picture could not be saved." });
+    }
+  }),
+);
+
 app.use("/api/uploads", express.static(uploadsDirectory));
 app.use(express.static(path.join(__dirname, "dist")));
 // Regex works on Express 4 and 5, and unknown /api routes get a JSON 404 instead of index.html.

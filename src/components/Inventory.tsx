@@ -40,6 +40,18 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState(String(currentPage));
+  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+
+  // Copies the full web address of an item's picture.
+  const copyPictureUrl = async (itemId: string, image: string) => {
+    try {
+      await navigator.clipboard.writeText(new URL(image, window.location.origin).href);
+      setCopiedItemId(itemId);
+      window.setTimeout(() => setCopiedItemId(null), 1500);
+    } catch {
+      window.alert('Could not copy the link. Open the item and copy the address from the Picture URL box.');
+    }
+  };
 
   const handleToggleSort = (field: keyof Item) => {
     if (sortField === field) {
@@ -309,6 +321,17 @@ export const Inventory: React.FC<InventoryProps> = ({
                 <span className="inv-num inv-price" role="cell">{formatPeso(i.price)}</span>
 
                 <span className="inv-actions" role="cell">
+                  {i.image && !i.image.startsWith('data:') && (
+                    <button
+                      type="button"
+                      className={`inv-icon-btn ${copiedItemId === i.id ? 'is-active' : ''}`}
+                      title={copiedItemId === i.id ? 'Link copied' : 'Copy picture URL'}
+                      aria-label={`Copy picture URL for ${i.name}`}
+                      onClick={(e) => { e.stopPropagation(); void copyPictureUrl(i.id, i.image!); }}
+                    >
+                      <i className={`bx ${copiedItemId === i.id ? 'bx-check' : 'bx-link'}`} aria-hidden="true"></i>
+                    </button>
+                  )}
                   {isAdmin ? (
                     <button
                       type="button"

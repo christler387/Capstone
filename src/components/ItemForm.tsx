@@ -40,6 +40,14 @@ const getImageFileName = (image?: string) => {
   );
 };
 
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => (typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read the picture.")));
+    reader.onerror = () => reject(new Error("Could not read the picture."));
+    reader.readAsDataURL(file);
+  });
+
 export const ItemForm: React.FC<ItemFormProps> = ({
   item,
   existingItems = [],
@@ -53,6 +61,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -154,7 +163,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const toggleScanner = () => setIsScannerOpen((prev) => !prev);
   const closeScanner = useCallback(() => setIsScannerOpen(false), []);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -168,23 +177,29 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setFormData((prev) => ({
-          ...prev,
-          image: reader.result as string,
-          imageFileName: file.name,
-        }));
-        setImageFileName(file.name);
-        setError(null);
-      }
-    };
-    reader.readAsDataURL(file);
+    // Save the picture right away so the form gets its web address before the item is saved.
+    setUploadingImage(true);
+    setError(null);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl, imageFileName: file.name }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "The picture could not be uploaded.");
+      setFormData((prev) => ({ ...prev, image: data.url }));
+      setImageFileName(file.name);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "The picture could not be uploaded.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || uploadingImage) return;
 
     const id = (formData.id ?? "").trim();
     const name = (formData.name ?? "").trim();
@@ -622,7 +637,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <input
             type="text"
             className="form-input image-url-input"
-            value={pendingImage ? `${imageFileName || "New picture"} (not saved yet)` : savedImageUrl}
+            value={uploadingImage ? "Uploading picture…" : pendingImage ? `${imageFileName || "Picture"} (choose it again for a link)` : savedImageUrl}
             placeholder="No image selected"
             aria-label="Picture URL"
             readOnly
@@ -649,7 +664,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           </div>
         )}
         {pendingImage && (
-          <span className="image-url-hint">The picture link is created when you save the item.</span>
+          <span className="image-url-hint">This picture is in an older format. Choose it again to get a link.</span>
         )}
       </div>
       <div className="form-group">
@@ -687,7 +702,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               className="olive-button"
               style={{ flex: 1 }}
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || uploadingImage}
             >
               {saving ? "Saving..." : "Save Item"}
             </button>
