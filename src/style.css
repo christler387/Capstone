@@ -2170,6 +2170,7 @@ footer p {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  padding: 0 var(--gap);
 }
 
 .inv-header {
