@@ -2820,6 +2820,11 @@ img.inv-thumb:hover {
   outline: none;
 }
 
+.picture-url-input.is-missing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(175, 4, 4, 0.12);
+}
+
 .field-missing-text {
   display: block;
   margin-top: 0.3rem;

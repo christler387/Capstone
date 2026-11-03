@@ -43,6 +43,28 @@ const getImageFileName = (image?: string) => {
 // A picture address the user can open: a web link or a picture uploaded to this site.
 const isWebAddress = (value: string) => /^(https?:\/\/|\/api\/uploads\/)/i.test(value.trim());
 
+// Every field must be filled in except the barcode. Dropdowns always have a value, so they are not listed.
+const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
+  id: "Item ID",
+  name: "Part Identification",
+  category: "Category",
+  rack: "Rack location",
+  quantity: "Quantity",
+  price: "Price",
+  compatibleVehicles: "Compatible vehicles",
+  image: "Picture",
+  orderingCost: "Ordering cost",
+  holdingCost: "Holding cost",
+  leadTimeDays: "Lead time",
+  safetyStock: "Safety stock",
+};
+
+const isEmptyValue = (value: unknown) =>
+  value === undefined || value === null || (typeof value === "string" && value.trim() === "") || (typeof value === "number" && Number.isNaN(value));
+
+const missingRequiredKeys = (data: ItemFormData) =>
+  (Object.keys(REQUIRED_FIELD_LABELS) as Array<keyof ItemFormData>).filter((key) => isEmptyValue(data[key]));
+
 const readFileAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -71,8 +93,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const [copied, setCopied] = useState(false);
   // Required fields are marked only after the user tries to save, so a new form does not start red.
   const [showMissing, setShowMissing] = useState(false);
-  const isMissing = (key: "id" | "name" | "category") =>
-    showMissing && !String(formData[key] ?? "").trim();
+  const isMissing = (key: keyof ItemFormData) => showMissing && isEmptyValue(formData[key]);
+  const missingClass = (key: keyof ItemFormData) => (isMissing(key) ? " is-missing" : "");
   const [imageFileName, setImageFileName] = useState(() =>
     getImageFileName(item?.image),
   );
@@ -217,13 +239,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     const category = (formData.category ?? "").trim();
     const barcode = (formData.barcode ?? "").trim();
 
-    const requiredLabels = { id: "Item ID", name: "Part Identification", category: "Category" };
-    const missingRequired = (Object.keys(requiredLabels) as Array<keyof typeof requiredLabels>).filter(
-      (key) => !String(formData[key] ?? "").trim(),
-    );
+    const missingRequired = missingRequiredKeys(formData);
     if (missingRequired.length > 0) {
       setShowMissing(true);
-      setError(`Please fill in: ${missingRequired.map((key) => requiredLabels[key]).join(", ")}.`);
+      setError(`Please fill in: ${missingRequired.map((key) => REQUIRED_FIELD_LABELS[key]).join(", ")}.`);
+      const firstMissing = missingRequired[0];
+      document.getElementById(firstMissing === "image" ? "edit-image-url" : `edit-${String(firstMissing)}`)?.focus();
       return;
     }
     setShowMissing(false);
@@ -453,7 +474,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             <input
               type="number"
               id="edit-orderingCost"
-              className="form-input font-mono"
+              className={`form-input font-mono${missingClass("orderingCost")}`}
+              aria-invalid={isMissing("orderingCost")}
               value={formData.orderingCost ?? 100}
               onChange={handleChange}
               min="0"
@@ -470,7 +492,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             <input
               type="number"
               id="edit-holdingCost"
-              className="form-input font-mono"
+              className={`form-input font-mono${missingClass("holdingCost")}`}
+              aria-invalid={isMissing("holdingCost")}
               value={formData.holdingCost ?? 0}
               onChange={handleChange}
               min="0"
@@ -487,7 +510,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             <input
               type="number"
               id="edit-leadTimeDays"
-              className="form-input font-mono"
+              className={`form-input font-mono${missingClass("leadTimeDays")}`}
+              aria-invalid={isMissing("leadTimeDays")}
               value={formData.leadTimeDays ?? 7}
               onChange={handleChange}
               min="0"
@@ -503,7 +527,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             <input
               type="number"
               id="edit-safetyStock"
-              className="form-input font-mono"
+              className={`form-input font-mono${missingClass("safetyStock")}`}
+              aria-invalid={isMissing("safetyStock")}
               value={formData.safetyStock ?? 10}
               onChange={handleChange}
               min="0"
@@ -580,7 +605,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">Rack Location</label>
           <select
             id="edit-rack"
-            className="form-input"
+            className={`form-input${missingClass("rack")}`}
+            aria-invalid={isMissing("rack")}
             value={formData.rack || ""}
             onChange={handleChange}
             disabled={readOnly}
@@ -625,7 +651,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <input
             type="number"
             id="edit-quantity"
-            className="form-input font-mono"
+            className={`form-input font-mono${missingClass("quantity")}`}
+            aria-invalid={isMissing("quantity")}
             value={formData.quantity}
             onChange={handleChange}
             min="0"
@@ -641,7 +668,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <input
             type="number"
             id="edit-price"
-            className="form-input font-mono"
+            className={`form-input font-mono${missingClass("price")}`}
+            aria-invalid={isMissing("price")}
             value={formData.price}
             onChange={handleChange}
             min="0"
@@ -677,7 +705,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           </div>
 
           <div className="picture-field-controls">
-            <div className="picture-url-input">
+            <div className={`picture-url-input${missingClass("image")}`}>
               <i className="bx bx-link" aria-hidden="true"></i>
               <input
                 id="edit-image-url"
@@ -734,6 +762,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               )}
             </div>
 
+            {isMissing("image") && <span className="field-missing-text">Required: paste a picture link or upload a file</span>}
             {pendingImage && (
               <span className="image-url-hint">This picture is in an older format. Upload it again to get a link.</span>
             )}
@@ -745,12 +774,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         <input
           type="text"
           id="edit-compatibleVehicles"
-          className="form-input"
+          className={`form-input${missingClass("compatibleVehicles")}`}
+          aria-invalid={isMissing("compatibleVehicles")}
           value={formData.compatibleVehicles || ""}
           onChange={handleChange}
           placeholder="e.g. Toyota Civic, Honda Altis"
           disabled={readOnly}
         />
+        {isMissing("compatibleVehicles") && <span className="field-missing-text">Required</span>}
       </div>
 
       <div className="flex-row-gap mt-4">
