@@ -2810,6 +2810,34 @@ img.inv-thumb:hover {
   }
 }
 
+/* Item form: required and optional field markers */
+.form-input.is-missing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(175, 4, 4, 0.12);
+}
+
+.form-input.is-missing:focus {
+  outline: none;
+}
+
+.field-missing-text {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: var(--f-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.field-optional {
+  font-family: var(--f-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(32, 48, 71, 0.5);
+}
+
 /* Barcode scanner status line */
 .barcode-scanner {
   display: flex;

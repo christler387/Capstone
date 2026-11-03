@@ -69,6 +69,10 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  // Required fields are marked only after the user tries to save, so a new form does not start red.
+  const [showMissing, setShowMissing] = useState(false);
+  const isMissing = (key: "id" | "name" | "category") =>
+    showMissing && !String(formData[key] ?? "").trim();
   const [imageFileName, setImageFileName] = useState(() =>
     getImageFileName(item?.image),
   );
@@ -213,18 +217,25 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     const category = (formData.category ?? "").trim();
     const barcode = (formData.barcode ?? "").trim();
 
-    if (!id || !name || !category || !barcode) {
-      setError(
-        "Please fill in all required fields (Item ID, Part Identification, Barcode, and Category).",
-      );
+    const requiredLabels = { id: "Item ID", name: "Part Identification", category: "Category" };
+    const missingRequired = (Object.keys(requiredLabels) as Array<keyof typeof requiredLabels>).filter(
+      (key) => !String(formData[key] ?? "").trim(),
+    );
+    if (missingRequired.length > 0) {
+      setShowMissing(true);
+      setError(`Please fill in: ${missingRequired.map((key) => requiredLabels[key]).join(", ")}.`);
       return;
     }
+    setShowMissing(false);
 
-    const duplicateBarcode = existingItems.some(
-      (existingItem) =>
-        existingItem.id !== item?.id &&
-        (existingItem.barcode ?? "").trim() === barcode,
-    );
+    // The barcode is optional. Only check for duplicates when one was entered.
+    const duplicateBarcode =
+      barcode !== "" &&
+      existingItems.some(
+        (existingItem) =>
+          existingItem.id !== item?.id &&
+          (existingItem.barcode ?? "").trim() === barcode,
+      );
     if (duplicateBarcode) {
       setError("That barcode is already registered to another item.");
       return;
@@ -348,12 +359,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         <input
           type="text"
           id="edit-id"
-          className="form-input font-mono"
+          className={`form-input font-mono ${isMissing("id") ? "is-missing" : ""}`}
           value={formData.id}
           onChange={handleChange}
           disabled={readOnly}
+          aria-invalid={isMissing("id")}
           required
         />
+        {isMissing("id") && <span className="field-missing-text">Required</span>}
       </div>
       <div className="grid-2 border-soft-no-pad p-0">
         <div className="form-group">
@@ -364,18 +377,20 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <input
             type="text"
             id="edit-name"
-            className="form-input"
+            className={`form-input ${isMissing("name") ? "is-missing" : ""}`}
             value={formData.name}
             onChange={handleChange}
             disabled={readOnly}
+            aria-invalid={isMissing("name")}
             required
           />
+          {isMissing("name") && <span className="field-missing-text">Required</span>}
         </div>
 
 {/* Barcode input and scanner */}
         <div className="form-group">
           <label className="label-micro">
-            Barcode {!readOnly && <span className="text-accent">*</span>}
+            Barcode <span className="field-optional">optional</span>
           </label>
 
           <div className="flex-row-gap">
@@ -386,7 +401,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               value={formData.barcode || ""}
               onChange={handleChange}
               disabled={readOnly}
-              required={!readOnly}
+              placeholder="Scan or type, or leave blank"
             />
 
             {!readOnly && (
@@ -413,13 +428,15 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <input
             type="text"
             id="edit-category"
-            className="form-input"
+            className={`form-input ${isMissing("category") ? "is-missing" : ""}`}
             value={formData.category || ""}
             onChange={handleChange}
             disabled={readOnly}
+            aria-invalid={isMissing("category")}
             required
             placeholder="Enter category"
           />
+          {isMissing("category") && <span className="field-missing-text">Required</span>}
         </div>
       </div>
       <div className="form-group">
