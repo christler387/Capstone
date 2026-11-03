@@ -54,6 +54,8 @@ export const pool = mysql.createPool({
   dateStrings: ["DATE"],
 });
 
+// Behind Hostinger's proxy, use the visitor's real address for rate limits (not the proxy's).
+app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
@@ -1178,6 +1180,47 @@ app.delete(
   }),
 );
 
+// ---- Sign-in rate limit: slows down password guessing and login floods ----
+// Failures are counted per account and per IP address. Too many in the window locks that key for a while.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES_PER_ACCOUNT = 5;
+const LOGIN_MAX_FAILURES_PER_IP = 30;
+const loginFailures = new Map(); // key -> { count, windowStart, lockedUntil }
+
+function lockRemainingMs(key) {
+  const entry = loginFailures.get(key);
+  if (!entry || !entry.lockedUntil) return 0;
+  const remaining = entry.lockedUntil - Date.now();
+  if (remaining <= 0) loginFailures.delete(key);
+  return Math.max(0, remaining);
+}
+
+function recordLoginFailure(key, maxFailures) {
+  const now = Date.now();
+  if (loginFailures.size > 10000) {
+    // Drop old entries so the map cannot grow without limit.
+    for (const [oldKey, oldEntry] of loginFailures) {
+      if (now - oldEntry.windowStart > LOGIN_WINDOW_MS && oldEntry.lockedUntil < now) loginFailures.delete(oldKey);
+    }
+  }
+  let entry = loginFailures.get(key);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    entry = { count: 0, windowStart: now, lockedUntil: 0 };
+  }
+  entry.count += 1;
+  if (entry.count >= maxFailures) entry.lockedUntil = now + LOGIN_LOCK_MS;
+  loginFailures.set(key, entry);
+}
+
+function tooManyLoginsResponse(res, waitMs) {
+  const minutes = Math.ceil(waitMs / 60000);
+  res.setHeader("Retry-After", String(Math.ceil(waitMs / 1000)));
+  return res.status(429).json({
+    error: `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+  });
+}
+
 app.post(
   "/api/login",
   ah(async (req, res) => {
@@ -1188,6 +1231,11 @@ app.post(
         .status(400)
         .json({ error: "Username and password are required." });
     }
+
+    const accountKey = `account:${String(username).trim().toLowerCase()}`;
+    const ipKey = `ip:${req.ip}`;
+    const lockedFor = Math.max(lockRemainingMs(accountKey), lockRemainingMs(ipKey));
+    if (lockedFor > 0) return tooManyLoginsResponse(res, lockedFor);
 
     // Find the account by username (case-insensitive), then check the password in code, so
     // older hashes and the new salted hashes are both handled.
@@ -1200,8 +1248,14 @@ app.post(
     );
     const user = rows[0];
     if (!user || !verifyPassword(user.password_hash, String(password))) {
+      // Same message for a wrong username and a wrong password, so accounts cannot be guessed.
+      recordLoginFailure(accountKey, LOGIN_MAX_FAILURES_PER_ACCOUNT);
+      recordLoginFailure(ipKey, LOGIN_MAX_FAILURES_PER_IP);
+      const nowLocked = Math.max(lockRemainingMs(accountKey), lockRemainingMs(ipKey));
+      if (nowLocked > 0) return tooManyLoginsResponse(res, nowLocked);
       return res.status(401).json({ error: "Invalid login details." });
     }
+    loginFailures.delete(accountKey);
     if (isLegacyPasswordHash(user.password_hash)) {
       await pool.query("UPDATE users SET password_hash=? WHERE id=?", [hashPassword(String(password)), user.id]);
     }
