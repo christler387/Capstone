@@ -40,6 +40,9 @@ const getImageFileName = (image?: string) => {
   );
 };
 
+// A picture address the user can open: a web link or a picture uploaded to this site.
+const isWebAddress = (value: string) => /^(https?:\/\/|\/api\/uploads\/)/i.test(value.trim());
+
 const readFileAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -103,7 +106,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   // A saved picture has a full web address the user can copy. A new upload gets its address when the item is saved.
   const pendingImage = Boolean(formData.image && formData.image.startsWith("data:"));
   const savedImageUrl =
-    formData.image && !pendingImage ? new URL(formData.image, window.location.origin).href : "";
+    formData.image && !pendingImage && isWebAddress(formData.image)
+      ? new URL(formData.image.trim(), window.location.origin).href
+      : "";
 
   const copyImageUrl = async () => {
     try {
@@ -220,6 +225,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     );
     if (duplicateBarcode) {
       setError("That barcode is already registered to another item.");
+      return;
+    }
+
+    const picture = (formData.image ?? "").trim();
+    if (picture && !picture.startsWith("data:") && !isWebAddress(picture)) {
+      setError("The picture address must start with https:// or http://.");
       return;
     }
 
@@ -637,10 +648,21 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <input
             type="text"
             className="form-input image-url-input"
-            value={uploadingImage ? "Uploading picture…" : pendingImage ? `${imageFileName || "Picture"} (choose it again for a link)` : savedImageUrl}
-            placeholder="No image selected"
+            value={
+              uploadingImage
+                ? "Uploading picture…"
+                : pendingImage
+                  ? `${imageFileName || "Picture"} (choose it again for a link)`
+                  : formData.image ?? ""
+            }
+            placeholder="Paste a picture link (https://…) or choose a file"
             aria-label="Picture URL"
-            readOnly
+            disabled={readOnly || uploadingImage}
+            readOnly={pendingImage}
+            onChange={(event) => {
+              setFormData((prev) => ({ ...prev, image: event.target.value }));
+              setError(null);
+            }}
           />
           <button
             type="button"

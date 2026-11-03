@@ -123,6 +123,10 @@ async function clearUserSession(req, res) {
 // Saves a base64 image sent by the item form to the uploads folder and returns its URL.
 async function storeItemImage(image, imageFileName) {
   if (typeof image !== "string" || !image.startsWith("data:")) {
+    // A pasted address must be a web link or an uploaded picture path, so it cannot run as a script.
+    if (image && !/^(https?:\/\/|\/api\/uploads\/)/i.test(image.trim())) {
+      throw Object.assign(new Error("The picture address must start with https:// or http://."), { status: 400 });
+    }
     return image || null;
   }
 
