@@ -304,10 +304,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       return;
     }
 
-    if (newPassword.length < 4) {
+    if (newPassword.length < 8) {
       setPasswordFeedback({
         type: "error",
-        message: "New password must be at least 4 characters long.",
+        message: "New password must be at least 8 characters long.",
       });
       return;
     }
@@ -416,10 +416,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       return;
     }
 
-    if (password.length < 4) {
+    if (password.length < 8) {
       setCreateUserFeedback({
         type: "error",
-        message: "Password must be at least 4 characters long.",
+        message: "Password must be at least 8 characters long.",
       });
       return;
     }

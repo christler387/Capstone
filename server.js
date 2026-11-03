@@ -831,10 +831,10 @@ app.post(
         .status(400)
         .json({ error: "Username must be at least 3 characters long." });
     }
-    if (normalizedPassword.length < 4) {
+    if (normalizedPassword.length < MIN_PASSWORD_LENGTH) {
       return res
         .status(400)
-        .json({ error: "Password must be at least 4 characters long." });
+        .json({ error: "Password must be at least 8 characters long." });
     }
 
     const [[existing]] = await pool.query(
@@ -873,10 +873,10 @@ app.put(
 
     const newPasswordString = String(newPassword).trim();
 
-    if (newPasswordString.length < 4) {
+    if (newPasswordString.length < MIN_PASSWORD_LENGTH) {
       return res
         .status(400)
-        .json({ error: "New password must be at least 4 characters long." });
+        .json({ error: "New password must be at least 8 characters long." });
     }
 
     const [rows] = await pool.query(
@@ -888,9 +888,14 @@ app.put(
     }
 
     const user = rows[0];
+    // Only wrong current-password attempts count, so the owner is locked out after repeated guesses.
+    const attemptsKey = `change-password:${user.id}`;
+    if (blockedByLimit(res, [attemptsKey], "Too many failed password attempts.")) return;
     if (!verifyPassword(user.password_hash, String(currentPassword))) {
+      recordLoginFailure(attemptsKey, 5);
       return res.status(401).json({ error: "Current password is incorrect." });
     }
+    loginFailures.delete(attemptsKey);
 
     await pool.query("UPDATE users SET password_hash=? WHERE id=?", [
       hashPassword(newPasswordString),
@@ -985,11 +990,11 @@ app.put(
     if (
       password !== undefined &&
       String(password).trim().length > 0 &&
-      String(password).trim().length < 4
+      String(password).trim().length < MIN_PASSWORD_LENGTH
     ) {
       return res
         .status(400)
-        .json({ error: "Password must be at least 4 characters long." });
+        .json({ error: "Password must be at least 8 characters long." });
     }
 
     // An empty email clears the recovery email. Any other value must be a valid address.
@@ -1213,12 +1218,23 @@ function recordLoginFailure(key, maxFailures) {
   loginFailures.set(key, entry);
 }
 
-function tooManyLoginsResponse(res, waitMs) {
+function tooManyLoginsResponse(res, waitMs, message = "Too many failed sign-in attempts.") {
   const minutes = Math.ceil(waitMs / 60000);
   res.setHeader("Retry-After", String(Math.ceil(waitMs / 1000)));
   return res.status(429).json({
-    error: `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
+    error: `${message} Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
   });
+}
+
+// The one minimum length for every password the app accepts.
+const MIN_PASSWORD_LENGTH = 8;
+
+// Sends a 429 and returns true when any of the keys is locked. Used by the password routes.
+function blockedByLimit(res, keys, message) {
+  const waitMs = Math.max(...keys.map(lockRemainingMs));
+  if (waitMs <= 0) return false;
+  tooManyLoginsResponse(res, waitMs, message);
+  return true;
 }
 
 app.post(
@@ -1349,6 +1365,13 @@ app.post(
     const email = normalizeEmail(req.body?.email);
     if (!email) return res.json(generic);
 
+    // Every request sends an email, so limit how often one address or one IP can ask.
+    const emailKey = `forgot:${email}`;
+    const ipKey = `forgot-ip:${req.ip}`;
+    if (blockedByLimit(res, [emailKey, ipKey], "Too many code requests.")) return;
+    recordLoginFailure(emailKey, 3);
+    recordLoginFailure(ipKey, 20);
+
     const [[user]] = await pool.query(
       "SELECT id FROM users WHERE LOWER(email)=? AND email_verified_at IS NOT NULL LIMIT 1",
       [email],
@@ -1376,6 +1399,12 @@ app.post(
     if (newPassword.length < 8) {
       return res.status(400).json({ error: "The new password must be at least 8 characters long." });
     }
+
+    const emailKey = `reset:${email}`;
+    const ipKey = `reset-ip:${req.ip}`;
+    if (blockedByLimit(res, [emailKey, ipKey], "Too many reset attempts.")) return;
+    recordLoginFailure(emailKey, 5);
+    recordLoginFailure(ipKey, 30);
 
     const [[user]] = await pool.query(
       "SELECT id FROM users WHERE LOWER(email)=? AND email_verified_at IS NOT NULL LIMIT 1",

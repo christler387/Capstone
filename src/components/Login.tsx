@@ -47,7 +47,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || 'Invalid login details. Try admin/admin123 or staff/staff123');
+        throw new Error(data?.error || 'Invalid login details.');
       }
 
       onLoginSuccess(data.username || inputUser, data.role, data.email, data.phone, Boolean(data.emailVerified));
