@@ -2810,6 +2810,34 @@ img.inv-thumb:hover {
   }
 }
 
+/* Barcode scanner status line */
+.barcode-scanner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.barcode-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 32px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: var(--panel);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(32, 48, 71, 0.7);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.barcode-status.is-read {
+  background: rgba(31, 157, 139, 0.14);
+  color: #137a6b;
+}
+
 .account-management-intro {
   margin: 0 0 0.25rem;
   font-family: var(--f-sans);
