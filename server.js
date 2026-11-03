@@ -63,7 +63,6 @@ app.use(express.json({ limit: "10mb" }));
 const ah = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
-const userSessions = new Map();
 const USER_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 function readSessionToken(req) {
@@ -74,34 +73,36 @@ function readSessionToken(req) {
   return cookie ? cookie.slice("autosupply_session=".length) : null;
 }
 
+const hashSessionToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+// Looks up the signed-in user. Sessions are stored in the database, so they survive server restarts.
 async function getAuthenticatedUser(req) {
   const token = readSessionToken(req);
-  const session = token ? userSessions.get(token) : null;
-  if (!session) return null;
-  if (session.expiresAt <= Date.now()) {
-    userSessions.delete(token);
-    return null;
-  }
-
+  if (!token) return null;
   const [[user]] = await pool.query(
-    "SELECT id, username, role FROM users WHERE id=? LIMIT 1",
-    [session.userId],
+    `SELECT u.id, u.username, u.role
+     FROM user_sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = ? AND s.expires_at > NOW()
+     LIMIT 1`,
+    [hashSessionToken(token)],
   );
-  if (!user) userSessions.delete(token);
   return user || null;
 }
 
-function setUserSession(req, res, userId) {
-  const now = Date.now();
-  for (const [token, session] of userSessions) {
-    if (session.expiresAt <= now) userSessions.delete(token);
-  }
+// Removes every session of one user, for example after a password change or account deletion.
+async function endAllSessionsForUser(userId) {
+  await pool.query("DELETE FROM user_sessions WHERE user_id=?", [userId]);
+}
+
+async function setUserSession(req, res, userId) {
+  await pool.query("DELETE FROM user_sessions WHERE expires_at <= NOW()");
 
   const token = crypto.randomBytes(32).toString("hex");
-  userSessions.set(token, {
-    userId,
-    expiresAt: now + USER_SESSION_TTL_MS,
-  });
+  await pool.query(
+    "INSERT INTO user_sessions (token_hash, user_id, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))",
+    [hashSessionToken(token), userId, Math.floor(USER_SESSION_TTL_MS / 1000)],
+  );
   const secure = req.secure ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
@@ -109,9 +110,9 @@ function setUserSession(req, res, userId) {
   );
 }
 
-function clearUserSession(req, res) {
+async function clearUserSession(req, res) {
   const token = readSessionToken(req);
-  if (token) userSessions.delete(token);
+  if (token) await pool.query("DELETE FROM user_sessions WHERE token_hash=?", [hashSessionToken(token)]);
   const secure = req.secure ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
@@ -467,6 +468,16 @@ async function initializeDatabase() {
   await addColumnIfMissing("users", "email", "VARCHAR(255) NULL");
   await addColumnIfMissing("users", "email_verified_at", "DATETIME NULL");
   await addColumnIfMissing("users", "password_updated_at", "DATETIME NULL");
+  // Sign-in sessions. Only a hash of each token is stored, so a copy of this table cannot be used to sign in.
+  await pool.query(`CREATE TABLE IF NOT EXISTS user_sessions (
+    token_hash CHAR(64) PRIMARY KEY,
+    user_id INT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_sessions_user (user_id),
+    CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS email_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -1088,9 +1099,7 @@ app.put(
       );
       await connection.commit();
       if (password !== undefined && String(password).trim()) {
-        for (const [token, session] of userSessions) {
-          if (session.userId === userId) userSessions.delete(token);
-        }
+        await endAllSessionsForUser(userId);
       }
 
       // Send the confirmation code to the new address. The user confirms it from their Recovery Email dialog.
@@ -1172,9 +1181,7 @@ app.delete(
 
       await connection.query("DELETE FROM users WHERE id=?", [userId]);
       await connection.commit();
-      for (const [token, session] of userSessions) {
-        if (session.userId === userId) userSessions.delete(token);
-      }
+      await endAllSessionsForUser(userId);
       res.json({ ok: true });
     } catch (error) {
       await connection.rollback();
@@ -1276,7 +1283,7 @@ app.post(
       await pool.query("UPDATE users SET password_hash=? WHERE id=?", [hashPassword(String(password)), user.id]);
     }
 
-    setUserSession(req, res, user.id);
+    await setUserSession(req, res, user.id);
     res.json({
       username: user.username,
       role: user.role,
@@ -1419,17 +1426,18 @@ app.post(
       hashPassword(newPassword),
       user.id,
     ]);
-    for (const [token, session] of userSessions) {
-      if (session.userId === user.id) userSessions.delete(token);
-    }
+    await endAllSessionsForUser(user.id);
     res.json({ ok: true });
   }),
 );
 
-app.post("/api/logout", (req, res) => {
-  clearUserSession(req, res);
-  res.json({ ok: true });
-});
+app.post(
+  "/api/logout",
+  ah(async (req, res) => {
+    await clearUserSession(req, res);
+    res.json({ ok: true });
+  }),
+);
 
 /* ----------------------------- Inventory ---------------------------- */
 
