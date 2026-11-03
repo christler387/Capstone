@@ -56,6 +56,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
   const [imageFileName, setImageFileName] = useState(() =>
     getImageFileName(item?.image),
   );
@@ -89,6 +90,21 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   useEffect(() => {
     setImageFileName(getImageFileName(item?.image));
   }, [item?.image]);
+
+  // A saved picture has a full web address the user can copy. A new upload gets its address when the item is saved.
+  const pendingImage = Boolean(formData.image && formData.image.startsWith("data:"));
+  const savedImageUrl =
+    formData.image && !pendingImage ? new URL(formData.image, window.location.origin).href : "";
+
+  const copyImageUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(savedImageUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Could not copy the link. Select the address and copy it by hand.");
+    }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -602,15 +618,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           ref={imageInputRef}
           style={{ display: "none" }}
         />
-        <div className="flex-row-gap">
+        <div className="image-url-row">
           <input
             type="text"
-            className="form-input"
-            value={imageFileName}
+            className="form-input image-url-input"
+            value={pendingImage ? `${imageFileName || "New picture"} (not saved yet)` : savedImageUrl}
             placeholder="No image selected"
-            aria-label="Image file name"
+            aria-label="Picture URL"
             readOnly
-            style={{ flex: 1, minWidth: 0 }}
           />
           <button
             type="button"
@@ -621,6 +636,21 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             Choose Image
           </button>
         </div>
+        {savedImageUrl && (
+          <div className="image-url-actions">
+            <button type="button" className="olive-button btn-outline btn-mini" onClick={copyImageUrl}>
+              <i className={`bx ${copied ? "bx-check" : "bx-copy"}`} aria-hidden="true"></i>
+              {copied ? "Copied" : "Copy URL"}
+            </button>
+            <a className="olive-button btn-outline btn-mini" href={savedImageUrl} target="_blank" rel="noreferrer">
+              <i className="bx bx-link-external" aria-hidden="true"></i>
+              Open picture
+            </a>
+          </div>
+        )}
+        {pendingImage && (
+          <span className="image-url-hint">The picture link is created when you save the item.</span>
+        )}
       </div>
       <div className="form-group">
         <label className="label-micro">Compatible Vehicles</label>

@@ -2129,6 +2129,42 @@ footer p {
   cursor: not-allowed;
 }
 
+/* Item form: picture URL with copy and open actions */
+.image-url-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.image-url-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
+.image-url-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.image-url-actions .olive-button,
+.image-url-actions a.olive-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-decoration: none;
+}
+
+.image-url-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-family: var(--f-sans);
+  font-size: 11px;
+  color: rgba(32, 48, 71, 0.6);
+}
+
 .account-management-intro {
   margin: 0 0 0.25rem;
   font-family: var(--f-sans);
