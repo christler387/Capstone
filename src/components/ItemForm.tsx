@@ -52,7 +52,6 @@ const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
   quantity: "Quantity",
   price: "Price",
   compatibleVehicles: "Compatible vehicles",
-  image: "Picture",
   orderingCost: "Ordering cost",
   holdingCost: "Holding cost",
   leadTimeDays: "Lead time",
@@ -682,7 +681,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       
       <div className="form-group picture-field">
         <div className="picture-field-head">
-          <label className="label-micro" htmlFor="edit-image-url">Picture</label>
+          <label className="label-micro" htmlFor="edit-image-url">
+            Picture <span className="field-optional">optional</span>
+          </label>
           <span className="picture-field-note">JPG, PNG, WebP or GIF, up to 5 MB</span>
         </div>
         <input
@@ -705,7 +706,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           </div>
 
           <div className="picture-field-controls">
-            <div className={`picture-url-input${missingClass("image")}`}>
+            <div className="picture-url-input">
               <i className="bx bx-link" aria-hidden="true"></i>
               <input
                 id="edit-image-url"
@@ -762,7 +763,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               )}
             </div>
 
-            {isMissing("image") && <span className="field-missing-text">Required: paste a picture link or upload a file</span>}
             {pendingImage && (
               <span className="image-url-hint">This picture is in an older format. Upload it again to get a link.</span>
             )}
