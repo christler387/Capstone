@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5QrcodeScanType, Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5QrcodeScanType, Html5QrcodeScanner } from 'html5-qrcode';
 
 interface BarcodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -23,33 +23,26 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
         {
           // Faster frames and a sharper image make labels read sooner.
           fps: 30,
+          // A larger scan area finds labels that sit near the edge of the view.
           qrbox: (viewfinderWidth, viewfinderHeight) => ({
-            width: Math.min(viewfinderWidth * 0.9, 440),
-            height: Math.min(viewfinderHeight * 0.55, 220),
+            width: Math.min(viewfinderWidth * 0.92, 480),
+            height: Math.min(viewfinderHeight * 0.7, 260),
           }),
           videoConstraints: {
             facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // Keep the image sharp while the camera moves.
+            advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
           },
           // Use the browser's built-in barcode reader when it has one (Chrome and Edge), and fall back otherwise.
           useBarCodeDetectorIfSupported: true,
           showTorchButtonIfSupported: true,
+          // Zoom in a little by default, so small labels are large enough to read.
+          showZoomSliderIfSupported: true,
+          defaultZoomValueIfSupported: 2,
           supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.CODABAR,
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.PDF_417,
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-          ]
+          // No formats list: the reader looks for every supported barcode and QR type.
         },
         false
       );
