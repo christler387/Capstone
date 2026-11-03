@@ -110,6 +110,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       ? new URL(formData.image.trim(), window.location.origin).href
       : "";
 
+  const previewUrl = uploadingImage ? "" : pendingImage ? formData.image ?? "" : savedImageUrl;
+
   const copyImageUrl = async () => {
     try {
       await navigator.clipboard.writeText(savedImageUrl);
@@ -633,8 +635,11 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         </div>
       </div>
       
-      <div className="form-group">
-        <label className="label-micro">IMAGE</label>
+      <div className="form-group picture-field">
+        <div className="picture-field-head">
+          <label className="label-micro" htmlFor="edit-image-url">Picture</label>
+          <span className="picture-field-note">JPG, PNG, WebP or GIF, up to 5 MB</span>
+        </div>
         <input
           type="file"
           id="edit-image-file"
@@ -644,50 +649,79 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           ref={imageInputRef}
           style={{ display: "none" }}
         />
-        <div className="image-url-row">
-          <input
-            type="text"
-            className="form-input image-url-input"
-            value={
-              uploadingImage
-                ? "Uploading picture…"
-                : pendingImage
-                  ? `${imageFileName || "Picture"} (choose it again for a link)`
-                  : formData.image ?? ""
-            }
-            placeholder="Paste a picture link (https://…) or choose a file"
-            aria-label="Picture URL"
-            disabled={readOnly || uploadingImage}
-            readOnly={pendingImage}
-            onChange={(event) => {
-              setFormData((prev) => ({ ...prev, image: event.target.value }));
-              setError(null);
-            }}
-          />
-          <button
-            type="button"
-            className="olive-button btn-outline"
-            onClick={() => imageInputRef.current?.click()}
-            disabled={readOnly}
-          >
-            Choose Image
-          </button>
-        </div>
-        {savedImageUrl && (
-          <div className="image-url-actions">
-            <button type="button" className="olive-button btn-outline btn-mini" onClick={copyImageUrl}>
-              <i className={`bx ${copied ? "bx-check" : "bx-copy"}`} aria-hidden="true"></i>
-              {copied ? "Copied" : "Copy URL"}
-            </button>
-            <a className="olive-button btn-outline btn-mini" href={savedImageUrl} target="_blank" rel="noreferrer">
-              <i className="bx bx-link-external" aria-hidden="true"></i>
-              Open picture
-            </a>
+
+        <div className="picture-field-body">
+          <div className={`picture-preview ${previewUrl ? "" : "is-empty"}`}>
+            {previewUrl ? (
+              <img src={previewUrl} alt="Item picture preview" referrerPolicy="no-referrer" />
+            ) : (
+              <i className="bx bx-image-add" aria-hidden="true"></i>
+            )}
           </div>
-        )}
-        {pendingImage && (
-          <span className="image-url-hint">This picture is in an older format. Choose it again to get a link.</span>
-        )}
+
+          <div className="picture-field-controls">
+            <div className="picture-url-input">
+              <i className="bx bx-link" aria-hidden="true"></i>
+              <input
+                id="edit-image-url"
+                type="text"
+                value={
+                  uploadingImage
+                    ? "Uploading picture…"
+                    : pendingImage
+                      ? `${imageFileName || "Picture"} (choose it again for a link)`
+                      : formData.image ?? ""
+                }
+                placeholder="Paste a picture link, or upload a file"
+                disabled={readOnly || uploadingImage}
+                readOnly={pendingImage}
+                onChange={(event) => {
+                  setFormData((prev) => ({ ...prev, image: event.target.value }));
+                  setError(null);
+                }}
+              />
+              {formData.image && !readOnly && !uploadingImage && (
+                <button
+                  type="button"
+                  className="inv-icon-btn"
+                  aria-label="Remove picture"
+                  title="Remove picture"
+                  onClick={() => setFormData((prev) => ({ ...prev, image: "" }))}
+                >
+                  <i className="bx bx-x" aria-hidden="true"></i>
+                </button>
+              )}
+            </div>
+
+            <div className="picture-actions">
+              <button
+                type="button"
+                className="picture-action"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={readOnly || uploadingImage}
+              >
+                <i className="bx bx-upload" aria-hidden="true"></i>
+                Upload file
+              </button>
+              {savedImageUrl && (
+                <button type="button" className="picture-action" onClick={copyImageUrl}>
+                  <i className={`bx ${copied ? "bx-check" : "bx-copy"}`} aria-hidden="true"></i>
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              )}
+              {savedImageUrl && (
+                <a className="picture-action" href={savedImageUrl} target="_blank" rel="noreferrer">
+                  <i className="bx bx-link-external" aria-hidden="true"></i>
+                  Open
+                </a>
+              )}
+            </div>
+
+            {pendingImage && (
+              <span className="image-url-hint">This picture is in an older format. Upload it again to get a link.</span>
+            )}
+          </div>
+        </div>
       </div>
       <div className="form-group">
         <label className="label-micro">Compatible Vehicles</label>
