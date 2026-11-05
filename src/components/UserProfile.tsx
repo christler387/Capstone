@@ -698,7 +698,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                         </div>
 
                         <div
-                          className="flex-row-center"
+                          className="flex-row-center audit-side"
                           style={{ gap: "0.75rem", flexShrink: 0 }}
                         >
                           <div

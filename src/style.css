@@ -2003,10 +2003,21 @@ footer p {
 }
 
 /* Audit row undo: button and confirm panel */
+/* Right side of each activity row: value, date and Undo stacked on one right edge. */
+.flex-row-center.audit-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.4rem !important;
+}
+
 .audit-undo-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
+  width: 5.5rem;
   white-space: nowrap;
   padding: 4px 10px;
   border: 1px solid rgba(175, 4, 4, 0.2);
