@@ -4820,11 +4820,15 @@ select.aisle-editor-input {
   overflow-x: clip;
 }
 
-/* Not sticky: a pinned panel gets pushed under the app header at the bottom of the
-   page. It sits in normal flow with a clear gap instead, so the two never touch. */
+/* Keeps the editor's place in the page. WarehouseMap pins it under the app header
+   (position: fixed) when scrolling would carry it up into the header. */
+.aisle-editor-slot {
+  margin-bottom: 1.5rem;
+}
+
 .aisle-editor {
   position: relative;
-  margin-bottom: 1.5rem;
+  z-index: 30;
 }
 
 /* Save and Cancel sit to the right of Delete aisle inside the editor header */

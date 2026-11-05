@@ -137,6 +137,44 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 }) => {
   const isAdmin = userRole === 'admin';
   const gridRef = useRef<HTMLDivElement>(null);
+  // The aisle editor keeps its place in the page. Once scrolling would carry it under the
+  // app header, it is pinned just below the header (with a gap) and the slot keeps the space.
+  const editorSlotRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const slot = editorSlotRef.current;
+    const editor = editorRef.current;
+    if (!slot || !editor) return;
+    const EDITOR_GAP = 16;
+    const update = () => {
+      const header = document.querySelector('.app-header')?.getBoundingClientRect();
+      const slotRect = slot.getBoundingClientRect();
+      const pinTop = (header?.bottom ?? 0) + EDITOR_GAP;
+      if (slotRect.top < pinTop) {
+        // scrollHeight is the full content height even while the panel is capped.
+        slot.style.height = `${editor.scrollHeight}px`;
+        // Keep the whole panel reachable on short screens: it scrolls inside itself.
+        Object.assign(editor.style, {
+          position: 'fixed',
+          top: `${pinTop}px`,
+          left: `${slotRect.left}px`,
+          width: `${slotRect.width}px`,
+          maxHeight: `calc(100vh - ${pinTop + EDITOR_GAP}px)`,
+          overflowY: 'auto',
+        });
+      } else {
+        slot.style.height = '';
+        Object.assign(editor.style, { position: '', top: '', left: '', width: '', maxHeight: '', overflowY: '' });
+      }
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  });
   const [activeFloorId, setActiveFloorId] = useState<number | null>(readStoredFloorId);
   const [analyticsScope, setAnalyticsScope] = useState<'floor' | 'all'>('floor');
   const [floorDialog, setFloorDialog] = useState<{ mode: 'add' | 'rename'; floorId?: number } | null>(null);
@@ -1085,7 +1123,8 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       </div>
 
       {isEditing && (
-        <section className="aisle-editor" aria-label="Aisle settings">
+        <div className="aisle-editor-slot" ref={editorSlotRef}>
+        <section className="aisle-editor" aria-label="Aisle settings" ref={editorRef}>
           {selectedAisle ? (
             <>
               <header className="aisle-editor-header">
@@ -1262,6 +1301,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
           )}
           <p className="aisle-editor-note">Save Layout applies every change at once. Cancel discards them.</p>
         </section>
+        </div>
       )}
 
       <div className="warehouse-layout-container">
