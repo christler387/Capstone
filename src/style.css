@@ -2004,9 +2004,12 @@ footer p {
 
 /* Audit row undo: button and confirm panel */
 /* Right side of each activity row: value, date and Undo stacked on one right edge. */
+/* Fixed width, so every row's right column ends at the same x, whatever the date length. */
 .flex-row-center.audit-side {
   display: flex;
   flex-direction: column;
+  flex: 0 0 7.25rem;
+  width: 7.25rem;
   align-items: flex-end;
   justify-content: center;
   gap: 0.4rem !important;
