@@ -2007,6 +2007,7 @@ footer p {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  white-space: nowrap;
   padding: 4px 10px;
   border: 1px solid rgba(175, 4, 4, 0.2);
   border-radius: 999px;
