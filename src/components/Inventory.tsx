@@ -305,7 +305,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
 
                 <span className={`inv-num inv-qty ${needsReorder ? 'is-alert' : ''}`} role="cell">
-                  {String(i.quantity).padStart(3, '0')}
+                  {i.quantity.toLocaleString()}
                 </span>
 
                 <button
@@ -315,7 +315,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                   title="Open stock-in for this item"
                   onClick={(event) => { event.stopPropagation(); onGoToStock(i.id); }}
                 >
-                  {String(reorderQuantity).padStart(2, '0')}
+                  {reorderQuantity.toLocaleString()}
                 </button>
 
                 <span className="inv-num inv-price" role="cell">{formatPeso(i.price)}</span>

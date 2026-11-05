@@ -99,7 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
     <div className="stats-bar">
       <div className="stat-box">
         <span className="label-micro">Total Items</span>
-        <p className="stat-value">{String(totalItems).padStart(3, '0')}</p>
+        <p className="stat-value">{totalItems.toLocaleString()}</p>
       </div>
       <div className="stat-box">
         <span className="label-micro">Inventory Value</span>
@@ -107,7 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
       </div>
       <div className="stat-box">
         <span className="label-micro">Critical Alerts</span>
-        <p className="stat-value" style={{ color: 'var(--accent)' }}>{String(lowCount).padStart(3, '0')}</p>
+        <p className="stat-value" style={{ color: 'var(--accent)' }}>{lowCount.toLocaleString()}</p>
       </div>
     </div>
   );

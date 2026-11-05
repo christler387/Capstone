@@ -995,13 +995,12 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
     <div className="app-container">
       <div className="content-wrapper">
         {databaseError && <div className="alert-text mb-4">{databaseError}</div>}
-        <header>
-          <div className="header-info" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <img className="brand-logo" src={skyrunLogo} alt="SkyRun logo" aria-label="SkyRun logo" style={{ width: '42px', height: '42px', objectFit: 'contain' }} />
-            <h1 className="title-main" style={{ margin: 0 }}>
-              {currentSection === 'dashboard' 
-                ? 'SKYRUN' 
-                : (currentSection === 'warehouse' ? 'Warehouse Map' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1))}
+        <header className="app-header">
+          <div className="header-info">
+            <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
+            <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
+            <h1 className="sr-only">
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation currentSection={currentSection} onSectionChange={setCurrentSection} />

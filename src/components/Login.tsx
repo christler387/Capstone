@@ -66,7 +66,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
           <span className="brand-wordmark">SKYRUN</span>
         </div>
 
-        <h1 className="login-title">Login</h1>
+        <h1 className="login-title">Welcome back</h1>
+        <p className="login-subtitle">Sign in to manage inventory and stock.</p>
 
         {error && (
           <div className="login-alert">

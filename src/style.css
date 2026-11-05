@@ -5481,3 +5481,386 @@ img {
   font-size: 13px;
   color: rgba(32, 48, 71, 0.72);
 }
+
+/* ==========================================================================
+   DESIGN SYSTEM PASS
+   Final layer: shared tokens and primitives (type, buttons, inputs, cards,
+   navigation, focus, scrollbars, responsive header). Feature sections above
+   keep their layout; this layer makes them read as one product.
+   ========================================================================== */
+:root {
+  --ink-muted: #5b6b82;
+  --ink-faint: #8a97a8;
+  --surface: #fffdf9;
+  --surface-hover: #f3efe6;
+  --line-strong: rgba(32, 48, 71, 0.28);
+  --focus-ring: 0 0 0 3px rgba(56, 103, 168, 0.35);
+  --shadow-sm: 0 1px 2px rgba(32, 48, 71, 0.06);
+  --shadow-md: 0 6px 18px rgba(32, 48, 71, 0.08);
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --control-h: 44px;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+}
+
+/* Form controls and buttons ignore the page font unless told to inherit it. */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button { cursor: pointer; }
+button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* Keyboard focus is always visible; mouse clicks do not show a ring. */
+:focus-visible {
+  outline: 2px solid var(--button);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+/* Scrollbars stay available (thin and quiet) so long lists can be scrolled by mouse. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(32, 48, 71, 0.25) transparent;
+}
+*::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(32, 48, 71, 0.22); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+body {
+  font-size: 15px;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: rgba(56, 103, 168, 0.22); }
+
+/* ---- Type scale ---- */
+.label-micro, .label-table {
+  font-family: var(--f-sans);
+  font-size: 12px;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+.title-main {
+  font-family: var(--f-sans);
+  font-style: normal;
+  font-weight: 700;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+
+/* ---- App header and brand ---- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: 0;
+  padding: var(--space-3) var(--gap);
+  background: rgba(247, 243, 235, 0.92);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--line-soft);
+  gap: var(--space-3);
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.header-info .brand-logo { width: 36px; height: 36px; }
+
+.brand-wordmark--header {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.top-nav {
+  margin-top: 0;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  scrollbar-width: none;
+}
+.top-nav::-webkit-scrollbar { display: none; }
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-family: var(--f-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  padding: 0 0.95rem;
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-muted);
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+.nav-btn .bx { font-size: 1.05rem; }
+.nav-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.nav-btn.active,
+.nav-btn.active:hover {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(175, 4, 4, 0.25);
+}
+
+/* ---- Buttons ---- */
+.olive-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h);
+  padding: 0 1.1rem;
+  font-family: var(--f-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.08s ease;
+}
+.olive-button:hover { opacity: 1; box-shadow: var(--shadow-sm); }
+.olive-button:active:not(:disabled) { transform: translateY(1px); }
+.olive-button:not(.btn-outline):not(.btn-danger) { background: var(--ink); color: var(--bg); }
+.olive-button:not(.btn-outline):not(.btn-danger):hover:not(:disabled) { background: #2c3e5a; }
+.olive-button.btn-outline {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+}
+.olive-button.btn-outline:not(:disabled):hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+  border-color: var(--ink-muted);
+  box-shadow: var(--shadow-sm);
+}
+.olive-button.btn-danger { background: var(--accent); color: #fff; border: 1px solid transparent; }
+.olive-button.btn-danger:hover:not(:disabled) { background: #8f0303; }
+.olive-button.btn-mini {
+  min-height: 30px;
+  padding: 0 0.6rem;
+  font-size: 0.75rem;
+  border-radius: 7px;
+}
+
+/* ---- Inputs ---- */
+input[type='text'], input[type='search'], input[type='number'], input[type='password'],
+input[type='email'], input[type='tel'], input[type='url'], input[type='date'], input[type='datetime-local'],
+select, textarea {
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+input[type='text']:focus, input[type='search']:focus, input[type='number']:focus,
+input[type='password']:focus, input[type='email']:focus, input[type='tel']:focus,
+input[type='date']:focus, select:focus, textarea:focus {
+  border-color: var(--button);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+::placeholder { color: var(--ink-faint); opacity: 1; }
+
+/* ---- Cards and panels ---- */
+.dash-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Login ---- */
+.login-shell {
+  padding: var(--space-8);
+  gap: 4rem;
+  background: var(--bg);
+}
+
+.login-panel {
+  min-height: 0;
+  width: min(100%, 400px);
+  padding: 2.25rem 2.25rem 2rem;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.login-panel .brand-lockup {
+  justify-content: flex-start;
+  margin-bottom: 1.75rem;
+}
+
+.login-panel .brand-wordmark {
+  font-size: 1.4rem;
+  letter-spacing: 0.1em;
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.25rem;
+}
+
+.login-subtitle {
+  margin: 0 0 1.5rem;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.input-block label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.input-block input {
+  min-height: var(--control-h);
+  padding: 0 0.9rem;
+  font-size: 0.95rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.input-block input:focus {
+  border-color: var(--button);
+  box-shadow: var(--focus-ring);
+}
+
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 2.75rem; }
+.password-toggle {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-muted);
+}
+.password-toggle:hover { background: var(--surface-hover); color: var(--ink); }
+
+.login-forgot {
+  align-self: flex-end;
+  margin-top: -0.4rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--button);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.login-forgot:hover { text-decoration: underline; }
+
+.login-button {
+  min-height: 48px;
+  margin-top: 0.25rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--f-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+.login-button:hover:not(:disabled) { background: #2c3e5a; box-shadow: var(--shadow-sm); }
+
+.login-alert {
+  border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
+  font-size: 0.85rem;
+}
+
+.login-art { width: min(44vw, 640px); transform: none; align-self: center; }
+
+/* ---- Responsive header and layout ---- */
+@media (min-width: 900px) {
+  .app-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+  .top-nav { flex: 0 1 auto; }
+}
+
+@media (max-width: 899px) {
+  .app-header { padding: var(--space-3) var(--space-4); }
+  .top-nav { width: 100%; }
+  .nav-btn { min-height: 40px; padding: 0 0.8rem; }
+}
+
+@media (max-width: 767px) {
+  .stats-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats-bar > .stat-box:last-child { grid-column: 1 / -1; border-bottom: none; }
+  .stat-box { padding: 1.1rem var(--space-4); }
+  .inv-header { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 700px) {
+  .login-shell { padding: var(--space-6); gap: 0; }
+  .login-panel { padding: 1.75rem 1.5rem 1.5rem; }
+}
+
+/* ---- Touch: bigger targets ---- */
+@media (pointer: coarse) {
+  .olive-button { min-height: 48px; }
+  input[type='text'], input[type='search'], input[type='number'], input[type='date'], select {
+    min-height: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-btn, .olive-button, .login-button, input, select, textarea {
+    transition: none !important;
+  }
+}
