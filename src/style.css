@@ -4820,10 +4820,11 @@ select.aisle-editor-input {
   overflow-x: clip;
 }
 
+/* Not sticky: a pinned panel gets pushed under the app header at the bottom of the
+   page. It sits in normal flow with a clear gap instead, so the two never touch. */
 .aisle-editor {
-  position: sticky;
-  top: 12px;
-  z-index: 30;
+  position: relative;
+  margin-bottom: 1.5rem;
 }
 
 /* Save and Cancel sit to the right of Delete aisle inside the editor header */
