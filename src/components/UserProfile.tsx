@@ -597,6 +597,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     const isMovement = "qty" in m;
                     const isIn = isMovement && m.type === "IN";
                     const actionLabel = isMovement ? m.type : m.action;
+                    // A quantity change made in the item form, shown as an adjustment.
+                    const qtyChange = "quantityChange" in m ? m.quantityChange : undefined;
+                    const qtyDelta = qtyChange ? qtyChange.to - qtyChange.from : 0;
                     const localDateTimestamp = new Date(
                       `${m.date}T00:00:00`,
                     ).getTime();
@@ -670,10 +673,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                 : item?.name || m.itemId}
                             </span>
                             <span
-                              className={`status-chip ${actionLabel === "IN" || actionLabel === "ADD" ? "status-optimal" : "status-critical"}`}
+                              className={`status-chip ${qtyChange ? (qtyDelta >= 0 ? "status-optimal" : "status-critical") : actionLabel === "IN" || actionLabel === "ADD" ? "status-optimal" : "status-critical"}`}
                               style={{ padding: "1px 6px", fontSize: "9px" }}
                             >
-                              {actionLabel}
+                              {qtyChange ? "ADJUST" : actionLabel}
                             </span>
                           </div>
 
@@ -688,6 +691,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                             <span className="font-mono opacity-50">
                               ID: {m.itemId}
                             </span>
+                            {qtyChange && (
+                              <span className="font-mono opacity-50" style={{ marginLeft: "0.5rem" }}>
+                                Qty {qtyChange.from} → {qtyChange.to}
+                              </span>
+                            )}
                             <span
                               className="font-mono opacity-50"
                               style={{ marginLeft: "0.5rem" }}
@@ -706,12 +714,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                             style={{ textAlign: "right" }}
                           >
                             <span
-                              className={`label-micro font-mono ${isIn || actionLabel === "ADD" ? "text-success" : "text-accent"}`}
+                              className={`label-micro font-mono ${isIn || actionLabel === "ADD" || (qtyChange && qtyDelta >= 0) ? "text-success" : "text-accent"}`}
                               style={{ fontWeight: "bold", fontSize: "14px" }}
                             >
                               {isMovement
                                 ? `${isIn ? "+" : "-"}${m.qty}`
-                                : actionLabel}
+                                : qtyChange
+                                  ? `${qtyDelta > 0 ? "+" : ""}${qtyDelta}`
+                                  : actionLabel}
                             </span>
                             <span
                               className="label-micro font-mono text-micro opacity-50"

@@ -588,6 +588,9 @@ async function initializeDatabase() {
     );
   }
 
+  // Quantity changes are recorded in the audit log as QTY entries.
+  await pool.query("ALTER TABLE inventory_audit MODIFY COLUMN action ENUM('ADD', 'DELETE', 'QTY') NOT NULL");
+
   const [[inventoryCount]] = await pool.query(
     "SELECT COUNT(*) AS count FROM inventory",
   );
@@ -658,6 +661,20 @@ function toMovement(row) {
   };
 }
 
+// The old and new quantity stored with a QTY audit entry.
+function quantityChangeOf(itemData) {
+  let data = itemData;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!data || !Number.isFinite(Number(data.oldQuantity))) return undefined;
+  return { from: Number(data.oldQuantity), to: Number(data.newQuantity) };
+}
+
 function toInventoryAudit(row) {
   const created = new Date(row.created_at);
   return {
@@ -668,6 +685,7 @@ function toInventoryAudit(row) {
     date: created.toISOString().slice(0, 10),
     timestamp: created.getTime(),
     createdBy: row.created_by || undefined,
+    quantityChange: row.action === "QTY" ? quantityChangeOf(row.item_data) : undefined,
   };
 }
 
@@ -1636,7 +1654,7 @@ app.put(
       await connection.beginTransaction();
       try {
         const [[current]] = await connection.query(
-          "SELECT version FROM inventory WHERE id=? FOR UPDATE",
+          "SELECT version, quantity FROM inventory WHERE id=? FOR UPDATE",
           [itemId],
         );
         if (!current) {
@@ -1664,6 +1682,21 @@ app.put(
           `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
           [...values, itemId],
         );
+        const oldQuantity = Number(current.quantity);
+        const newQuantity = Number(item.quantity) || 0;
+        if (newQuantity !== oldQuantity) {
+          await connection.query(
+            "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+              `AUDIT-QTY-${crypto.randomUUID()}`,
+              itemId,
+              item.name,
+              "QTY",
+              JSON.stringify({ oldQuantity, newQuantity, delta: newQuantity - oldQuantity }),
+              item.updatedBy || "Unknown",
+            ],
+          );
+        }
         await connection.commit();
         return { status: 200, version: Number(current.version) + 1 };
       } catch (error) {
@@ -1742,6 +1775,22 @@ app.patch(
         await connection.query("DELETE FROM inventory WHERE id=?", [
           audit.item_id,
         ]);
+      } else if (audit.action === "QTY") {
+        const change = quantityChangeOf(audit.item_data);
+        if (!change) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: "This entry cannot be undone because its quantity details are unavailable.",
+          });
+        }
+        const [result] = await connection.query(
+          "UPDATE inventory SET quantity = GREATEST(0, quantity - ?), version = version + 1 WHERE id=?",
+          [change.to - change.from, audit.item_id],
+        );
+        if (result.affectedRows === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: "Item not found." });
+        }
       } else {
         const item =
           typeof audit.item_data === "string"

@@ -704,11 +704,14 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   };
 
   const updateItem = async (id: string, data: Item) => {
+    const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
     const savedItem = await requestJson<Item>(`/inventory/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, updatedBy: currentUser }),
     });
     setInventory(prev => prev.map(i => i.id === id ? savedItem : i));
+    // A quantity change adds an audit entry, so the activity list is refreshed too.
+    setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
   const deleteItem = async (id: string) => {

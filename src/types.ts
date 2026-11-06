@@ -45,7 +45,7 @@ export interface Movement {
   createdBy?: string;
 }
 
-export type InventoryAuditAction = 'ADD' | 'DELETE';
+export type InventoryAuditAction = 'ADD' | 'DELETE' | 'QTY';
 
 export type AisleOrientation = 'portrait' | 'landscape';
 
@@ -85,6 +85,8 @@ export interface InventoryAuditEntry {
   date: string;
   timestamp: number;
   createdBy?: string;
+  // For QTY entries: the quantity before and after the change.
+  quantityChange?: { from: number; to: number };
 }
 
 
