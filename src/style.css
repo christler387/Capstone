@@ -2404,7 +2404,7 @@ footer p {
 }
 
 .inv-table {
-  min-width: 1640px;
+  min-width: 1656px;
 }
 
 /* Picture and part name stay in view while the wide table scrolls sideways.
@@ -2437,7 +2437,7 @@ footer p {
 
 .inv-row {
   display: grid;
-  grid-template-columns: 64px minmax(220px, 2fr) 120px 120px 120px 120px 90px 90px 150px 76px 100px 120px 84px;
+  grid-template-columns: 64px minmax(220px, 2fr) 120px 120px 120px 120px 90px 90px 150px 76px 116px 120px 84px;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
@@ -2468,6 +2468,8 @@ footer p {
 
 .inv-head .num.is-centered {
   text-align: center;
+  padding-left: 1.5rem;
+  white-space: nowrap;
 }
 
 .inv-sort {
@@ -2656,13 +2658,15 @@ img.inv-thumb:hover {
   width: 100%;
   justify-self: stretch;
   text-align: center;
-  padding: 2px 6px;
+  /* Extra left padding moves the centre of the column to the right. */
+  padding: 2px 6px 2px 1.5rem;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   font: inherit;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  justify-self: end;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
