@@ -2463,6 +2463,10 @@ footer p {
   text-align: right;
 }
 
+.inv-head .num.is-centered {
+  text-align: center;
+}
+
 .inv-sort {
   display: inline-flex;
   align-items: center;
@@ -2644,6 +2648,9 @@ img.inv-thumb:hover {
 }
 
 .inv-reorder {
+  width: 100%;
+  justify-self: stretch;
+  text-align: center;
   padding: 2px 6px;
   border: 1px solid transparent;
   border-radius: 8px;

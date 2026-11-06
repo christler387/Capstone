@@ -235,7 +235,7 @@ export const Inventory: React.FC<InventoryProps> = ({
             <span role="columnheader">Size</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
-            <span role="columnheader" className="num">Reorder qty</span>
+            <span role="columnheader" className="num is-centered">Reorder qty</span>
             <span role="columnheader" className="num">Price</span>
             <span role="columnheader" className="num">{isAdmin ? 'Actions' : 'Locate'}</span>
           </div>
