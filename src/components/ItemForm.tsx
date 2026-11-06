@@ -4,7 +4,7 @@ import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
 
 // Typed fields that suggest values already saved on other items.
-const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "itemType", "model", "color", "unitOfMeasure"];
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -498,25 +498,19 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <ScannerDialog onScanSuccess={handleBarcodeScanned} onClose={closeScanner} />
         )}
 
+      </div>
+      <div className="grid-3 border-soft-no-pad p-0">
         <div className="form-group">
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
           </label>
           {renderDescriptorField("category", "Category", "Type or pick", true)}
         </div>
-      </div>
-      <div className="grid-3 border-soft-no-pad p-0">
         <div className="form-group">
           <label className="label-micro">
             Brand
           </label>
           {renderDescriptorField("brand", "Brand", "")}
-        </div>
-        <div className="form-group">
-          <label className="label-micro">
-            Type
-          </label>
-          {renderDescriptorField("itemType", "Type", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
