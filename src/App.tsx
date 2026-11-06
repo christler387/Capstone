@@ -67,6 +67,33 @@ const App: React.FC = () => {
   // The warehouse layout loads on its own, so a layout problem never blocks the inventory.
   const refreshLayout = () => requestJson<WarehouseLayout>('/layout').then(setLayout);
 
+  // Other people use the system too, so lists are reloaded from the server after every change
+  // instead of being patched from memory.
+  const reloadInventory = () => requestJson<Item[]>('/inventory').then(setInventory);
+  const reloadMovements = () => requestJson<Movement[]>('/movements').then(setMovements);
+  const reloadAll = () =>
+    Promise.all([
+      reloadInventory(),
+      reloadMovements(),
+      requestJson<InventoryAuditEntry[]>('/inventory-audit').then(setInventoryAudit),
+    ]).then(() => undefined);
+
+  // Keep the screens current while others work: refresh when the window is shown again and every 30 seconds.
+  useEffect(() => {
+    if (!user) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') reloadAll().catch(() => undefined);
+    };
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [user]);
+
   useEffect(() => {
     refreshLayout().catch(() => setLayout([]));
   }, []);
@@ -700,10 +727,8 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
       method: 'POST',
       body: JSON.stringify(movement),
     });
-    setMovements(prev => [...prev, savedMovement]);
-    setInventory(prev => prev.map(i => i.id === movement.itemId
-      ? { ...i, quantity: i.quantity + (movement.type === 'IN' ? movement.qty : -movement.qty) }
-      : i));
+    setMovements(prev => (prev.some(m => m.id === savedMovement.id) ? prev : [...prev, savedMovement]));
+    await reloadInventory();
   };
 
   const undoMovement = async (movementId: string, undoQuantity: number) => {
@@ -719,15 +744,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
     setMovements(prev => result.deleted
       ? prev.filter(m => m.id !== movementId)
       : prev.map(m => m.id === movementId && result.movement ? result.movement : m));
-    setInventory(prev => prev.map(i => {
-      if (i.id === movementToUndo.itemId) {
-        return {
-          ...i,
-          quantity: Math.max(0, i.quantity + (movementToUndo.type === 'IN' ? -undoQuantity : undoQuantity))
-        };
-      }
-      return i;
-    }));
+    await reloadInventory();
   };
 
   const undoInventoryAudit = async (auditId: string) => {
@@ -744,11 +761,24 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   };
 
   const bulkUpdateInventory = async (newInventory: Item[]) => {
-    await Promise.all(newInventory.map(item => requestJson<Item>(`/inventory/${encodeURIComponent(item.id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(item),
-    })));
-    setInventory([...newInventory]);
+    // Send only the items that changed, so an untouched item is never overwritten.
+    const changed = newInventory.filter(item => {
+      const current = inventory.find(i => i.id === item.id);
+      return !current || JSON.stringify(current) !== JSON.stringify(item);
+    });
+    const results = await Promise.allSettled(changed.map(item =>
+      requestJson<Item>(`/inventory/${encodeURIComponent(item.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(item),
+      }),
+    ));
+    await reloadInventory();
+    const failed = results.filter(result => result.status === 'rejected').length;
+    if (failed > 0) {
+      const message = `${failed} item(s) were changed by someone else while you were working. The latest data is now shown; please check the warehouse map and try again.`;
+      setDatabaseError(message);
+      throw new Error(message);
+    }
   };
 
   const handleAddItem = (rackStr?: string) => {
@@ -772,8 +802,9 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
     if (exists && (!editingItem || editingItem.id === data.id)) {
       await updateItem(data.id, data);
     } else if (exists && editingItem && editingItem.id !== data.id) {
-      await deleteItem(editingItem.id);
+      // Add under the new ID first: if that fails, the original item is still there.
       await addItem(data);
+      await deleteItem(editingItem.id);
     } else {
       await addItem(data);
     }

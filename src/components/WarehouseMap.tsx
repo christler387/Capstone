@@ -325,7 +325,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
       }
       return item;
     });
-    onBulkUpdate(newInventory);
+    Promise.resolve(onBulkUpdate(newInventory)).catch(() => undefined);
     setOptimizationResult(null);
   };
 
@@ -784,7 +784,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     const movedInventory = inventory.map(item =>
       normalizeRack(item.rack) === normalizeRack(code) ? { ...item, rack: targetRack } : item,
     );
-    onBulkUpdate(movedInventory);
+    Promise.resolve(onBulkUpdate(movedInventory)).catch(() => undefined);
     updateDraft(copy => {
       const found = findInCopy(copy, aisleId);
       if (found) found.aisle.racks.pop();

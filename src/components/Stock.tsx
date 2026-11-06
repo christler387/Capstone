@@ -31,6 +31,7 @@ export const Stock: React.FC<StockProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showConfirmOverdraw, setShowConfirmOverdraw] = useState<boolean>(false);
   const [pendingMovement, setPendingMovement] = useState<Movement | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   const [itemSearch, setItemSearch] = useState('');
   const [formData, setFormData] = useState({
     itemId: selectedItemId || '',
@@ -109,7 +110,8 @@ export const Stock: React.FC<StockProps> = ({
 
     const activeUserName = userName || sessionStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
     const movement: Movement = {
-      id: `MOV-${Date.now()}`,
+      // Unique per record, so two people recording at the same moment never share an ID.
+      id: `MOV-${crypto.randomUUID()}`,
       itemId: formData.itemId,
       type: type.toUpperCase() as 'IN' | 'OUT',
       qty: formData.qty,
@@ -121,11 +123,19 @@ export const Stock: React.FC<StockProps> = ({
   };
 
   const confirmMovement = async () => {
-    if (!pendingMovement) return;
-    await onAddMovement(pendingMovement);
-    setFormData(prev => ({ ...prev, qty: 0 }));
-    setPendingMovement(null);
-    setShowConfirmOverdraw(false);
+    if (!pendingMovement || isRecording) return;
+    setIsRecording(true);
+    setError(null);
+    try {
+      await onAddMovement(pendingMovement);
+      setFormData(prev => ({ ...prev, qty: 0 }));
+      setPendingMovement(null);
+      setShowConfirmOverdraw(false);
+    } catch (recordError) {
+      setError(recordError instanceof Error ? recordError.message : 'Could not record the movement. Please try again.');
+    } finally {
+      setIsRecording(false);
+    }
   };
 
 
@@ -303,7 +313,7 @@ export const Stock: React.FC<StockProps> = ({
         footer={
           <div className="flex-row-gap" style={{ width: '100%' }}>
             <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => setPendingMovement(null)}>Cancel</button>
-            <button className={`olive-button ${pendingMovement?.type === 'OUT' ? 'btn-danger' : ''}`} style={{ flex: 1 }} onClick={confirmMovement}>Confirm</button>
+            <button className={`olive-button ${pendingMovement?.type === 'OUT' ? 'btn-danger' : ''}`} style={{ flex: 1 }} onClick={confirmMovement} disabled={isRecording}>{isRecording ? 'Recording…' : 'Confirm'}</button>
           </div>
         }
       >

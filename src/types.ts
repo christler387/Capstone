@@ -23,6 +23,8 @@ export interface Item {
   holdingCost?: number;
   leadTimeDays?: number;
   safetyStock?: number;
+  // Changes each time the item is saved. Sent back on save so an out-of-date edit is refused.
+  version?: number;
   brand?: string;
   itemType?: string;
   model?: string;

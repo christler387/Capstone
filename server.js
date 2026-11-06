@@ -63,6 +63,36 @@ app.use(express.json({ limit: "10mb" }));
 const ah = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
+// Item writes run one at a time, so two people saving at once cannot both pass the
+// "ID / barcode is free" check and then both insert it. The lock is held on one connection.
+const INVENTORY_LOCK = "skyrun:inventory";
+async function withInventoryLock(run) {
+  const connection = await pool.getConnection();
+  try {
+    const [[lock]] = await connection.query("SELECT GET_LOCK(?, 15) AS acquired", [INVENTORY_LOCK]);
+    if (Number(lock?.acquired) !== 1) {
+      const busy = new Error("The system is busy with another change. Please try again.");
+      busy.httpStatus = 503;
+      throw busy;
+    }
+    try {
+      return await run(connection);
+    } finally {
+      await connection.query("SELECT RELEASE_LOCK(?)", [INVENTORY_LOCK]);
+    }
+  } finally {
+    connection.release();
+  }
+}
+
+// The next free numeric item ID, for telling someone who picked a taken ID what to use instead.
+async function nextFreeItemId(connection) {
+  const [[row]] = await connection.query(
+    "SELECT COALESCE(MAX(CAST(id AS UNSIGNED)), 0) AS maxId FROM inventory WHERE id REGEXP '^[0-9]+$'",
+  );
+  return String(Number(row.maxId) + 1).padStart(3, "0");
+}
+
 const USER_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 function readSessionToken(req) {
@@ -439,6 +469,8 @@ async function initializeDatabase() {
     "safety_stock",
     "INT NOT NULL DEFAULT 10",
   );
+  // Bumped on every change to the item, so an edit made from an older copy is refused.
+  await addColumnIfMissing("inventory", "version", "INT NOT NULL DEFAULT 0");
   // Descriptive fields shown in the item form (nullable: existing items start without them).
   for (const column of ITEM_DESCRIPTOR_COLUMNS) {
     await addColumnIfMissing("inventory", column, "VARCHAR(100) NULL");
@@ -599,6 +631,7 @@ function toItem(row) {
     holdingCost: Number(row.holding_cost || Number(row.price) * 0.2),
     leadTimeDays: Number(row.lead_time_days || 7),
     safetyStock: Number(row.safety_stock ?? 10),
+    version: Number(row.version || 0),
     brand: row.brand || undefined,
     itemType: row.item_type || undefined,
     model: row.model || undefined,
@@ -1526,34 +1559,61 @@ app.post(
       return res.status(400).json({ error: "Item ID is required." });
     }
     const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
-    if (barcode) {
-      const [[existingItem]] = await pool.query(
-        "SELECT id FROM inventory WHERE TRIM(barcode)=? LIMIT 1",
-        [barcode],
-      );
-      if (existingItem) {
-        return res.status(409).json({ error: "That barcode is already registered to another item." });
-      }
-    }
     const createdBy = item.createdBy || "Unknown";
 
-    await pool.query(
-      `INSERT INTO inventory (${INVENTORY_COLUMNS})
-       VALUES (${INVENTORY_PLACEHOLDERS})`,
-      inventoryValues(itemId, item),
-    );
-    await pool.query(
-      "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        `AUDIT-ADD-${crypto.randomUUID()}`,
-        itemId,
-        item.name,
-        "ADD",
-        JSON.stringify({ ...item, id: itemId }),
-        createdBy,
-      ],
-    );
-    res.status(201).json({ ...item, id: itemId });
+    const outcome = await withInventoryLock(async (connection) => {
+      await connection.beginTransaction();
+      try {
+        const [[sameId]] = await connection.query(
+          "SELECT id FROM inventory WHERE id=? LIMIT 1",
+          [itemId],
+        );
+        if (sameId) {
+          await connection.rollback();
+          const next = await nextFreeItemId(connection);
+          return {
+            status: 409,
+            error: `Item ID ${itemId} is already used by another item. The next free ID is ${next}.`,
+          };
+        }
+        if (barcode) {
+          const [[sameBarcode]] = await connection.query(
+            "SELECT id FROM inventory WHERE TRIM(barcode)=? LIMIT 1",
+            [barcode],
+          );
+          if (sameBarcode) {
+            await connection.rollback();
+            return { status: 409, error: "That barcode is already registered to another item." };
+          }
+        }
+        await connection.query(
+          `INSERT INTO inventory (${INVENTORY_COLUMNS})
+           VALUES (${INVENTORY_PLACEHOLDERS})`,
+          inventoryValues(itemId, item),
+        );
+        await connection.query(
+          "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            `AUDIT-ADD-${crypto.randomUUID()}`,
+            itemId,
+            item.name,
+            "ADD",
+            JSON.stringify({ ...item, id: itemId }),
+            createdBy,
+          ],
+        );
+        await connection.commit();
+        return { status: 201 };
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
+    });
+
+    if (outcome.status !== 201) {
+      return res.status(outcome.status).json({ error: outcome.error });
+    }
+    res.status(201).json({ ...item, id: itemId, version: 0 });
   }),
 );
 
@@ -1568,24 +1628,56 @@ app.put(
     const itemId = normalizeItemId(req.params.id);
     const submittedItemId = normalizeItemId(item.id || itemId);
     const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
-    if (barcode) {
-      const [[existingItem]] = await pool.query(
-        "SELECT id FROM inventory WHERE TRIM(barcode)=? AND id<>? LIMIT 1",
-        [barcode, itemId],
-      );
-      if (existingItem) {
-        return res.status(409).json({ error: "That barcode is already registered to another item." });
-      }
-    }
+    // The version the form was opened with. A save based on an older version would overwrite
+    // someone else's change, so it is refused.
+    const expectedVersion =
+      item.version === undefined || item.version === null ? null : Number(item.version);
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
-    const [result] = await pool.query(
-      `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")} WHERE id=?`,
-      [...values, itemId],
-    );
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Item not found." });
+
+    const outcome = await withInventoryLock(async (connection) => {
+      await connection.beginTransaction();
+      try {
+        const [[current]] = await connection.query(
+          "SELECT version FROM inventory WHERE id=? FOR UPDATE",
+          [itemId],
+        );
+        if (!current) {
+          await connection.rollback();
+          return { status: 404, error: "Item not found." };
+        }
+        if (expectedVersion !== null && Number(current.version) !== expectedVersion) {
+          await connection.rollback();
+          return {
+            status: 409,
+            error: "Someone else changed this item while you were editing it. Close the form, open the item again and make your change.",
+          };
+        }
+        if (barcode) {
+          const [[sameBarcode]] = await connection.query(
+            "SELECT id FROM inventory WHERE TRIM(barcode)=? AND id<>? LIMIT 1",
+            [barcode, itemId],
+          );
+          if (sameBarcode) {
+            await connection.rollback();
+            return { status: 409, error: "That barcode is already registered to another item." };
+          }
+        }
+        await connection.query(
+          `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
+          [...values, itemId],
+        );
+        await connection.commit();
+        return { status: 200, version: Number(current.version) + 1 };
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
+    });
+
+    if (outcome.status !== 200) {
+      return res.status(outcome.status).json({ error: outcome.error });
     }
-    res.json({ ...item, id: submittedItemId });
+    res.json({ ...item, id: submittedItemId, version: outcome.version });
   }),
 );
 
@@ -1723,6 +1815,13 @@ app.post(
         await connection.rollback();
         return res.status(404).json({ error: "Item not found." });
       }
+      // The same movement sent twice (for example after a timeout) is recorded once.
+      const [[alreadyRecorded]] = await connection.query("SELECT * FROM movements WHERE id=?", [id]);
+      if (alreadyRecorded) {
+        await connection.rollback();
+        return res.status(200).json(toMovement(alreadyRecorded));
+      }
+
       if (movement.type === "OUT" && qty > item.quantity) {
         await connection.rollback();
         return res.status(400).json({
@@ -1736,7 +1835,7 @@ app.post(
         [id, itemId, movement.type, qty, date, movement.createdBy || null],
       );
       await connection.query(
-        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?",
+        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
         [delta, itemId],
       );
       await connection.commit();
@@ -1771,7 +1870,7 @@ app.delete(
         req.params.id,
       ]);
       await connection.query(
-        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?",
+        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
         [delta, movement.item_id],
       );
       await connection.commit();
@@ -1828,7 +1927,7 @@ app.patch(
         ]);
       }
       await connection.query(
-        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?) WHERE id=?",
+        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
         [delta, movement.item_id],
       );
       await connection.commit();
@@ -2568,10 +2667,19 @@ app.use((error, _req, res, _next) => {
   if (error?.status >= 400 && error.status < 500) {
     return res.status(error.status).json({ error: "The request could not be read." });
   }
+  if (error?.httpStatus) {
+    return res.status(error.httpStatus).json({ error: error.message });
+  }
   if (error?.code === "ER_DUP_ENTRY") {
     return res
       .status(409)
-      .json({ error: "A record with that ID already exists." });
+      .json({ error: "That was just saved by someone else. Refresh the list and try again." });
+  }
+  // Lock timeouts and deadlocks are temporary: ask the client to retry instead of failing.
+  if (error?.code === "ER_LOCK_WAIT_TIMEOUT" || error?.code === "ER_LOCK_DEADLOCK") {
+    return res
+      .status(503)
+      .json({ error: "The system is busy with another change. Please try again." });
   }
   if (error?.code === "ER_NO_REFERENCED_ROW_2") {
     return res.status(400).json({ error: "Referenced item does not exist." });
