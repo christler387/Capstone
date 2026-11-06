@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Item } from "../types";
+import { Item, ItemDescriptorField } from "../types";
 import { ScannerDialog } from "./ScannerDialog";
+import { Combobox, normalizeDescriptor } from "./Combobox";
+
+// Typed fields that suggest values already saved on other items.
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "itemType", "model", "partNumber", "color", "unitOfMeasure"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -48,6 +52,12 @@ const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
   id: "Item ID",
   name: "Part Identification",
   category: "Category",
+  brand: "Brand",
+  itemType: "Type",
+  model: "Model",
+  partNumber: "Part number",
+  color: "Color",
+  unitOfMeasure: "Unit of measure",
   rack: "Rack location",
   quantity: "Quantity",
   price: "Price",
@@ -115,6 +125,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     holdingCost: 0,
     leadTimeDays: 7,
     safetyStock: 10,
+    unitOfMeasure: "PCS",
     ...item,
   });
 
@@ -147,18 +158,42 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     }
   };
 
-  // Category suggestions are the categories already used by saved items. Typing a new
-  // category is allowed; once an item with it is saved, it shows up here.
-  const categoryOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          existingItems
-            .map((existing) => (existing.category || "").trim().toUpperCase())
-            .filter(Boolean),
-        ),
-      ).sort(),
-    [existingItems],
+  // Suggestions for each typed field are the values already saved on items.
+  // A new value can always be typed; once an item with it is saved, it is suggested too.
+  const descriptorOptions = useMemo(() => {
+    const options = {} as Record<ItemDescriptorField, string[]>;
+    for (const field of DESCRIPTOR_FIELDS) {
+      const values = new Set<string>();
+      for (const existing of existingItems) {
+        const value = normalizeDescriptor(String(existing[field] ?? ""));
+        if (value) values.add(value);
+      }
+      options[field] = Array.from(values).sort();
+    }
+    return options;
+  }, [existingItems]);
+
+  const setDescriptor = (field: ItemDescriptorField, value: string) => {
+    setError(null);
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // The input for a typed field with suggestions. The label is rendered by the caller.
+  const renderDescriptorField = (field: ItemDescriptorField, label: string, placeholder: string) => (
+    <>
+      <Combobox
+        id={`edit-${field}`}
+        label={label}
+        value={(formData[field] as string) || ""}
+        onValueChange={(value) => setDescriptor(field, value)}
+        options={descriptorOptions[field]}
+        placeholder={placeholder}
+        disabled={readOnly}
+        invalid={isMissing(field)}
+        required={!readOnly}
+      />
+      {isMissing(field) && <span className="field-missing-text">Required</span>}
+    </>
   );
 
   const handleChange = (
@@ -249,8 +284,15 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
     const id = (formData.id ?? "").trim();
     const name = (formData.name ?? "").trim();
-    const category = (formData.category ?? "").trim();
+    const category = normalizeDescriptor(formData.category ?? "");
     const barcode = (formData.barcode ?? "").trim();
+    // Typed fields are stored in one style, even if Enter submitted before the field lost focus.
+    const descriptors = Object.fromEntries(
+      DESCRIPTOR_FIELDS.filter((field) => field !== "category").map((field) => [
+        field,
+        normalizeDescriptor(String(formData[field] ?? "")),
+      ]),
+    );
 
     const missingRequired = missingRequiredKeys(formData);
     if (missingRequired.length > 0) {
@@ -307,7 +349,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ ...formData, id, name, category, barcode } as Item);
+      await onSave({ ...formData, ...descriptors, id, name, category, barcode } as Item);
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -459,29 +501,49 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
           </label>
-          <input
-            type="text"
-            id="edit-category"
-            className={`form-input ${isMissing("category") ? "is-missing" : ""}`}
-            value={formData.category || ""}
-            onChange={handleChange}
-            disabled={readOnly}
-            aria-invalid={isMissing("category")}
-            required
-            placeholder="Type or pick a category"
-            list="edit-category-options"
-            autoComplete="off"
-          />
-          {!readOnly && (
-            <datalist id="edit-category-options">
-              {categoryOptions.map((category) => (
-                <option key={category} value={category} />
-              ))}
-            </datalist>
-          )}
-          {isMissing("category") && <span className="field-missing-text">Required</span>}
+          {renderDescriptorField("category", "Category", "Type or pick")}
         </div>
       </div>
+
+      <div className="grid-3 border-soft-no-pad p-0">
+        <div className="form-group">
+          <label className="label-micro">
+            Brand {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          {renderDescriptorField("brand", "Brand", "")}
+        </div>
+        <div className="form-group">
+          <label className="label-micro">
+            Type {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          {renderDescriptorField("itemType", "Type", "")}
+        </div>
+        <div className="form-group">
+          <label className="label-micro">
+            Model {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          {renderDescriptorField("model", "Model", "")}
+        </div>
+        <div className="form-group">
+          <label className="label-micro">
+            Part no. {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          {renderDescriptorField("partNumber", "Part number", "")}
+        </div>
+        <div className="form-group">
+          <label className="label-micro">
+            Color {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          {renderDescriptorField("color", "Color", "")}
+        </div>
+        <div className="form-group">
+          <label className="label-micro">
+            Unit {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          {renderDescriptorField("unitOfMeasure", "Unit of measure", "")}
+        </div>
+      </div>
+
       <div className="form-group">
         <label className="label-micro">
           Replenishment Settings{" "}

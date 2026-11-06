@@ -368,6 +368,18 @@ async function addColumnIfMissing(table, column, definition) {
   }
 }
 
+// Item form fields that are typed or picked from suggestions, in the order they are stored.
+// Each maps to a camelCase property on the item and a snake_case column in inventory.
+const ITEM_DESCRIPTOR_FIELDS = [
+  ["brand", "brand"],
+  ["itemType", "item_type"],
+  ["model", "model"],
+  ["partNumber", "part_number"],
+  ["color", "color"],
+  ["unitOfMeasure", "unit_of_measure"],
+];
+const ITEM_DESCRIPTOR_COLUMNS = ITEM_DESCRIPTOR_FIELDS.map(([, column]) => column);
+
 async function initializeDatabase() {
   // Try to create the database. On shared hosting this is usually not permitted
   // (the DB already exists), so a failure here is only a warning.
@@ -427,6 +439,10 @@ async function initializeDatabase() {
     "safety_stock",
     "INT NOT NULL DEFAULT 10",
   );
+  // Descriptive fields shown in the item form (nullable: existing items start without them).
+  for (const column of ITEM_DESCRIPTOR_COLUMNS) {
+    await addColumnIfMissing("inventory", column, "VARCHAR(100) NULL");
+  }
   // Existing databases may still have a TEXT image column, which is too small for uploaded images.
   await pool.query("ALTER TABLE inventory MODIFY COLUMN image LONGTEXT NULL");
 
@@ -581,6 +597,12 @@ function toItem(row) {
     holdingCost: Number(row.holding_cost || Number(row.price) * 0.2),
     leadTimeDays: Number(row.lead_time_days || 7),
     safetyStock: Number(row.safety_stock ?? 10),
+    brand: row.brand || undefined,
+    itemType: row.item_type || undefined,
+    model: row.model || undefined,
+    partNumber: row.part_number || undefined,
+    color: row.color || undefined,
+    unitOfMeasure: row.unit_of_measure || undefined,
   };
 }
 
@@ -1446,7 +1468,11 @@ app.post(
 /* ----------------------------- Inventory ---------------------------- */
 
 const INVENTORY_COLUMNS =
-  "id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock";
+  "id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock, " +
+  ITEM_DESCRIPTOR_COLUMNS.join(", ");
+
+// One "?" per column in INVENTORY_COLUMNS.
+const INVENTORY_PLACEHOLDERS = INVENTORY_COLUMNS.split(",").map(() => "?").join(", ");
 
 function inventoryValues(id, item) {
   const price = Number(item.price) || 0;
@@ -1468,6 +1494,7 @@ function inventoryValues(id, item) {
     item.holdingCost > 0 ? item.holdingCost : price * 0.2,
     item.leadTimeDays ?? 7,
     item.safetyStock ?? 10,
+    ...ITEM_DESCRIPTOR_FIELDS.map(([field]) => (item[field] || "").toString().trim() || null),
   ];
 }
 
@@ -1510,7 +1537,7 @@ app.post(
 
     await pool.query(
       `INSERT INTO inventory (${INVENTORY_COLUMNS})
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (${INVENTORY_PLACEHOLDERS})`,
       inventoryValues(itemId, item),
     );
     await pool.query(
@@ -1550,7 +1577,7 @@ app.put(
     }
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
     const [result] = await pool.query(
-      `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=? WHERE id=?`,
+      `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")} WHERE id=?`,
       [...values, itemId],
     );
     if (result.affectedRows === 0) {
@@ -1630,7 +1657,7 @@ app.patch(
             : audit.item_data;
         await connection.query(
           `INSERT INTO inventory (${INVENTORY_COLUMNS})
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (${INVENTORY_PLACEHOLDERS})`,
           inventoryValues(audit.item_id, item),
         );
       }
