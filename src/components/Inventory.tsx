@@ -62,6 +62,8 @@ export const Inventory: React.FC<InventoryProps> = ({
     }
   };
 
+  const SIZE_LABELS: Record<string, string> = { SMALL: 'Small', MEDIUM: 'Medium', LARGE: 'Large' };
+
   const formatLocation = (rack: string) => {
     if (!rack) return '---';
     if (rack.includes('-')) return rack;
@@ -227,6 +229,10 @@ export const Inventory: React.FC<InventoryProps> = ({
             </button>
             <span role="columnheader">Category</span>
             <span role="columnheader">Brand</span>
+            <span role="columnheader">Model</span>
+            <span role="columnheader">Part no.</span>
+            <span role="columnheader">Color</span>
+            <span role="columnheader">Size</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
             <span role="columnheader" className="num">Reorder qty</span>
@@ -294,6 +300,22 @@ export const Inventory: React.FC<InventoryProps> = ({
                 <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
                 <span className={`inv-brand${i.brand ? '' : ' is-empty'}`} role="cell">
                   {i.brand || '—'}
+                </span>
+
+                <span className={`inv-brand${i.model ? '' : ' is-empty'}`} role="cell">
+                  {i.model || '—'}
+                </span>
+
+                <span className={`inv-brand${i.partNumber ? '' : ' is-empty'}`} role="cell">
+                  {i.partNumber || '—'}
+                </span>
+
+                <span className={`inv-brand${i.color ? '' : ' is-empty'}`} role="cell">
+                  {i.color || '—'}
+                </span>
+
+                <span className={`inv-brand${i.size ? '' : ' is-empty'}`} role="cell">
+                  {i.size ? SIZE_LABELS[i.size] : '—'}
                 </span>
 
                 <div className="inv-location" role="cell">

@@ -2404,12 +2404,37 @@ footer p {
 }
 
 .inv-table {
-  min-width: 1040px;
+  min-width: 1640px;
+}
+
+/* Picture and part name stay in view while the wide table scrolls sideways. */
+.inv-head > :nth-child(1),
+.inv-head > :nth-child(2),
+.inv-item > :nth-child(1),
+.inv-item > :nth-child(2) {
+  position: sticky;
+  z-index: 2;
+  background: #fff;
+}
+
+.inv-head > :nth-child(1),
+.inv-head > :nth-child(2) {
+  background: #fbfaf6;
+}
+
+.inv-head > :nth-child(1),
+.inv-item > :nth-child(1) {
+  left: 0;
+}
+
+.inv-head > :nth-child(2),
+.inv-item > :nth-child(2) {
+  left: 76px;
 }
 
 .inv-row {
   display: grid;
-  grid-template-columns: 64px minmax(240px, 2.4fr) 120px 120px 150px 76px 100px 120px 84px;
+  grid-template-columns: 64px minmax(220px, 2fr) 120px 120px 120px 120px 90px 90px 150px 76px 100px 120px 84px;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
