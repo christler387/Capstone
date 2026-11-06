@@ -2407,18 +2407,20 @@ footer p {
   min-width: 1640px;
 }
 
-/* Picture and part name stay in view while the wide table scrolls sideways. */
+/* Picture and part name stay in view while the wide table scrolls sideways.
+   Pinned cells take the same background as their row, so hover and the normal state match. */
 .inv-head > :nth-child(1),
 .inv-head > :nth-child(2),
 .inv-item > :nth-child(1),
 .inv-item > :nth-child(2) {
   position: sticky;
   z-index: 2;
-  background: #fff;
+  background: var(--row-bg, #fbfaf6);
 }
 
 .inv-head > :nth-child(1),
 .inv-head > :nth-child(2) {
+  --row-bg: #fbfaf6;
   background: #fbfaf6;
 }
 
@@ -2430,6 +2432,7 @@ footer p {
 .inv-head > :nth-child(2),
 .inv-item > :nth-child(2) {
   left: 76px;
+  box-shadow: 1px 0 0 var(--line-soft);
 }
 
 .inv-row {
@@ -2486,13 +2489,15 @@ footer p {
 }
 
 .inv-item {
+  --row-bg: #ffffff;
   position: relative;
   cursor: pointer;
+  background: var(--row-bg);
   transition: background 0.12s ease;
 }
 
 .inv-item:hover {
-  background: #f7f9fc;
+  --row-bg: #f7f9fc;
 }
 
 .inv-item.is-low::before {
