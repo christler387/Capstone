@@ -2409,7 +2409,7 @@ footer p {
 
 .inv-row {
   display: grid;
-  grid-template-columns: 64px minmax(240px, 2.4fr) 120px 120px 150px 76px 100px 120px 84px;
+  grid-template-columns: 64px 120px minmax(240px, 2.4fr) 120px 150px 76px 100px 120px 84px;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
