@@ -427,6 +427,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         </div>
       )}
 
+      <div className="item-form-grid">
+        <div className="item-form-col">
+          <h3 className="item-form-section-title">Item details</h3>
       <div className="form-group">
         <label className="label-micro">
           Item ID {!readOnly && <span className="text-accent">*</span>}
@@ -503,7 +506,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           {renderDescriptorField("category", "Category", "Type or pick", true)}
         </div>
       </div>
-
       <div className="grid-3 border-soft-no-pad p-0">
         <div className="form-group">
           <label className="label-micro">
@@ -542,226 +544,20 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           {renderDescriptorField("unitOfMeasure", "Unit of measure", "")}
         </div>
       </div>
-
       <div className="form-group">
-        <label className="label-micro">
-          Replenishment Settings{" "}
-          {!readOnly && <span className="text-accent">*</span>}
-        </label>
-        <div className="grid-4 border-soft-no-pad p-0">
-          <div className="form-group">
-            <label className="label-micro">
-              Ordering Cost (₱){" "}
-              {!readOnly && <span className="text-accent">*</span>}
-            </label>
-            <input
-              type="number"
-              id="edit-orderingCost"
-              className={`form-input font-mono${missingClass("orderingCost")}`}
-              aria-invalid={isMissing("orderingCost")}
-              value={formData.orderingCost ?? 100}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              required={!readOnly}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="form-group">
-            <label className="label-micro">
-              Holding Cost / Year (₱){" "}
-              {!readOnly && <span className="text-accent">*</span>}
-            </label>
-            <input
-              type="number"
-              id="edit-holdingCost"
-              className={`form-input font-mono${missingClass("holdingCost")}`}
-              aria-invalid={isMissing("holdingCost")}
-              value={formData.holdingCost ?? 0}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              required={!readOnly}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="form-group">
-            <label className="label-micro">
-              Lead Time (Days){" "}
-              {!readOnly && <span className="text-accent">*</span>}
-            </label>
-            <input
-              type="number"
-              id="edit-leadTimeDays"
-              className={`form-input font-mono${missingClass("leadTimeDays")}`}
-              aria-invalid={isMissing("leadTimeDays")}
-              value={formData.leadTimeDays ?? 7}
-              onChange={handleChange}
-              min="0"
-              step="1"
-              required={!readOnly}
-              disabled={readOnly}
-            />
-          </div>
-          <div className="form-group">
-            <label className="label-micro">
-              Safety Stock {!readOnly && <span className="text-accent">*</span>}
-            </label>
-            <input
-              type="number"
-              id="edit-safetyStock"
-              className={`form-input font-mono${missingClass("safetyStock")}`}
-              aria-invalid={isMissing("safetyStock")}
-              value={formData.safetyStock ?? 10}
-              onChange={handleChange}
-              min="0"
-              step="1"
-              required={!readOnly}
-              disabled={readOnly}
-            />
-          </div>
-        </div>
+        <label className="label-micro">Compatible Vehicles</label>
+        <input
+          type="text"
+          id="edit-compatibleVehicles"
+          className={`form-input${missingClass("compatibleVehicles")}`}
+          aria-invalid={isMissing("compatibleVehicles")}
+          value={formData.compatibleVehicles || ""}
+          onChange={handleChange}
+          placeholder="e.g. Toyota Civic, Honda Altis"
+          disabled={readOnly}
+        />
+        {isMissing("compatibleVehicles") && <span className="field-missing-text">Required</span>}
       </div>
-
-      <div className="grid-3 border-soft-no-pad p-0">
-        <div className="form-group">
-          <label className="label-micro">Size</label>
-          <select
-            id="edit-size"
-            className="form-input"
-            value={formData.size || "MEDIUM"}
-            onChange={handleChange}
-            disabled={readOnly}
-          >
-            <option value="SMALL">Small</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LARGE">Large</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="label-micro">Weight</label>
-          <select
-            id="edit-weight"
-            className="form-input"
-            value={formData.weight || "MEDIUM"}
-            onChange={handleChange}
-            disabled={readOnly}
-          >
-            <option value="LIGHT">Light</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HEAVY">Heavy</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="label-micro">Demand</label>
-          <select
-            id="edit-demand"
-            className="form-input"
-            value={formData.demand || "MEDIUM"}
-            onChange={handleChange}
-            disabled={readOnly}
-          >
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="grid-2 border-soft-no-pad p-0" style={{ gridTemplateColumns: 'minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr)' }}>
-        <div className="form-group">
-          <label className="label-micro" htmlFor="edit-floor">Floor</label>
-          <select
-            id="edit-floor"
-            className="form-input"
-            value={currentFloorId ?? ""}
-            onChange={(event) => chooseFloor(Number(event.target.value))}
-            disabled={readOnly || floorOptions.length === 0}
-          >
-            {floorOptions.map(([floorId, floorName]) => (
-              <option key={floorId} value={floorId}>{floorName}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label className="label-micro">Rack Location</label>
-          <select
-            id="edit-rack"
-            className="form-input"
-            value={formData.rack || ""}
-            onChange={handleChange}
-            disabled={readOnly}
-          >
-            <option value="">Select a rack</option>
-            {hasUnlistedRack && (
-              <option value={formData.rack}>{formData.rack} (current)</option>
-            )}
-            {racksOnFloor.length === 0 && (
-              <option value="" disabled>No racks on this floor yet</option>
-            )}
-            {racksOnFloor.map((rack) => (
-              <option key={rack} value={rack}>
-                {rack}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label className="label-micro">Level</label>
-          <select
-            id="edit-level"
-            className="form-input"
-            value={formData.level}
-            onChange={handleChange}
-            disabled={readOnly}
-          >
-            <option value="L1">L1 (Bottom)</option>
-            <option value="L2">L2</option>
-            <option value="L3">L3</option>
-            <option value="L4">L4 (Top)</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="grid-2 border-soft-no-pad p-0">
-        <div className="form-group">
-          <label className="label-micro">
-            Quantity {!readOnly && <span className="text-accent">*</span>}
-          </label>
-          <input
-            type="number"
-            id="edit-quantity"
-            className={`form-input font-mono${missingClass("quantity")}`}
-            aria-invalid={isMissing("quantity")}
-            value={formData.quantity}
-            onChange={handleChange}
-            min="0"
-            disabled={readOnly}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="label-micro">
-            Price (₱) {!readOnly && <span className="text-accent">*</span>}
-          </label>
-          <input
-            type="number"
-            id="edit-price"
-            className={`form-input font-mono${missingClass("price")}`}
-            aria-invalid={isMissing("price")}
-            value={formData.price}
-            onChange={handleChange}
-            min="0"
-            step="0.01"
-            disabled={readOnly}
-            required
-          />
-        </div>
-      </div>
-      
       <div className="form-group picture-field">
         <div className="picture-field-head">
           <label className="label-micro" htmlFor="edit-image-url">
@@ -852,19 +648,225 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           </div>
         </div>
       </div>
+        </div>
+        <div className="item-form-col">
+          <h3 className="item-form-section-title">Stock and location</h3>
+      <div className="grid-2 border-soft-no-pad p-0" style={{ gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.15fr)' }}>
+        <div className="form-group">
+          <label className="label-micro" htmlFor="edit-floor">Floor</label>
+          <select
+            id="edit-floor"
+            className="form-input"
+            value={currentFloorId ?? ""}
+            onChange={(event) => chooseFloor(Number(event.target.value))}
+            disabled={readOnly || floorOptions.length === 0}
+          >
+            {floorOptions.map(([floorId, floorName]) => (
+              <option key={floorId} value={floorId}>{floorName}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="label-micro">Rack Location</label>
+          <select
+            id="edit-rack"
+            className="form-input"
+            value={formData.rack || ""}
+            onChange={handleChange}
+            disabled={readOnly}
+          >
+            <option value="">Select a rack</option>
+            {hasUnlistedRack && (
+              <option value={formData.rack}>{formData.rack} (current)</option>
+            )}
+            {racksOnFloor.length === 0 && (
+              <option value="" disabled>No racks on this floor yet</option>
+            )}
+            {racksOnFloor.map((rack) => (
+              <option key={rack} value={rack}>
+                {rack}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="label-micro">Level</label>
+          <select
+            id="edit-level"
+            className="form-input"
+            value={formData.level}
+            onChange={handleChange}
+            disabled={readOnly}
+          >
+            <option value="L1">L1 (Bottom)</option>
+            <option value="L2">L2</option>
+            <option value="L3">L3</option>
+            <option value="L4">L4 (Top)</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid-2 border-soft-no-pad p-0">
+        <div className="form-group">
+          <label className="label-micro">
+            Quantity {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          <input
+            type="number"
+            id="edit-quantity"
+            className={`form-input font-mono${missingClass("quantity")}`}
+            aria-invalid={isMissing("quantity")}
+            value={formData.quantity}
+            onChange={handleChange}
+            min="0"
+            disabled={readOnly}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="label-micro">
+            Price (₱) {!readOnly && <span className="text-accent">*</span>}
+          </label>
+          <input
+            type="number"
+            id="edit-price"
+            className={`form-input font-mono${missingClass("price")}`}
+            aria-invalid={isMissing("price")}
+            value={formData.price}
+            onChange={handleChange}
+            min="0"
+            step="0.01"
+            disabled={readOnly}
+            required
+          />
+        </div>
+      </div>
+      <div className="grid-3 border-soft-no-pad p-0">
+        <div className="form-group">
+          <label className="label-micro">Size</label>
+          <select
+            id="edit-size"
+            className="form-input"
+            value={formData.size || "MEDIUM"}
+            onChange={handleChange}
+            disabled={readOnly}
+          >
+            <option value="SMALL">Small</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LARGE">Large</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="label-micro">Weight</label>
+          <select
+            id="edit-weight"
+            className="form-input"
+            value={formData.weight || "MEDIUM"}
+            onChange={handleChange}
+            disabled={readOnly}
+          >
+            <option value="LIGHT">Light</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HEAVY">Heavy</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="label-micro">Demand</label>
+          <select
+            id="edit-demand"
+            className="form-input"
+            value={formData.demand || "MEDIUM"}
+            onChange={handleChange}
+            disabled={readOnly}
+          >
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+        </div>
+      </div>
       <div className="form-group">
-        <label className="label-micro">Compatible Vehicles</label>
-        <input
-          type="text"
-          id="edit-compatibleVehicles"
-          className={`form-input${missingClass("compatibleVehicles")}`}
-          aria-invalid={isMissing("compatibleVehicles")}
-          value={formData.compatibleVehicles || ""}
-          onChange={handleChange}
-          placeholder="e.g. Toyota Civic, Honda Altis"
-          disabled={readOnly}
-        />
-        {isMissing("compatibleVehicles") && <span className="field-missing-text">Required</span>}
+        <label className="label-micro">
+          Replenishment Settings{" "}
+          {!readOnly && <span className="text-accent">*</span>}
+        </label>
+        <div className="grid-4 border-soft-no-pad p-0">
+          <div className="form-group">
+            <label className="label-micro">
+              Ordering Cost (₱){" "}
+              {!readOnly && <span className="text-accent">*</span>}
+            </label>
+            <input
+              type="number"
+              id="edit-orderingCost"
+              className={`form-input font-mono${missingClass("orderingCost")}`}
+              aria-invalid={isMissing("orderingCost")}
+              value={formData.orderingCost ?? 100}
+              onChange={handleChange}
+              min="0"
+              step="0.01"
+              required={!readOnly}
+              disabled={readOnly}
+            />
+          </div>
+          <div className="form-group">
+            <label className="label-micro">
+              Holding Cost / Year (₱){" "}
+              {!readOnly && <span className="text-accent">*</span>}
+            </label>
+            <input
+              type="number"
+              id="edit-holdingCost"
+              className={`form-input font-mono${missingClass("holdingCost")}`}
+              aria-invalid={isMissing("holdingCost")}
+              value={formData.holdingCost ?? 0}
+              onChange={handleChange}
+              min="0"
+              step="0.01"
+              required={!readOnly}
+              disabled={readOnly}
+            />
+          </div>
+          <div className="form-group">
+            <label className="label-micro">
+              Lead Time (Days){" "}
+              {!readOnly && <span className="text-accent">*</span>}
+            </label>
+            <input
+              type="number"
+              id="edit-leadTimeDays"
+              className={`form-input font-mono${missingClass("leadTimeDays")}`}
+              aria-invalid={isMissing("leadTimeDays")}
+              value={formData.leadTimeDays ?? 7}
+              onChange={handleChange}
+              min="0"
+              step="1"
+              required={!readOnly}
+              disabled={readOnly}
+            />
+          </div>
+          <div className="form-group">
+            <label className="label-micro">
+              Safety Stock {!readOnly && <span className="text-accent">*</span>}
+            </label>
+            <input
+              type="number"
+              id="edit-safetyStock"
+              className={`form-input font-mono${missingClass("safetyStock")}`}
+              aria-invalid={isMissing("safetyStock")}
+              value={formData.safetyStock ?? 10}
+              onChange={handleChange}
+              min="0"
+              step="1"
+              required={!readOnly}
+              disabled={readOnly}
+            />
+          </div>
+        </div>
+      </div>
+        </div>
       </div>
 
       <div className="flex-row-gap mt-4">

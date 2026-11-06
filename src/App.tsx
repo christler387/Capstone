@@ -905,6 +905,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
       <Modal 
         isOpen={isItemModalOpen} 
         onClose={() => setIsItemModalOpen(false)} 
+        type="landscape"
         title={userRole === 'staff' ? `Item Details: ${editingItem?.id || ''}` : (editingItem?.name ? `Edit Item: ${editingItem.id}` : 'Add New Item')}
       >
         <ItemForm 
