@@ -2537,11 +2537,16 @@ img.inv-thumb:hover {
 }
 
 .inv-category {
+  display: block;
+  min-width: 0;
   font-family: var(--f-sans);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: rgba(32, 48, 71, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inv-brand {

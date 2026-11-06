@@ -291,7 +291,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
 
 
-                <span className="inv-category" role="cell">{i.category}</span>
+                <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
                 <span className={`inv-brand${i.brand ? '' : ' is-empty'}`} role="cell">
                   {i.brand || '—'}
                 </span>
