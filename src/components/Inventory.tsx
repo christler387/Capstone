@@ -62,8 +62,6 @@ export const Inventory: React.FC<InventoryProps> = ({
     }
   };
 
-  const SIZE_LABELS: Record<string, string> = { SMALL: 'Small', MEDIUM: 'Medium', LARGE: 'Large' };
-
   const formatLocation = (rack: string) => {
     if (!rack) return '---';
     if (rack.includes('-')) return rack;
@@ -232,7 +230,6 @@ export const Inventory: React.FC<InventoryProps> = ({
             <span role="columnheader">Model</span>
             <span role="columnheader">Part no.</span>
             <span role="columnheader">Color</span>
-            <span role="columnheader">Size</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
             <span role="columnheader" className="num is-centered">Reorder qty</span>
@@ -306,16 +303,16 @@ export const Inventory: React.FC<InventoryProps> = ({
                   {i.model || '—'}
                 </span>
 
-                <span className={`inv-brand${i.partNumber ? '' : ' is-empty'}`} role="cell">
+                <span
+                  className={`inv-part${i.partNumber ? '' : ' is-empty'}`}
+                  role="cell"
+                  title={i.partNumber || undefined}
+                >
                   {i.partNumber || '—'}
                 </span>
 
                 <span className={`inv-brand${i.color ? '' : ' is-empty'}`} role="cell">
                   {i.color || '—'}
-                </span>
-
-                <span className={`inv-brand${i.size ? '' : ' is-empty'}`} role="cell">
-                  {i.size ? SIZE_LABELS[i.size] : '—'}
                 </span>
 
                 <div className="inv-location" role="cell">
