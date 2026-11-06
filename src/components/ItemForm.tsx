@@ -47,12 +47,12 @@ const getImageFileName = (image?: string) => {
 // A picture address the user can open: a web link or a picture uploaded to this site.
 const isWebAddress = (value: string) => /^(https?:\/\/|\/api\/uploads\/)/i.test(value.trim());
 
-// Every field must be filled in except the barcode. Dropdowns always have a value, so they are not listed.
+// Fields that must be filled in before saving. Everything else (barcode, rack, brand, type, model,
+// part no., color, unit) is optional. Dropdowns always have a value, so they are not listed.
 const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
   id: "Item ID",
   name: "Part Identification",
   category: "Category",
-  rack: "Rack location",
   quantity: "Quantity",
   price: "Price",
   compatibleVehicles: "Compatible vehicles",
@@ -381,9 +381,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const chooseFloor = (floorId: number) => {
     setSelectedFloorId(floorId);
     const racksHere = rackFloors.filter((rack) => rack.floorId === floorId).map((rack) => rack.code);
-    // Keep the rack if it is already on this floor; otherwise take the floor's first rack.
-    if (!racksHere.includes(formData.rack || '')) {
-      setFormData((prev) => ({ ...prev, rack: racksHere[0] ?? '' }));
+    // Keep the rack if it is already on this floor. Otherwise clear it, since a rack is optional.
+    if (formData.rack && !racksHere.includes(formData.rack)) {
+      setFormData((prev) => ({ ...prev, rack: '' }));
     }
   };
 
@@ -688,8 +688,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">Rack Location</label>
           <select
             id="edit-rack"
-            className={`form-input${missingClass("rack")}`}
-            aria-invalid={isMissing("rack")}
+            className="form-input"
             value={formData.rack || ""}
             onChange={handleChange}
             disabled={readOnly}

@@ -300,8 +300,9 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <button
                     type="button"
                     className="inv-location-btn"
+                    disabled={!i.rack}
                     onClick={(e) => { e.stopPropagation(); onLocateOnMap(i.rack); }}
-                    title="Show on warehouse map"
+                    title={i.rack ? 'Show on warehouse map' : 'No rack assigned'}
                   >
                     <i className="bx bx-map-pin" aria-hidden="true"></i>
                     {formatLocation(i.rack)}
@@ -351,8 +352,9 @@ export const Inventory: React.FC<InventoryProps> = ({
                     <button
                       type="button"
                       className="inv-icon-btn"
-                      title="Locate on map"
                       aria-label={`Locate ${i.name} on map`}
+                      disabled={!i.rack}
+                      title={i.rack ? 'Locate on map' : 'No rack assigned'}
                       onClick={(e) => { e.stopPropagation(); onLocateOnMap(i.rack); }}
                     >
                       <i className="bx bx-map-pin" aria-hidden="true"></i>

@@ -445,6 +445,8 @@ async function initializeDatabase() {
   }
   // Existing databases may still have a TEXT image column, which is too small for uploaded images.
   await pool.query("ALTER TABLE inventory MODIFY COLUMN image LONGTEXT NULL");
+  // A rack is optional, so an item can be saved before it is placed on the map.
+  await pool.query("ALTER TABLE inventory MODIFY COLUMN rack VARCHAR(32) NULL");
 
   await pool.query(`CREATE TABLE IF NOT EXISTS inventory_audit (
     id VARCHAR(64) PRIMARY KEY,
@@ -586,7 +588,7 @@ function toItem(row) {
     barcode: row.barcode || undefined,
     quantity: Number(row.quantity),
     price: Number(row.price),
-    rack: row.rack,
+    rack: row.rack || "",
     level: row.level || undefined,
     size: row.size || undefined,
     weight: row.weight || undefined,
@@ -1483,7 +1485,7 @@ function inventoryValues(id, item) {
     item.barcode || null,
     item.quantity || 0,
     price,
-    item.rack,
+    item.rack || null,
     item.level || null,
     item.size || null,
     item.weight || null,
@@ -1514,10 +1516,10 @@ app.post(
       ...itemData,
       image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
     };
-    if (!item.name || !item.category || !item.rack) {
+    if (!item.name || !item.category) {
       return res
         .status(400)
-        .json({ error: "Name, category, and rack are required." });
+        .json({ error: "Name and category are required." });
     }
     const itemId = normalizeItemId(item.id);
     if (!itemId) {
