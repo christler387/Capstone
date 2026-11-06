@@ -4,7 +4,7 @@ import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
 
 // Typed fields that suggest values already saved on other items.
-const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "itemType", "model", "partNumber", "color", "unitOfMeasure"];
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "itemType", "model", "color", "unitOfMeasure"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -529,7 +529,15 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">
             Part no.
           </label>
-          {renderDescriptorField("partNumber", "Part number", "")}
+          <input
+            type="text"
+            id="edit-partNumber"
+            className="form-input"
+            value={formData.partNumber || ""}
+            onChange={handleChange}
+            disabled={readOnly}
+            autoComplete="off"
+          />
         </div>
         <div className="form-group">
           <label className="label-micro">
