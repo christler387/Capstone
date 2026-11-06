@@ -5856,43 +5856,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 .login-art { width: min(44vw, 640px); transform: none; align-self: center; }
 
-/* ---- Combobox: typed value with suggestions (item form) ---- */
+/* ---- Combobox: a plain text box that suggests saved values (item form) ---- */
 .combobox {
   position: relative;
-}
-
-.combobox-input {
-  padding-right: 2.5rem;
-}
-
-.combobox-toggle {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ink-muted);
-}
-
-.combobox-toggle:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--ink);
-}
-
-.combobox-toggle .bx {
-  font-size: 1.15rem;
-  transition: transform 0.18s ease;
-}
-
-.combobox.is-open .combobox-toggle .bx {
-  transform: rotate(180deg);
 }
 
 .combobox-list {
@@ -5930,13 +5896,6 @@ input[type='date']:focus, select:focus, textarea:focus {
 .combobox-option.is-add {
   color: var(--button);
   font-weight: 600;
-}
-
-.combobox-empty {
-  padding: 0.6rem 0.7rem;
-  font-size: 0.85rem;
-  color: var(--ink-muted);
-  list-style: none;
 }
 
 /* ---- Responsive header and layout ---- */

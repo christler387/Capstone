@@ -112,16 +112,6 @@ export const Combobox: React.FC<ComboboxProps> = ({
     onValueChange(normalizeDescriptor(value));
   };
 
-  const toggleList = () => {
-    if (disabled) return;
-    if (isOpen) {
-      close();
-    } else {
-      setIsOpen(true);
-    }
-    inputRef.current?.focus();
-  };
-
   const activeDescendant = isOpen && activeIndex >= 0 ? optionId(activeIndex) : undefined;
 
   return (
@@ -139,6 +129,9 @@ export const Combobox: React.FC<ComboboxProps> = ({
           setActiveIndex(-1);
         }}
         onKeyDown={handleKeyDown}
+        onFocus={() => {
+          if (!disabled) setIsOpen(true);
+        }}
         onBlur={handleBlur}
         disabled={disabled}
         required={required}
@@ -152,27 +145,9 @@ export const Combobox: React.FC<ComboboxProps> = ({
         autoComplete="off"
         spellCheck={false}
       />
-      <button
-        type="button"
-        className="combobox-toggle"
-        tabIndex={-1}
-        aria-label={`Show ${label.toLowerCase()} suggestions`}
-        disabled={disabled}
-        // Keep focus in the text field when the toggle is pressed.
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={toggleList}
-      >
-        <i className="bx bx-chevron-down" aria-hidden="true"></i>
-      </button>
-
-      {isOpen && (
+      {isOpen && items.length > 0 && (
         <ul id={listboxId} role="listbox" className="combobox-list" aria-label={`${label} suggestions`}>
-          {items.length === 0 ? (
-            <li className="combobox-empty" role="presentation">
-              No saved {label.toLowerCase()} yet. Type one to add it.
-            </li>
-          ) : (
-            items.map((item, index) => (
+          {items.map((item, index) => (
               <li
                 key={`${item.kind}-${item.value}`}
                 id={optionId(index)}
@@ -187,8 +162,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                 {item.kind === "add" ? <i className="bx bx-plus" aria-hidden="true"></i> : null}
                 <span>{item.label}</span>
               </li>
-            ))
-          )}
+          ))}
         </ul>
       )}
     </div>
