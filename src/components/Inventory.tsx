@@ -213,7 +213,6 @@ export const Inventory: React.FC<InventoryProps> = ({
         <div className="inv-table" role="table" aria-label="Inventory items">
           <div className="inv-row inv-head" role="row">
             <span role="columnheader">Picture</span>
-            <span role="columnheader">Category</span>
             <button
               type="button"
               role="columnheader"
@@ -226,6 +225,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 aria-hidden="true"
               ></i>
             </button>
+            <span role="columnheader">Category</span>
             <span role="columnheader">Brand</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
@@ -275,7 +275,6 @@ export const Inventory: React.FC<InventoryProps> = ({
                   )}
                 </span>
 
-                <span className="inv-category" role="cell">{i.category}</span>
                 <div className="inv-name" role="cell">
                   <span className="inv-name-text">{i.name}</span>
                   {i.compatibleVehicles && (
@@ -292,6 +291,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
 
 
+                <span className="inv-category" role="cell">{i.category}</span>
                 <span className={`inv-brand${i.brand ? '' : ' is-empty'}`} role="cell">
                   {i.brand || '—'}
                 </span>
