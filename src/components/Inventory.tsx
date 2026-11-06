@@ -80,7 +80,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const filteredInventory = inventory
     .filter(i => {
-      const matchesSearch = [i.name, i.id, i.category, i.brand || '', i.partNumber || '', i.barcode || '', i.compatibleVehicles || ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
+      const matchesSearch = [i.name, i.id, i.category, i.brand || '', i.barcode || '', i.compatibleVehicles || ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
       const matchesCategory = categoryFilter === 'ALL' || i.category === categoryFilter;
       return matchesSearch && matchesCategory;
     })
@@ -156,7 +156,7 @@ export const Inventory: React.FC<InventoryProps> = ({
           <i className="bx bx-search" aria-hidden="true"></i>
           <input
             type="text"
-            placeholder="Search by name, ID, category, brand, part no., barcode or vehicle"
+            placeholder="Search by name, ID, category, brand, barcode or vehicle"
             aria-label="Search inventory"
             value={search}
             onChange={(e) => {

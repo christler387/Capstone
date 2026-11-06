@@ -404,7 +404,6 @@ const ITEM_DESCRIPTOR_FIELDS = [
   ["brand", "brand"],
   ["itemType", "item_type"],
   ["model", "model"],
-  ["partNumber", "part_number"],
   ["color", "color"],
   ["unitOfMeasure", "unit_of_measure"],
 ];
@@ -635,7 +634,6 @@ function toItem(row) {
     brand: row.brand || undefined,
     itemType: row.item_type || undefined,
     model: row.model || undefined,
-    partNumber: row.part_number || undefined,
     color: row.color || undefined,
     unitOfMeasure: row.unit_of_measure || undefined,
   };

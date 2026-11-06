@@ -4,7 +4,7 @@ import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
 
 // Typed fields that suggest values already saved on other items.
-const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "itemType", "model", "partNumber", "color", "unitOfMeasure"];
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "itemType", "model", "color", "unitOfMeasure"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -48,7 +48,7 @@ const getImageFileName = (image?: string) => {
 const isWebAddress = (value: string) => /^(https?:\/\/|\/api\/uploads\/)/i.test(value.trim());
 
 // Fields that must be filled in before saving. Everything else (barcode, rack, brand, type, model,
-// part no., color, unit) is optional. Dropdowns always have a value, so they are not listed.
+// color, unit) is optional. Dropdowns always have a value, so they are not listed.
 const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
   id: "Item ID",
   name: "Part Identification",
@@ -524,12 +524,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             Model
           </label>
           {renderDescriptorField("model", "Model", "")}
-        </div>
-        <div className="form-group">
-          <label className="label-micro">
-            Part no.
-          </label>
-          {renderDescriptorField("partNumber", "Part number", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
