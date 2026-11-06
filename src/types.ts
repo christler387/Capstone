@@ -28,12 +28,13 @@ export interface Item {
   brand?: string;
   itemType?: string;
   model?: string;
+  partNumber?: string;
   color?: string;
   unitOfMeasure?: string;
 }
 
 // Item fields that are typed in, with suggestions drawn from the values already saved.
-export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 'color' | 'unitOfMeasure';
+export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 'partNumber' | 'color' | 'unitOfMeasure';
 
 export interface Movement {
   id: string;
