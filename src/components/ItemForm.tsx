@@ -111,7 +111,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     price: 0,
     image: "",
     level: "L1",
-    size: "MEDIUM",
     weight: "MEDIUM",
     demand: "MEDIUM",
     compatibleVehicles: "",
@@ -751,21 +750,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           />
         </div>
       </div>
-      <div className="grid-3 border-soft-no-pad p-0">
-        <div className="form-group">
-          <label className="label-micro">Size</label>
-          <select
-            id="edit-size"
-            className="form-input"
-            value={formData.size || "MEDIUM"}
-            onChange={handleChange}
-            disabled={readOnly}
-          >
-            <option value="SMALL">Small</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LARGE">Large</option>
-          </select>
-        </div>
+      <div className="grid-2 border-soft-no-pad p-0">
         <div className="form-group">
           <label className="label-micro">Weight</label>
           <select
