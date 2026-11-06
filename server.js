@@ -1575,7 +1575,9 @@ app.post(
       return res.status(400).json({ error: "Item ID is required." });
     }
     const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
-    const createdBy = item.createdBy || "Unknown";
+    // The signed-in user is recorded; the name sent by the browser is only a fallback.
+    const actor = await getAuthenticatedUser(req);
+    const createdBy = actor?.username || item.createdBy || "Unknown";
 
     const outcome = await withInventoryLock(async (connection) => {
       await connection.beginTransaction();
@@ -1648,6 +1650,8 @@ app.put(
     // someone else's change, so it is refused.
     const expectedVersion =
       item.version === undefined || item.version === null ? null : Number(item.version);
+    const actor = await getAuthenticatedUser(req);
+    const actorName = actor?.username || item.updatedBy || "Unknown";
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
 
     const outcome = await withInventoryLock(async (connection) => {
@@ -1693,7 +1697,7 @@ app.put(
               item.name,
               "QTY",
               JSON.stringify({ oldQuantity, newQuantity, delta: newQuantity - oldQuantity }),
-              item.updatedBy || "Unknown",
+              actorName,
             ],
           );
         }
@@ -1716,7 +1720,8 @@ app.delete(
   "/api/inventory/:id",
   ah(async (req, res) => {
     const itemId = normalizeItemId(req.params.id);
-    const createdBy = req.body?.createdBy || "Unknown";
+    const actor = await getAuthenticatedUser(req);
+    const createdBy = actor?.username || req.body?.createdBy || "Unknown";
     const [[item]] = await pool.query("SELECT * FROM inventory WHERE id=?", [
       itemId,
     ]);
@@ -1848,6 +1853,8 @@ app.post(
         .json({ error: "Quantity must be a positive whole number." });
     }
 
+    const actor = await getAuthenticatedUser(req);
+    const actorName = actor?.username || movement.createdBy || null;
     const id = movement.id || `MOV-${crypto.randomUUID()}`;
     const date = movement.date || new Date().toISOString().slice(0, 10);
     const connection = await pool.getConnection();
@@ -1879,7 +1886,7 @@ app.post(
       const delta = movement.type === "IN" ? qty : -qty;
       await connection.query(
         "INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-        [id, itemId, movement.type, qty, date, movement.createdBy || null],
+        [id, itemId, movement.type, qty, date, actorName],
       );
       await connection.query(
         "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
