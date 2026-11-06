@@ -52,12 +52,6 @@ const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
   id: "Item ID",
   name: "Part Identification",
   category: "Category",
-  brand: "Brand",
-  itemType: "Type",
-  model: "Model",
-  partNumber: "Part number",
-  color: "Color",
-  unitOfMeasure: "Unit of measure",
   rack: "Rack location",
   quantity: "Quantity",
   price: "Price",
@@ -179,7 +173,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   };
 
   // The input for a typed field with suggestions. The label is rendered by the caller.
-  const renderDescriptorField = (field: ItemDescriptorField, label: string, placeholder: string) => (
+  const renderDescriptorField = (
+    field: ItemDescriptorField,
+    label: string,
+    placeholder: string,
+    isRequired = false,
+  ) => (
     <>
       <Combobox
         id={`edit-${field}`}
@@ -189,10 +188,10 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         options={descriptorOptions[field]}
         placeholder={placeholder}
         disabled={readOnly}
-        invalid={isMissing(field)}
-        required={!readOnly}
+        invalid={isRequired && isMissing(field)}
+        required={isRequired && !readOnly}
       />
-      {isMissing(field) && <span className="field-missing-text">Required</span>}
+      {isRequired && isMissing(field) && <span className="field-missing-text">Required</span>}
     </>
   );
 
@@ -501,44 +500,44 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           <label className="label-micro">
             Category {!readOnly && <span className="text-accent">*</span>}
           </label>
-          {renderDescriptorField("category", "Category", "Type or pick")}
+          {renderDescriptorField("category", "Category", "Type or pick", true)}
         </div>
       </div>
 
       <div className="grid-3 border-soft-no-pad p-0">
         <div className="form-group">
           <label className="label-micro">
-            Brand {!readOnly && <span className="text-accent">*</span>}
+            Brand
           </label>
           {renderDescriptorField("brand", "Brand", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
-            Type {!readOnly && <span className="text-accent">*</span>}
+            Type
           </label>
           {renderDescriptorField("itemType", "Type", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
-            Model {!readOnly && <span className="text-accent">*</span>}
+            Model
           </label>
           {renderDescriptorField("model", "Model", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
-            Part no. {!readOnly && <span className="text-accent">*</span>}
+            Part no.
           </label>
           {renderDescriptorField("partNumber", "Part number", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
-            Color {!readOnly && <span className="text-accent">*</span>}
+            Color
           </label>
           {renderDescriptorField("color", "Color", "")}
         </div>
         <div className="form-group">
           <label className="label-micro">
-            Unit {!readOnly && <span className="text-accent">*</span>}
+            Unit
           </label>
           {renderDescriptorField("unitOfMeasure", "Unit of measure", "")}
         </div>
