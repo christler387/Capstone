@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Item } from "../types";
 import { ScannerDialog } from "./ScannerDialog";
 
@@ -146,6 +146,20 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       setError("Could not copy the link. Select the address and copy it by hand.");
     }
   };
+
+  // Category suggestions are the categories already used by saved items. Typing a new
+  // category is allowed; once an item with it is saved, it shows up here.
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          existingItems
+            .map((existing) => (existing.category || "").trim().toUpperCase())
+            .filter(Boolean),
+        ),
+      ).sort(),
+    [existingItems],
+  );
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -454,8 +468,17 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             disabled={readOnly}
             aria-invalid={isMissing("category")}
             required
-            placeholder="Enter category"
+            placeholder="Type or pick a category"
+            list="edit-category-options"
+            autoComplete="off"
           />
+          {!readOnly && (
+            <datalist id="edit-category-options">
+              {categoryOptions.map((category) => (
+                <option key={category} value={category} />
+              ))}
+            </datalist>
+          )}
           {isMissing("category") && <span className="field-missing-text">Required</span>}
         </div>
       </div>
