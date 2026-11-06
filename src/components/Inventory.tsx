@@ -226,6 +226,7 @@ export const Inventory: React.FC<InventoryProps> = ({
               ></i>
             </button>
             <span role="columnheader">Category</span>
+            <span role="columnheader">Brand</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
             <span role="columnheader" className="num">Reorder qty</span>
@@ -290,6 +291,10 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
 
                 <span className="inv-category" role="cell">{i.category}</span>
+
+                <span className={`inv-brand${i.brand ? '' : ' is-empty'}`} role="cell">
+                  {i.brand || '—'}
+                </span>
 
                 <div className="inv-location" role="cell">
                   <button

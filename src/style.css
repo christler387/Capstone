@@ -2409,7 +2409,7 @@ footer p {
 
 .inv-row {
   display: grid;
-  grid-template-columns: 64px minmax(240px, 2.4fr) 120px 150px 76px 100px 120px 84px;
+  grid-template-columns: 64px minmax(240px, 2.4fr) 120px 120px 150px 76px 100px 120px 84px;
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 1rem;
@@ -2542,6 +2542,20 @@ img.inv-thumb:hover {
   font-weight: 600;
   letter-spacing: 0.04em;
   color: rgba(32, 48, 71, 0.75);
+}
+
+.inv-brand {
+  font-family: var(--f-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inv-brand.is-empty {
+  color: var(--ink-faint);
 }
 
 .inv-location {
