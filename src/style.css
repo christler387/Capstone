@@ -7555,3 +7555,25 @@ input[type='date']:focus, select:focus, textarea:focus {
     margin-bottom: clamp(0px, 0.6vh, 6px);
   }
 }
+
+/* Phones and tablets: the login form is centred, full width up to 400px, with no photo. */
+@media (max-width: 899px) {
+  .login-shell {
+    justify-items: center;
+    align-items: center;
+    padding: 24px 16px;
+    box-sizing: border-box;
+  }
+
+  .login-shell > .login-panel {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  .login-showcase {
+    display: none;
+  }
+}
