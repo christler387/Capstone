@@ -7292,7 +7292,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   top: 3.5rem;
   bottom: 1rem;
   border-radius: 28px;
-  background: #a8389a;
+  background: linear-gradient(170deg, #a30000 0%, #8c0a34 45%, #a8286f 75%, #b64bc4 100%);
 }
 
 /* The photo is not clipped by the panel: it rises above the top edge and past the bottom. */
