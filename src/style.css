@@ -7422,8 +7422,11 @@ input[type='date']:focus, select:focus, textarea:focus {
   .login-shell > .login-panel {
     width: min(100%, 380px);
     padding: 40px 38px;
-    background: linear-gradient(160deg, #6f1a6e 0%, #8a0a4a 52%, #960000 100%);
-    border: 0;
+    /* Frosted glass: a translucent version of the photo's gradient over a background blur. */
+    background: linear-gradient(160deg, rgba(111, 26, 110, 0.84) 0%, rgba(138, 10, 74, 0.82) 52%, rgba(150, 0, 0, 0.86) 100%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 24px;
     box-shadow: 0 24px 48px rgba(90, 10, 60, 0.28);
   }
