@@ -7672,3 +7672,47 @@ input[type='date']:focus, select:focus, textarea:focus {
     display: none;
   }
 }
+
+/* Login photo: arrows for mouse use, and a horizontal swipe that does not block page scrolling. */
+.login-showcase {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.login-showcase-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 42px;
+  height: 42px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  color: #5a1a4f;
+  font-size: 1.4rem;
+  box-shadow: 0 6px 18px rgba(20, 0, 20, 0.22);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.login-showcase-arrow:hover {
+  background: #ffffff;
+  transform: translateY(-50%) scale(1.06);
+}
+
+.login-showcase-arrow:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
+}
+
+.login-showcase-arrow.is-prev {
+  left: 1.25rem;
+}
+
+.login-showcase-arrow.is-next {
+  right: 1.25rem;
+}
