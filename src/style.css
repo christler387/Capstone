@@ -6422,3 +6422,339 @@ input[type='date']:focus, select:focus, textarea:focus {
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   TOP BAR: brand on the left, links centred, alerts and account on the right
+   ========================================================================== */
+.app-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem var(--gap);
+  min-height: 0;
+  background: rgba(247, 243, 235, 0.92);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.header-info {
+  justify-self: start;
+  min-width: 0;
+}
+
+.top-nav {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.nav-link {
+  position: relative;
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  background: transparent;
+  font-family: var(--f-sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  border-radius: 8px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.nav-link:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.nav-link.is-active {
+  color: var(--ink);
+}
+
+.nav-link.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0.85rem;
+  right: 0.85rem;
+  bottom: -0.2rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.top-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Critical alerts */
+.crit {
+  position: relative;
+}
+
+.crit-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 38px;
+  padding: 0 0.8rem 0 0.7rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--f-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.crit-button:hover {
+  border-color: var(--line);
+  box-shadow: var(--shadow-md);
+}
+
+.crit-button .bx {
+  font-size: 1.1rem;
+}
+
+.crit-button.has-alerts .bx {
+  color: var(--accent);
+}
+
+.crit-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.crit-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  animation: crit-pulse 1.8s ease-out infinite;
+}
+
+@keyframes crit-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(175, 4, 4, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(175, 4, 4, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(175, 4, 4, 0);
+  }
+}
+
+.crit-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 80;
+  width: min(380px, calc(100vw - 32px));
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  animation: crit-in 0.16s ease-out;
+}
+
+@keyframes crit-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.crit-panel-head {
+  padding: 1rem 1.1rem 0.75rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.crit-panel-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.crit-panel-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.crit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.crit-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.crit-item:hover,
+.crit-item:focus-visible {
+  background: var(--surface-hover);
+}
+
+.crit-item-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crit-item-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crit-item-sub {
+  margin-top: 0.1rem;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.crit-item-qty {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.crit-new {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.crit-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.25rem 1.1rem;
+  font-size: 0.88rem;
+  color: var(--ink-muted);
+}
+
+.crit-empty .bx {
+  font-size: 1.25rem;
+  color: var(--success);
+}
+
+/* Account */
+.top-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--f-sans);
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: box-shadow 0.15s ease;
+}
+
+.top-avatar:hover {
+  box-shadow: 0 0 0 3px rgba(32, 48, 71, 0.12);
+}
+
+.top-avatar.is-active {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+}
+
+/* Phones: brand and actions on one row, links on the row below */
+@media (max-width: 899px) {
+  .app-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0.7rem var(--space-4);
+  }
+  .top-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -0.25rem;
+  }
+  .top-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-link {
+    flex: 0 0 auto;
+  }
+  .crit-label {
+    display: none;
+  }
+  .crit-button {
+    height: 38px;
+    padding: 0 0.6rem;
+    gap: 0.3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crit-dot,
+  .crit-panel {
+    animation: none;
+  }
+}

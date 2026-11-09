@@ -33,6 +33,7 @@ import { WarehouseMap } from './components/WarehouseMap';
 import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
 import skyrunLogo from './assets/Skyrun.png';
+import { isAtReorderPoint } from './inventoryMetrics';
 
 // The session is kept in sessionStorage, so closing the tab signs the user out.
 // It also expires after 15 minutes without mouse, keyboard, touch or scroll activity.
@@ -1038,7 +1039,14 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
               {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
-          <Navigation currentSection={currentSection} onSectionChange={setCurrentSection} />
+          <Navigation
+            currentSection={currentSection}
+            onSectionChange={setCurrentSection}
+            criticalItems={inventory.filter((item) => isAtReorderPoint(item, movements))}
+            movements={movements}
+            onOpenItem={handleGoToStock}
+            userName={user || ''}
+          />
         </header>
 
         {renderComponentRouter()}
