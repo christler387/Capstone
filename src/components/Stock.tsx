@@ -343,8 +343,8 @@ export const Stock: React.FC<StockProps> = ({
               <p className="stock-subtitle">{tab === 'in' ? 'Add units received for an existing item.' : 'Deduct units that left the warehouse.'}</p>
             </div>
             <button className={`barcode-pill-btn ${isScannerOpen ? 'active' : ''}`} onClick={() => setIsScannerOpen(!isScannerOpen)}>
-              <i className="bx bx-barcode-reader"></i> 
-              <span>{isScannerOpen ? 'CLOSING...' : 'SCAN BARCODE'}</span>
+              <i className={`bx ${isScannerOpen ? 'bx-x' : 'bx-barcode-reader'}`} aria-hidden="true"></i>
+              <span>{isScannerOpen ? 'Close scanner' : 'Scan barcode'}</span>
             </button>
           </div>
           {renderFormFields(tab)}

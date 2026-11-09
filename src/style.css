@@ -7141,3 +7141,113 @@ input[type='date']:focus, select:focus, textarea:focus {
 .actions-bar .tab-btn.active {
   color: var(--ink);
 }
+
+/* ---- Stock: barcode scanner panel (camera view and the library's controls) ---- */
+.stock-scanner {
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.stock-scanner .stock-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.stock-scanner .barcode-scanner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+/* The camera view: a 16:9 frame with rounded corners, left aligned with the fields */
+.stock-scanner #reader {
+  width: 100% !important;
+  max-width: 560px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  background: #101418;
+}
+
+.stock-scanner #reader video {
+  border-radius: 14px;
+}
+
+/* Hide the library's own headings and "scan a file" link: they add noise */
+.stock-scanner #reader__header_message,
+.stock-scanner #reader__dashboard_section_swaplink,
+.stock-scanner #reader__scan_region > img {
+  display: none !important;
+}
+
+.stock-scanner #reader__dashboard_section {
+  padding: 0.75rem 0.25rem 0 !important;
+}
+
+.stock-scanner #reader__dashboard_section_csr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.stock-scanner #reader__dashboard_section_csr span {
+  font-family: var(--f-sans);
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+.stock-scanner #reader select {
+  min-height: 38px;
+  max-width: 100%;
+  padding: 0 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: var(--f-sans);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.stock-scanner #reader button {
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--f-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+.stock-scanner #reader button:hover {
+  background: #2c3e5a;
+}
+
+.stock-scanner .barcode-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+.stock-scanner .barcode-status.is-read {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.stock-scanner .barcode-status .bx {
+  font-size: 1.05rem;
+}
