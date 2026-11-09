@@ -7299,9 +7299,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .login-showcase-slide {
   position: absolute;
   left: 1rem;
-  top: 0;
-  width: calc(100% - 2rem);
-  height: 100%;
+  top: 20px;
+  width: calc(100% - 1rem - 20px);
+  height: calc(100% - 40px);
   /* Fill the panel width and keep the head near the top, cropping the bottom. */
   object-fit: cover;
   object-position: center top;
