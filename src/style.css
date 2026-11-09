@@ -7367,7 +7367,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   /* Soft wash of the photo's violet and red behind the form. */
   .login-shell {
     background:
-      radial-gradient(ellipse 38% 46% at 30% 50%, rgba(193, 112, 255, 0.24), rgba(145, 0, 0, 0.08) 60%, rgba(255, 255, 255, 0) 100%),
+      radial-gradient(ellipse 30% 40% at 30% 50%, rgba(193, 112, 255, 0.24), rgba(193, 112, 255, 0) 100%),
       #ffffff;
   }
 
