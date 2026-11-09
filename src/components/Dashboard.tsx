@@ -8,16 +8,6 @@ interface DashboardProps {
   onGoToStock: (id: string) => void;
 }
 
-const STANDARD_CATEGORIES = new Set([
-  'BODY',
-  'BRAKES',
-  'ELECTRICAL',
-  'ENGINE',
-  'MISC',
-  'SUSPENSION',
-  'TRANSMISSION',
-]);
-
 const formatPeso = (value: number) => `₱${value.toLocaleString()}`;
 
 const formatWhen = (timestamp: number) =>
@@ -83,8 +73,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
     .sort((a, b) => a.quantity - b.quantity || a.name.localeCompare(b.name));
 
   const catData = inventory.reduce((acc, i) => {
-    const category = (i.category || '').trim().toUpperCase();
-    const displayCategory = STANDARD_CATEGORIES.has(category) ? category : 'MISC';
+    const displayCategory = (i.category || '').trim().toUpperCase() || 'UNCATEGORIZED';
     if (!acc[displayCategory]) acc[displayCategory] = { qty: 0, val: 0 };
     acc[displayCategory].qty += i.quantity;
     acc[displayCategory].val += i.price * i.quantity;
@@ -95,6 +84,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
     .map(([name, d]) => ({ name, value: d.val, units: d.qty }))
     .sort((a, b) => (categoryMetric === 'value' ? b.value - a.value : b.units - a.units));
   const categoryMax = Math.max(1, ...categoryRows.map((row) => (categoryMetric === 'value' ? row.value : row.units)));
+  const totalUnits = categoryRows.reduce((sum, row) => sum + row.units, 0);
+  const largest = [...categoryRows].sort((a, b) => b.value - a.value)[0];
 
   const recentMovements = [...movements].sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
 
@@ -160,6 +151,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
           {categoryRows.length === 0 ? (
             <Empty icon="bx-category" text="No categories yet. Add an item to see them here." />
           ) : (
+            <div className="dash2-scroll">
             <ul className="dash2-bars">
               {categoryRows.map((row) => {
                 const amount = categoryMetric === 'value' ? row.value : row.units;
@@ -175,9 +167,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
                 );
               })}
             </ul>
+            </div>
           )}
         </Panel>
 
+        <div className="dash2-stack">
         <Panel
           title="Needs attention"
           meta={lowStock.length > 0 ? `${lowStock.length} item${lowStock.length === 1 ? '' : 's'} at or below reorder point` : undefined}
@@ -203,6 +197,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
             </ul>
           )}
         </Panel>
+
+        <Panel title="Summary" meta="Across all categories">
+          <div className="dash2-summary">
+            <div className="dash2-stat">
+              <span className="dash2-stat-label">Categories</span>
+              <span className="dash2-stat-value">{categoryRows.length.toLocaleString()}</span>
+            </div>
+            <div className="dash2-stat">
+              <span className="dash2-stat-label">Units on hand</span>
+              <span className="dash2-stat-value">{totalUnits.toLocaleString()}</span>
+            </div>
+            <div className="dash2-stat">
+              <span className="dash2-stat-label">Largest by value</span>
+              <span className="dash2-stat-value dash2-stat-small">
+                {largest ? `${largest.name} · ${Math.round((largest.value / Math.max(totalValue, 1)) * 100)}%` : '—'}
+              </span>
+            </div>
+            <div className="dash2-stat">
+              <span className="dash2-stat-label">Average unit value</span>
+              <span className="dash2-stat-value">{totalUnits > 0 ? formatPeso(Math.round(totalValue / totalUnits)) : '—'}</span>
+            </div>
+          </div>
+        </Panel>
+        </div>
       </div>
 
       <div className="dash2-pair">

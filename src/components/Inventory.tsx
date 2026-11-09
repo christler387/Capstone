@@ -15,7 +15,6 @@ interface InventoryProps {
   userRole?: UserRole;
 }
 
-const CATEGORIES = ['ALL', 'BODY', 'BRAKES', 'ELECTRICAL', 'ENGINE', 'SUSPENSION', 'TRANSMISSION'];
 const PAGE_SIZE = 10;
 
 const formatPeso = (value: number) =>
@@ -75,13 +74,15 @@ export const Inventory: React.FC<InventoryProps> = ({
   };
 
   const totalItems = inventory.length;
+  // "All" plus every category in use, so a newly added category gets its own filter button.
+  const categoryOptions = ['ALL', ...Array.from(new Set(inventory.map(i => (i.category || '').trim().toUpperCase()).filter(Boolean))).sort()];
   const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
   const lowCount = inventory.filter(i => isAtReorderPoint(i, movements)).length;
 
   const filteredInventory = inventory
     .filter(i => {
       const matchesSearch = [i.name, i.id, i.category, i.brand || '', i.partNumber || '', i.barcode || '', i.compatibleVehicles || ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
-      const matchesCategory = categoryFilter === 'ALL' || i.category === categoryFilter;
+      const matchesCategory = categoryFilter === 'ALL' || (i.category || '').trim().toUpperCase() === categoryFilter;
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
@@ -190,7 +191,7 @@ export const Inventory: React.FC<InventoryProps> = ({
         </div>
 
         <div className="inv-chips" role="group" aria-label="Filter by category">
-          {CATEGORIES.map(cat => (
+          {categoryOptions.map(cat => (
             <button
               key={cat}
               type="button"
