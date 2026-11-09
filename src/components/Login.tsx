@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import skyrunLogo from '../assets/Skyrun.png';
+import { LoginShowcase } from './LoginShowcase';
 import { SessionNoticeDialog } from './SessionNoticeDialog';
 import { PasswordResetDialog } from './PasswordResetDialog';
 
@@ -142,9 +142,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
         </form>
       </div>
 
-      <div className="login-art" aria-hidden="true">
-        <img src={skyrunLogo} alt="" />
-      </div>
+      <LoginShowcase />
     </div>
   );
 };
