@@ -7287,7 +7287,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 .login-showcase::before {
   content: "";
   position: absolute;
-  left: 1rem;
+  left: 26%;
   right: 1rem;
   top: 1rem;
   bottom: 1rem;
