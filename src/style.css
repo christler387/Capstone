@@ -7682,10 +7682,10 @@ input[type='date']:focus, select:focus, textarea:focus {
   user-select: none;
 }
 
-/* Desktop: the login form sits 30px further right. */
+/* Desktop: the login form sits 80px further right. */
 @media (min-width: 900px) {
   .login-shell > .login-panel {
     position: relative;
-    left: 30px;
+    left: 80px;
   }
 }
