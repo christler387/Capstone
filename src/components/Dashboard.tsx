@@ -2,39 +2,11 @@ import React, { useState } from 'react';
 import { Item, Movement } from '../types';
 import { getEoq, getReorderQuantity, getRop, isAtReorderPoint } from '../inventoryMetrics';
 
-const API_BASE = '/api';
-
-async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers || {}),
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `API request failed with ${response.status}`);
-  }
-
-  return response.status === 204 ? (undefined as T) : response.json();
-}
-
 interface DashboardProps {
   inventory: Item[];
   movements: Movement[];
   onGoToStock: (id: string) => void;
 }
-
-const SectionCard: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => (
-  <div className="dash-card">
-    <span className="label-micro">{title}</span>
-    <div className="dash-card-list">
-      {children}
-    </div>
-  </div>
-);
 
 const STANDARD_CATEGORIES = new Set([
   'BODY',
@@ -46,211 +18,242 @@ const STANDARD_CATEGORIES = new Set([
   'TRANSMISSION',
 ]);
 
+const formatPeso = (value: number) => `₱${value.toLocaleString()}`;
+
+const formatWhen = (timestamp: number) =>
+  new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+const KpiCard: React.FC<{ icon: string; label: string; value: string; hint: string; alert?: boolean }> = ({
+  icon,
+  label,
+  value,
+  hint,
+  alert = false,
+}) => (
+  <article className={`dash2-kpi${alert ? ' is-alert' : ''}`}>
+    <div className="dash2-kpi-head">
+      <span className="dash2-kpi-icon" aria-hidden="true">
+        <i className={`bx ${icon}`}></i>
+      </span>
+      <span className="dash2-kpi-label">{label}</span>
+    </div>
+    <p className="dash2-kpi-value">{value}</p>
+    <p className="dash2-kpi-hint">{hint}</p>
+  </article>
+);
+
+const Panel: React.FC<{
+  title: string;
+  meta?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, meta, action, children }) => (
+  <section className="dash2-panel">
+    <header className="dash2-panel-head">
+      <div>
+        <h2 className="dash2-panel-title">{title}</h2>
+        {meta && <p className="dash2-panel-meta">{meta}</p>}
+      </div>
+      {action}
+    </header>
+    <div className="dash2-panel-body">{children}</div>
+  </section>
+);
+
+const Empty: React.FC<{ icon: string; text: string }> = ({ icon, text }) => (
+  <div className="dash2-empty">
+    <i className={`bx ${icon}`} aria-hidden="true"></i>
+    <p>{text}</p>
+  </div>
+);
+
 export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGoToStock }) => {
-  const [insight, setInsight] = useState<string | null>(null);
-  const [insightError, setInsightError] = useState<string | null>(null);
-  const [isLoadingInsight, setIsLoadingInsight] = useState(false);
+  const [categoryMetric, setCategoryMetric] = useState<'value' | 'units'>('value');
+
   const totalItems = inventory.length;
-  const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-  const lowStock = inventory.filter(i => isAtReorderPoint(i, movements));
-  const lowCount = lowStock.length;
+  const totalValue = inventory.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const lowStock = inventory
+    .filter((i) => isAtReorderPoint(i, movements))
+    .sort((a, b) => a.quantity - b.quantity || a.name.localeCompare(b.name));
 
   const catData = inventory.reduce((acc, i) => {
     const category = (i.category || '').trim().toUpperCase();
     const displayCategory = STANDARD_CATEGORIES.has(category) ? category : 'MISC';
     if (!acc[displayCategory]) acc[displayCategory] = { qty: 0, val: 0 };
     acc[displayCategory].qty += i.quantity;
-    acc[displayCategory].val += (i.price * i.quantity);
+    acc[displayCategory].val += i.price * i.quantity;
     return acc;
-  }, {} as Record<string, { qty: number, val: number }>);
+  }, {} as Record<string, { qty: number; val: number }>);
 
-  const recentMovements = [...movements].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
-  const reorderReport = inventory
-    .map(item => ({
+  const categoryRows = Object.entries(catData)
+    .map(([name, d]) => ({ name, value: d.val, units: d.qty }))
+    .sort((a, b) => (categoryMetric === 'value' ? b.value - a.value : b.units - a.units));
+  const categoryMax = Math.max(1, ...categoryRows.map((row) => (categoryMetric === 'value' ? row.value : row.units)));
+
+  const recentMovements = [...movements].sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
+
+  const reorderRows = inventory
+    .map((item) => ({
       item,
       eoq: getEoq(item, movements),
       rop: getRop(item, movements),
       reorderQty: getReorderQuantity(item, movements),
     }))
     .filter(({ reorderQty }) => reorderQty > 0)
-    .sort((a, b) => {
-      if (a.reorderQty !== b.reorderQty) return b.reorderQty - a.reorderQty;
-      return b.item.quantity - a.item.quantity;
-    })
-    .slice(0, 5);
+    .sort((a, b) => (a.reorderQty !== b.reorderQty ? b.reorderQty - a.reorderQty : b.item.quantity - a.item.quantity));
 
-  const generateInsights = async () => {
-    setIsLoadingInsight(true);
-    setInsightError(null);
-    try {
-      const result = await requestJson<{ insight: string; model: string }>('/insights', {
-        method: 'POST',
-        body: JSON.stringify({ inventory, movements }),
-      });
-      setInsight(result.insight);
-    } catch (error) {
-      setInsightError(error instanceof Error ? error.message : 'Unable to generate inventory insights.');
-    } finally {
-      setIsLoadingInsight(false);
-    }
-  };
-
-  const renderSummaryStats = () => (
-    <div className="stats-bar">
-      <div className="stat-box">
-        <span className="label-micro">Total Items</span>
-        <p className="stat-value">{totalItems.toLocaleString()}</p>
-      </div>
-      <div className="stat-box">
-        <span className="label-micro">Inventory Value</span>
-        <p className="stat-value">₱{totalValue.toLocaleString()}</p>
-      </div>
-      <div className="stat-box">
-        <span className="label-micro">Critical Alerts</span>
-        <p className="stat-value" style={{ color: 'var(--accent)' }}>{lowCount.toLocaleString()}</p>
-      </div>
-    </div>
-  );
-
-  const renderDashboardGrid = (includeOverview = true, includeReports = true) => (
-    <div className={`dashboard-grid ${includeOverview ? 'overview-grid' : 'report-grid'}`}>
-        {includeOverview && <SectionCard title="Low Stock Alerts">
-          {lowStock.length > 0 ? (
-            lowStock.sort((a, b) => a.name.localeCompare(b.name)).map(i => (
-              <div key={i.id} className="flex-row-between border-soft low-stock-item cursor-pointer" onClick={() => onGoToStock(i.id)}>
-                <span className="label-micro opacity-80" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '70%' }}>{i.name}</span>
-                <span className="label-micro alert-text font-mono text-xs" style={{ fontWeight: 'bold' }}>
-                  {i.quantity}
-                </span>
-              </div>
-            ))
-          ) : (
-            <p className="label-micro opacity-30">All stock levels optimal.</p>
-          )}
-        </SectionCard>}
-        {includeOverview && <SectionCard title="Category Units">
-          {Object.entries(catData).length > 0 ? (
-            Object.entries(catData).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, d]) => (
-              <div key={cat} className="flex-row-between border-soft">
-                <span className="label-micro opacity-80" style={{ textTransform: 'none' }}>{cat}</span>
-                <span className="label-micro font-mono" style={{ fontWeight: 'bold' }}>{d.qty.toLocaleString()} units</span>
-              </div>
-            ))
-          ) : (
-            <p className="label-micro opacity-30">No category unit data.</p>
-          )}
-        </SectionCard>}
-        {includeOverview && <SectionCard title="Category Prices">
-          {Object.entries(catData).length > 0 ? (
-            Object.entries(catData).sort((a, b) => a[0].localeCompare(b[0])).map(([cat, d]) => (
-              <div key={cat} className="flex-row-between border-soft">
-                <span className="label-micro opacity-80" style={{ textTransform: 'none' }}>{cat}</span>
-                <span className="label-micro font-mono" style={{ fontWeight: 'bold' }}>₱{d.val.toLocaleString()}</span>
-              </div>
-            ))
-          ) : (
-            <p className="label-micro opacity-30">No category price data.</p>
-          )}
-        </SectionCard>}
-        {includeReports && <SectionCard title="Recent Audit History">
-          {recentMovements.length > 0 ? (
-            recentMovements.map(movement => {
-              const item = inventory.find(i => i.id === movement.itemId);
-              const isIn = movement.type === 'IN';
-              const dateFormatted = new Date(movement.timestamp).toLocaleString('en-US', {
-                day: '2-digit',
-                month: 'short',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              }).toUpperCase();
-
-              return (
-                <div
-                  key={movement.id}
-                  className="flex-row-between border-soft"
-                  style={{
-                    gap: '0.75rem',
-                    alignItems: 'flex-start',
-                    padding: '0.45rem 0.5rem',
-                    margin: '0 -0.5rem',
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      className="label-micro opacity-80"
-                      style={{
-                        display: 'block',
-                        textTransform: 'uppercase',
-                        textOverflow: 'ellipsis',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        lineHeight: 1.2,
-                        letterSpacing: '0.08em',
-                      }}
-                    >
-                      {item?.name || movement.itemId}
-                    </span>
-                    <span
-                      className="label-micro font-mono opacity-50"
-                      style={{
-                        display: 'block',
-                        fontSize: '11px',
-                        marginTop: '2px',
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      {dateFormatted}
-                    </span>
-                  </div>
-                  <span
-                    className={`label-micro font-mono ${isIn ? 'text-success' : 'text-accent'}`}
-                    style={{
-                      fontWeight: 'bold',
-                      flexShrink: 0,
-                      minWidth: '2.5rem',
-                      textAlign: 'right',
-                      lineHeight: 1.2,
-                      letterSpacing: '0.08em',
-                    }}
-                  >
-                    {isIn ? '+' : '-'}{movement.qty}
-                  </span>
-                </div>
-              );
-            })
-          ) : (
-            <p className="label-micro opacity-30">No recent audit activity.</p>
-          )}
-        </SectionCard>}
-        {includeReports && <SectionCard title="EOQ & ROP Report">
-          {reorderReport.length > 0 ? (
-            reorderReport.map(({ item, eoq, rop, reorderQty }) => (
-              <div key={item.id} className="flex-row-between border-soft reorder-report-row" onClick={() => onGoToStock(item.id)}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span className="label-micro opacity-80" style={{ display: 'block', textTransform: 'none', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.name}</span>
-                </div>
-                <div className="flex-col-end" style={{ flexShrink: 0 }}>
-                  <span className="label-micro font-mono text-accent" style={{ fontWeight: 'bold' }}>
-                    BUY {reorderQty}
-                  </span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="label-micro opacity-30">No reorder data available.</p>
-          )}
-        </SectionCard>}
-    </div>
-  );
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   return (
-    <div className="content-section">
-      {renderSummaryStats()}
-      {renderDashboardGrid(true, false)}
-      {renderDashboardGrid(false, true)}
+    <div className="dash2">
+      <div className="dash2-header">
+        <div>
+          <h1 className="dash2-title">Dashboard</h1>
+          <p className="dash2-subtitle">{today}</p>
+        </div>
+      </div>
+
+      <section className="dash2-kpis" aria-label="Key figures">
+        <KpiCard icon="bx-package" label="Total items" value={totalItems.toLocaleString()} hint="Items on record" />
+        <KpiCard icon="bx-wallet" label="Inventory value" value={formatPeso(totalValue)} hint="Price × quantity on hand" />
+        <KpiCard
+          icon="bx-error-circle"
+          label="Low stock"
+          value={lowStock.length.toLocaleString()}
+          hint="At or below reorder point"
+          alert={lowStock.length > 0}
+        />
+        <KpiCard
+          icon="bx-cart"
+          label="To reorder"
+          value={reorderRows.length.toLocaleString()}
+          hint="Items with a suggested order"
+        />
+      </section>
+
+      <div className="dash2-main">
+        <Panel
+          title="By category"
+          meta={categoryMetric === 'value' ? 'Inventory value per category' : 'Units on hand per category'}
+          action={
+            <div className="dash2-seg" role="group" aria-label="Show by">
+              <button type="button" aria-pressed={categoryMetric === 'value'} onClick={() => setCategoryMetric('value')}>
+                Value
+              </button>
+              <button type="button" aria-pressed={categoryMetric === 'units'} onClick={() => setCategoryMetric('units')}>
+                Units
+              </button>
+            </div>
+          }
+        >
+          {categoryRows.length === 0 ? (
+            <Empty icon="bx-category" text="No categories yet. Add an item to see them here." />
+          ) : (
+            <ul className="dash2-bars">
+              {categoryRows.map((row) => {
+                const amount = categoryMetric === 'value' ? row.value : row.units;
+                const label = categoryMetric === 'value' ? formatPeso(row.value) : `${row.units.toLocaleString()} units`;
+                return (
+                  <li key={row.name} className="dash2-bar-row">
+                    <span className="dash2-bar-name">{row.name}</span>
+                    <span className="dash2-bar-track" aria-hidden="true">
+                      <span className="dash2-bar-fill" style={{ width: `${(amount / categoryMax) * 100}%` }}></span>
+                    </span>
+                    <span className="dash2-bar-value">{label}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel
+          title="Needs attention"
+          meta={lowStock.length > 0 ? `${lowStock.length} item${lowStock.length === 1 ? '' : 's'} at or below reorder point` : undefined}
+        >
+          {lowStock.length === 0 ? (
+            <Empty icon="bx-check-circle" text="Every item is above its reorder point." />
+          ) : (
+            <ul className="dash2-list">
+              {lowStock.slice(0, 8).map((item) => {
+                const rop = getRop(item, movements);
+                return (
+                  <li key={item.id}>
+                    <button type="button" className="dash2-row-button" onClick={() => onGoToStock(item.id)}>
+                      <span className="dash2-row-main">
+                        <span className="dash2-row-title">{item.name}</span>
+                        <span className="dash2-row-sub">Reorder point {Math.round(rop).toLocaleString()}</span>
+                      </span>
+                      <span className="dash2-pill is-alert">{item.quantity.toLocaleString()} left</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      <div className="dash2-pair">
+        <Panel title="Recent activity" meta="Latest stock movements">
+          {recentMovements.length === 0 ? (
+            <Empty icon="bx-transfer-alt" text="No stock movements yet." />
+          ) : (
+            <ul className="dash2-list">
+              {recentMovements.map((movement) => {
+                const item = inventory.find((i) => i.id === movement.itemId);
+                const isIn = movement.type === 'IN';
+                return (
+                  <li key={movement.id}>
+                    <div className="dash2-row-static">
+                      <span className="dash2-row-main">
+                        <span className="dash2-row-title">{item?.name || movement.itemId}</span>
+                        <span className="dash2-row-sub">{formatWhen(movement.timestamp)}</span>
+                      </span>
+                      <span className={`dash2-chip ${isIn ? 'is-in' : 'is-out'}`}>
+                        {isIn ? 'In' : 'Out'} {movement.qty.toLocaleString()}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="Reorder plan" meta="Suggested order quantities (EOQ)">
+          {reorderRows.length === 0 ? (
+            <Empty icon="bx-cart" text="No reorders needed right now." />
+          ) : (
+            <ul className="dash2-list">
+              {reorderRows.slice(0, 8).map(({ item, eoq, reorderQty }) => (
+                <li key={item.id}>
+                  <button type="button" className="dash2-row-button" onClick={() => onGoToStock(item.id)}>
+                    <span className="dash2-row-main">
+                      <span className="dash2-row-title">{item.name}</span>
+                      <span className="dash2-row-sub">
+                        Now {item.quantity.toLocaleString()} · EOQ {Math.round(eoq).toLocaleString()}
+                      </span>
+                    </span>
+                    <span className="dash2-pill">Order {reorderQty.toLocaleString()}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 };
