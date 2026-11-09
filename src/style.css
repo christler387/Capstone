@@ -7288,10 +7288,10 @@ input[type='date']:focus, select:focus, textarea:focus {
   content: "";
   position: absolute;
   left: 26%;
-  right: 1rem;
-  top: 1rem;
-  bottom: 1rem;
-  border-radius: 28px;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 28px 0 0 28px;
   background: linear-gradient(170deg, #a30000 0%, #8c0a34 45%, #a8286f 75%, #b64bc4 100%);
 }
 
