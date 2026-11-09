@@ -7280,17 +7280,27 @@ input[type='date']:focus, select:focus, textarea:focus {
 .login-showcase {
   grid-column: 2;
   position: relative;
-  margin: 1rem;
-  border-radius: 28px;
-  overflow: hidden;
-  background: linear-gradient(165deg, #af0404 0%, #8a0838 48%, #b24fc4 100%);
-  min-height: calc(100vh - 2rem);
+  min-height: 100vh;
 }
 
+/* The coloured panel sits behind the photo. */
+.login-showcase::before {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: 3.5rem;
+  bottom: 1rem;
+  border-radius: 28px;
+  background: linear-gradient(165deg, #af0404 0%, #8a0838 48%, #b24fc4 100%);
+}
+
+/* The photo is not clipped by the panel: it rises above the top edge and past the bottom. */
 .login-showcase-slide {
   position: absolute;
-  inset: 0;
-  width: 100%;
+  left: 1rem;
+  top: 0;
+  width: calc(100% - 2rem);
   height: 100%;
   /* Fill the panel width and keep the head near the top, cropping the bottom. */
   object-fit: cover;
