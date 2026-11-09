@@ -7577,3 +7577,42 @@ input[type='date']:focus, select:focus, textarea:focus {
     display: none;
   }
 }
+
+/* Phones: dashboard stats stay two-up and compact; the top nav fades at the edge to show it scrolls. */
+@media (max-width: 480px) {
+  .dash2 .dash2-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
+  .dash2-kpi-value {
+    font-size: 1.05rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dash2-kpi-hint {
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 899px) {
+  .top-nav {
+    -webkit-mask-image: linear-gradient(to right, #000 82%, transparent);
+    mask-image: linear-gradient(to right, #000 82%, transparent);
+  }
+}
+
+/* Phones: category bars fit the screen width instead of fixed 150px + 140px columns. */
+@media (max-width: 480px) {
+  .dash2-bar-row {
+    grid-template-columns: minmax(0, 104px) minmax(0, 1fr) minmax(0, 84px);
+    gap: 0.6rem;
+  }
+
+  .dash2-bar-value {
+    white-space: nowrap;
+    font-size: 0.8rem;
+  }
+}
