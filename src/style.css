@@ -7523,7 +7523,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 /* Desktop: the form card always stays smaller than the photo panel. Its width and spacing scale with the window. */
 @media (min-width: 900px) {
   .login-shell > .login-panel {
-    width: clamp(260px, 21vw, 300px);
+    width: clamp(300px, 26vw, 380px);
     max-height: calc(100vh - 96px);
     padding: clamp(22px, 3.9vh, 40px) clamp(22px, 2.6vw, 38px);
     box-sizing: border-box;
