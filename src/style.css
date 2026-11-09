@@ -7616,3 +7616,59 @@ input[type='date']:focus, select:focus, textarea:focus {
     font-size: 0.8rem;
   }
 }
+
+/* Phones: each inventory row becomes a card instead of a sideways-scrolling table. */
+@media (max-width: 640px) {
+  .inv-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .inv-table {
+    min-width: 0;
+  }
+
+  .inv-head {
+    display: none;
+  }
+
+  .inv-row.inv-item {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px 12px;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 14px;
+    background: #ffffff;
+    border: 1px solid var(--line-soft);
+    border-radius: 14px;
+  }
+
+  .inv-item > * {
+    position: static !important;
+    left: auto !important;
+    box-shadow: none !important;
+    background: none !important;
+    text-align: left;
+    min-width: 0;
+  }
+
+  /* Picture on the left, spanning the card. */
+  .inv-item > :nth-child(1) { grid-column: 1; grid-row: 1 / span 5; }
+  .inv-item > :nth-child(2) { grid-column: 2 / span 2; grid-row: 1; }
+  .inv-item > :nth-child(3) { grid-column: 2; grid-row: 2; }
+  .inv-item > :nth-child(4) { grid-column: 3; grid-row: 2; }
+  .inv-item > :nth-child(5) { grid-column: 2 / span 2; grid-row: 3; }
+  .inv-item > :nth-child(8) { grid-column: 2; grid-row: 4; }
+  .inv-item > :nth-child(9) { grid-column: 3; grid-row: 4; }
+  .inv-item > :nth-child(11) { grid-column: 2; grid-row: 5; }
+  .inv-item > :nth-child(12) { grid-column: 3; grid-row: 5; }
+
+  /* Less useful on a phone: part number, colour and reorder quantity. */
+  .inv-item > :nth-child(6),
+  .inv-item > :nth-child(7),
+  .inv-item > :nth-child(10) {
+    display: none;
+  }
+}
