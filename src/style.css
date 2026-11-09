@@ -7162,14 +7162,15 @@ input[type='date']:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  align-items: stretch;
+  align-items: center;
+  text-align: center;
 }
 
 /* The camera view: a 16:9 frame with rounded corners, left aligned with the fields */
 .stock-scanner #reader {
   width: 100% !important;
   max-width: 560px !important;
-  margin: 0 !important;
+  margin: 0 auto !important;
   border: 0 !important;
   border-radius: 14px !important;
   overflow: hidden;
@@ -7238,6 +7239,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 .stock-scanner .barcode-status {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.45rem;
   font-size: 0.85rem;
   color: var(--ink-muted);
