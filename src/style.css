@@ -7681,3 +7681,23 @@ input[type='date']:focus, select:focus, textarea:focus {
   touch-action: pan-y;
   user-select: none;
 }
+
+/* Desktop: the photo panel is narrower, and the photo fills it, as in the reference. */
+@media (min-width: 900px) {
+  .login-showcase::before {
+    left: 2.75rem;
+    right: 2.75rem;
+    top: 3.5rem;
+    bottom: 1rem;
+  }
+
+  .login-showcase-slide {
+    left: 2.75rem;
+    top: 3.5rem;
+    bottom: 1rem;
+    width: calc(100% - 5.5rem);
+    height: calc(100% - 4.5rem);
+    object-fit: cover;
+    object-position: center 8%;
+  }
+}
