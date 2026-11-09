@@ -7385,14 +7385,6 @@ input[type='date']:focus, select:focus, textarea:focus {
     background: linear-gradient(90deg, #1f2f47, #5a1a4f);
   }
 
-  /* The form sits on a white card, so it reads as one unit with the photo. */
-  .login-card {
-    background: #ffffff;
-    border: 1px solid rgba(193, 112, 255, 0.18);
-    border-radius: 24px;
-    box-shadow: 0 1px 2px rgba(20, 8, 30, 0.04), 0 16px 40px rgba(90, 26, 79, 0.12);
-  }
-
   /* White fields with a lavender border, so they sit well on the wash. */
   .login-panel .input-block input {
     background: #ffffff;
@@ -7421,5 +7413,88 @@ input[type='date']:focus, select:focus, textarea:focus {
   .login-panel input:focus-visible {
     outline: 3px solid rgba(193, 112, 255, 0.55);
     outline-offset: 2px;
+  }
+}
+
+/* Desktop: the form sits on a gradient card (violet to red, from the photo), with light text.
+   The card is the .login-panel element; Login.tsx has no separate card wrapper. */
+@media (min-width: 900px) {
+  .login-shell > .login-panel {
+    width: min(100%, 380px);
+    padding: 40px 38px;
+    background: linear-gradient(160deg, #6f1a6e 0%, #8a0a4a 52%, #960000 100%);
+    border: 0;
+    border-radius: 24px;
+    box-shadow: 0 24px 48px rgba(90, 10, 60, 0.28);
+  }
+
+  .login-panel .brand-wordmark {
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+    background: none;
+  }
+
+  .login-title {
+    color: #ffffff;
+  }
+
+  .login-subtitle {
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .login-title::before {
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .login-panel .input-block label {
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .login-panel .input-block input {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.38);
+    color: #ffffff;
+  }
+
+  .login-panel .input-block input::placeholder {
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  .login-panel .input-block input:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+
+  .login-panel .input-block input:focus {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22);
+  }
+
+  .login-panel .password-toggle {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .login-forgot {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .login-forgot:hover {
+    color: #ffffff;
+    text-decoration: underline;
+  }
+
+  .login-button {
+    background: #ffffff;
+    color: #5a1a4f;
+    box-shadow: 0 10px 24px rgba(20, 0, 20, 0.25);
+  }
+
+  .login-button span,
+  .login-button i {
+    color: #5a1a4f;
+  }
+
+  .login-panel button:focus-visible,
+  .login-panel input:focus-visible {
+    outline-color: rgba(255, 255, 255, 0.9);
   }
 }
