@@ -6809,3 +6809,335 @@ input[type='date']:focus, select:focus, textarea:focus {
 .dash2-stat-small {
   font-size: 0.95rem;
 }
+
+/* ---- Stock: a focused form in a narrower card ---- */
+.stock-tab-content {
+  max-width: 880px;
+}
+
+.stock-tab-content .dash-card {
+  padding: 1.5rem 1.5rem 1.75rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.stock-tab-content .flex-row-between {
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.stock-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.stock-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.stock-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.stock-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.stock-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.stock-section-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stock-section-label i {
+  margin-right: 0.25rem;
+}
+
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.stock-grid .stock-field:only-child {
+  grid-column: 1 / -1;
+}
+
+.stock-form .form-input {
+  min-height: var(--control-h);
+}
+
+/* Item search and its suggestions */
+.stock-item-search {
+  position: relative;
+}
+
+.stock-search {
+  padding-left: 0.95rem;
+}
+
+.stock-item-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.stock-item-suggestion {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.stock-item-suggestion:hover,
+.stock-item-suggestion:focus-visible {
+  background: var(--surface-hover);
+}
+
+.stock-item-suggestion-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stock-item-suggestion-meta {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-item-suggestion.is-add {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--button);
+}
+
+/* The chosen item, shown as a summary rather than disabled inputs */
+.stock-selected {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface-hover);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+}
+
+.stock-selected-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.stock-selected-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-selected-meta,
+.stock-selected-vehicles {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-selected-vehicles {
+  color: var(--success);
+}
+
+.stock-selected-onhand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
+.stock-selected-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.stock-selected-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.stock-change {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stock-change:hover {
+  background: var(--surface-hover);
+}
+
+/* Preview of the new stock level */
+.stock-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: rgba(56, 103, 168, 0.08);
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.stock-preview-value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.stock-preview.is-warning {
+  background: rgba(175, 4, 4, 0.08);
+  color: var(--accent);
+}
+
+.stock-preview.is-warning .stock-preview-value {
+  color: var(--accent);
+}
+
+/* Alerts above the form */
+.stock-alert {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.stock-alert > .bx {
+  font-size: 1.2rem;
+  margin-top: 0.1rem;
+  flex: 0 0 auto;
+}
+
+.stock-alert.is-error {
+  background: rgba(175, 4, 4, 0.06);
+  border: 1px solid rgba(175, 4, 4, 0.25);
+  color: var(--accent);
+}
+
+.stock-alert.is-warning {
+  background: rgba(224, 165, 47, 0.12);
+  border: 1px solid rgba(224, 165, 47, 0.4);
+  color: #7a5300;
+}
+
+.stock-alert-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.stock-alert-body p {
+  margin: 0;
+}
+
+.stock-alert-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.stock-scanner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: var(--surface-hover);
+}
+
+/* Submit */
+.stock-submit {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.stock-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .stock-tab-content .dash-card {
+    padding: 1.1rem 1rem 1.25rem;
+  }
+  .stock-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stock-selected {
+    flex-wrap: wrap;
+  }
+}
+
+/* Stock: tabs readable when inactive */
+.actions-bar .tab-btn {
+  opacity: 1;
+  color: var(--ink-muted);
+  letter-spacing: 0.08em;
+}
+
+.actions-bar .tab-btn.active {
+  color: var(--ink);
+}

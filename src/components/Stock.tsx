@@ -139,151 +139,192 @@ export const Stock: React.FC<StockProps> = ({
   };
 
 
-  const renderFormFields = (type: 'in' | 'out') => (
-    <div className="flex-col-gap">
-      {error && (
-        <div 
-          className="font-mono alert-text" 
-          style={{ 
-            fontSize: '11px', 
-            padding: '0.75rem', 
-            border: '1px solid var(--accent)', 
-            background: 'rgba(255, 68, 68, 0.05)', 
-            borderRadius: 'var(--radius)'
-          }}
-        >
-          <i className="bx bx-error-circle" style={{ marginRight: '6px', verticalAlign: 'middle' }}></i>
-          {error}
-        </div>
-      )}
+  const renderFormFields = (type: 'in' | 'out') => {
+    const isIn = type === 'in';
+    const selectedItem = formData.itemId ? inventory.find(i => i.id === formData.itemId) : undefined;
+    const onHand = selectedItem?.quantity ?? 0;
+    const qty = Number(formData.qty) || 0;
+    const after = isIn ? onHand + qty : onHand - qty;
+    const canRecord = Boolean(selectedItem) && qty > 0;
+    const isShort = !isIn && qty > onHand;
 
-      {showConfirmOverdraw && (
-        <div 
-          className="font-mono alert-text" 
-          style={{ 
-            fontSize: '11px', 
-            padding: '1rem', 
-            border: '1px solid var(--accent)', 
-            background: 'rgba(255, 68, 68, 0.08)', 
-            borderRadius: 'var(--radius)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem'
-          }}
-        >
-          <div>
-            <i className="bx bx-error" style={{ marginRight: '6px', fontSize: '13px', verticalAlign: 'middle' }}></i>
-            <strong>CRITICAL STOCK SHORTAGE:</strong> The requested deduction quantity is greater than the available stock. Do you wish to override and force the stock deduction?
+    return (
+      <div className="stock-form">
+        {error && (
+          <div className="stock-alert is-error" role="alert">
+            <i className="bx bx-error-circle" aria-hidden="true"></i>
+            <span>{error}</span>
           </div>
-          <div className="flex-row-gap gap-2">
-            <button 
-              className="olive-button btn-outline label-micro" 
-              style={{ padding: '4px 10px', fontSize: '9px', textTransform: 'none' }}
-              onClick={() => setShowConfirmOverdraw(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+        )}
 
-      {isScannerOpen && (
-        <div className="scanner-container-inline mb-4 p-4 border-soft" style={{ background: 'var(--bg-card)' }}>
-          <div className="flex-row-between mb-2">
-            <span className="label-micro"><i className="bx bx-camera"></i> Scan Item</span>
-          </div>
-          <BarcodeScanner 
-            onScanSuccess={(val) => {
-              const found = inventory.find(i => i.id === val || i.barcode === val);
-              if (found) {
-                handleItemSelect(found.id, type);
-                setIsScannerOpen(false);
-              }
-            }} 
-          />
-        </div>
-      )}
-      <div className="form-group">
-        <label className="label-micro">{type === 'in' ? 'Select Item to Restock' : 'Select Item to Deduct'}</label>
-        <div className="stock-item-search">
-          <input
-            type="search"
-            className="form-input"
-            value={itemSearch}
-            onChange={(e) => handleItemSearch(e.target.value, type)}
-            placeholder="Search items by ID or name..."
-            aria-label={type === 'in' ? 'Search item to restock' : 'Search item to deduct'}
-          />
-          {!formData.itemId && itemSearch.trim() && (
-            <div className="stock-item-suggestions">
-              {type === 'in' && userRole === 'admin' && (
-                <button type="button" className="stock-item-suggestion" onClick={() => onAddItem()}>
-                  + Add New Item
+        {showConfirmOverdraw && (
+          <div className="stock-alert is-warning" role="alert">
+            <i className="bx bx-error" aria-hidden="true"></i>
+            <div className="stock-alert-body">
+              <p>
+                Only <strong>{onHand.toLocaleString()}</strong> unit{onHand === 1 ? '' : 's'} are on hand, but you are deducting{' '}
+                <strong>{qty.toLocaleString()}</strong>. Deduct anyway?
+              </p>
+              <div className="stock-alert-actions">
+                <button type="button" className="olive-button btn-outline btn-mini" onClick={() => setShowConfirmOverdraw(false)}>
+                  Cancel
                 </button>
+                <button
+                  type="button"
+                  className="olive-button btn-danger btn-mini"
+                  onClick={() => { setShowConfirmOverdraw(false); handleRecord(type, true); }}
+                >
+                  Deduct anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isScannerOpen && (
+          <div className="stock-scanner">
+            <span className="stock-section-label"><i className="bx bx-camera" aria-hidden="true"></i> Scan item</span>
+            <BarcodeScanner
+              onScanSuccess={(val) => {
+                const found = inventory.find(i => i.id === val || i.barcode === val);
+                if (found) {
+                  handleItemSelect(found.id, type);
+                  setIsScannerOpen(false);
+                }
+              }}
+            />
+          </div>
+        )}
+
+        <div className="stock-field">
+          <label className="stock-section-label" htmlFor={`stock-search-${type}`}>
+            {isIn ? 'Item to restock' : 'Item to deduct'}
+          </label>
+
+          {selectedItem ? (
+            <div className="stock-selected">
+              <div className="stock-selected-main">
+                <span className="stock-selected-name">{selectedItem.name}</span>
+                <span className="stock-selected-meta">
+                  {selectedItem.id} · {selectedItem.category || 'No category'}
+                  {selectedItem.rack ? ` · ${selectedItem.rack}` : ''}
+                </span>
+                {formData.compatibleVehicles && (
+                  <span className="stock-selected-vehicles">{formData.compatibleVehicles}</span>
+                )}
+              </div>
+              <div className="stock-selected-onhand">
+                <span className="stock-selected-label">On hand</span>
+                <span className="stock-selected-value">{onHand.toLocaleString()}</span>
+              </div>
+              <button
+                type="button"
+                className="stock-change"
+                onClick={() => {
+                  setItemSearch('');
+                  setFormData(prev => ({ ...prev, itemId: '', name: '', category: '', rack: '', compatibleVehicles: '' }));
+                }}
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="stock-item-search">
+              <input
+                id={`stock-search-${type}`}
+                type="search"
+                className="form-input stock-search"
+                value={itemSearch}
+                onChange={(e) => handleItemSearch(e.target.value, type)}
+                placeholder="Search by item name or ID"
+                aria-label={isIn ? 'Search item to restock' : 'Search item to deduct'}
+                autoComplete="off"
+              />
+              {itemSearch.trim() && (
+                <div className="stock-item-suggestions" role="listbox">
+                  {isIn && userRole === 'admin' && (
+                    <button type="button" className="stock-item-suggestion is-add" onClick={() => onAddItem()}>
+                      <i className="bx bx-plus" aria-hidden="true"></i> Add a new item
+                    </button>
+                  )}
+                  {[...inventory]
+                    .filter(item => `${item.id} ${item.name}`.toLowerCase().includes(itemSearch.trim().toLowerCase()))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(item => (
+                      <button type="button" className="stock-item-suggestion" key={item.id} onClick={() => handleItemSelect(item.id, type)}>
+                        <span className="stock-item-suggestion-name">{item.name}</span>
+                        <span className="stock-item-suggestion-meta">{item.id} · {item.quantity.toLocaleString()} on hand</span>
+                      </button>
+                    ))}
+                </div>
               )}
-              {[...inventory]
-                .filter(item => `${item.id} ${item.name}`.toLowerCase().includes(itemSearch.trim().toLowerCase()))
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map(item => (
-                  <button type="button" className="stock-item-suggestion" key={item.id} onClick={() => handleItemSelect(item.id, type)}>
-                    {item.id} - {item.name}
-                  </button>
-                ))}
             </div>
           )}
         </div>
-      </div>
-      <div className="form-group">
-        <label className="label-micro">Item Name</label>
-        <input type="text" className="form-input" value={formData.name} readOnly placeholder="Part Name" />
-      </div>
-      <div className="form-group">
-        <label className="label-micro">Category</label>
-        <input type="text" className="form-input" value={formData.category} readOnly placeholder="Category" />
-      </div>
-      {formData.compatibleVehicles && (
-        <div className="form-group">
-          <label className="label-micro">Compatible Vehicles</label>
-          <input type="text" className="form-input text-success font-semibold" style={{ color: 'var(--success)' }} value={formData.compatibleVehicles} readOnly placeholder="None" />
+
+        <div className="stock-grid">
+          {isIn && (
+            <div className="stock-field">
+              <label className="stock-section-label" htmlFor="stock-rack">Rack location</label>
+              <select
+                id="stock-rack"
+                className="form-input font-mono"
+                value={formData.rack}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData(prev => ({ ...prev, rack: val }));
+                }}
+              >
+                <option value="">Not placed yet</option>
+                {rackLocations.map(rack => (
+                  <option key={rack} value={rack}>{rack}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="stock-field">
+            <label className="stock-section-label" htmlFor={`stock-qty-${type}`}>
+              Quantity to {isIn ? 'add' : 'deduct'} <span className="text-accent">*</span>
+            </label>
+            <input
+              id={`stock-qty-${type}`}
+              type="number"
+              inputMode="numeric"
+              className="form-input font-mono"
+              placeholder="0"
+              min="1"
+              disabled={!selectedItem}
+              value={formData.qty || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData(prev => ({ ...prev, qty: val === '' ? 0 : parseInt(val, 10) || 0 }));
+              }}
+            />
+          </div>
         </div>
-      )}
-      {type === 'in' && (
-        <div className="form-group">
-          <label className="label-micro">Rack Location</label>
-          <select
-            className="form-input font-mono"
-            value={formData.rack}
-            onChange={(e) => {
-              const val = e.target.value;
-              setFormData(prev => ({ ...prev, rack: val }));
-            }}
-          >
-            <option value="">Select a rack</option>
-            {rackLocations.map(rack => (
-              <option key={rack} value={rack}>{rack}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      <div className="form-group">
-        <label className="label-micro">Quantity to {type === 'in' ? 'Add' : 'Deduct'} <span className="text-accent">*</span></label>
-        <input 
-          type="number" 
-          className="form-input font-mono" 
-          placeholder="0" 
-          min="1" 
-          value={formData.qty || ''} 
-          onChange={(e) => {
-            const val = e.target.value;
-            setFormData(prev => ({ ...prev, qty: val === '' ? 0 : parseInt(val, 10) || 0 }));
-          }} 
-        />
+
+        {selectedItem && (
+          <div className={`stock-preview${isShort ? ' is-warning' : ''}`} aria-live="polite">
+            <span>{qty > 0 ? 'Stock after this change' : 'Stock on hand'}</span>
+            <span className="stock-preview-value">
+              {qty > 0 ? `${onHand.toLocaleString()} → ${Math.max(0, after).toLocaleString()}` : onHand.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className={`olive-button stock-submit ${isIn ? '' : 'btn-danger'}`}
+          disabled={!canRecord}
+          onClick={() => handleRecord(type)}
+        >
+          {isIn ? 'Record stock in' : 'Record stock out'}
+        </button>
       </div>
-      <button className={`olive-button ${type === 'out' ? 'btn-danger' : ''}`} onClick={() => handleRecord(type)}>
-        Record Stock {type === 'in' ? 'In' : 'Out'}
-      </button>
-    </div>
-  );
+    );
+  };
+
 
   
   return (
@@ -297,7 +338,10 @@ export const Stock: React.FC<StockProps> = ({
       <div className="stock-tab-content">
         <div className="dash-card m-gap">
           <div className="flex-row-between">
-            <span className="label-micro">Stock {tab === 'in' ? 'In' : 'Out'} Log</span>
+            <div className="stock-heading">
+              <h2 className="stock-title">{tab === 'in' ? 'Record stock in' : 'Record stock out'}</h2>
+              <p className="stock-subtitle">{tab === 'in' ? 'Add units received for an existing item.' : 'Deduct units that left the warehouse.'}</p>
+            </div>
             <button className={`barcode-pill-btn ${isScannerOpen ? 'active' : ''}`} onClick={() => setIsScannerOpen(!isScannerOpen)}>
               <i className="bx bx-barcode-reader"></i> 
               <span>{isScannerOpen ? 'CLOSING...' : 'SCAN BARCODE'}</span>
