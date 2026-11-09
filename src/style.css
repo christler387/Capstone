@@ -7384,4 +7384,42 @@ input[type='date']:focus, select:focus, textarea:focus {
   .login-button {
     background: linear-gradient(90deg, #1f2f47, #5a1a4f);
   }
+
+  /* The form sits on a white card, so it reads as one unit with the photo. */
+  .login-card {
+    background: #ffffff;
+    border: 1px solid rgba(193, 112, 255, 0.18);
+    border-radius: 24px;
+    box-shadow: 0 1px 2px rgba(20, 8, 30, 0.04), 0 16px 40px rgba(90, 26, 79, 0.12);
+  }
+
+  /* White fields with a lavender border, so they sit well on the wash. */
+  .login-panel .input-block input {
+    background: #ffffff;
+    border-color: #d9d0ec;
+  }
+
+  .login-panel .input-block input:hover:not(:disabled) {
+    border-color: #b9a9dd;
+  }
+
+  /* Button states: hover, pressed, and a visible focus ring for keyboard users. */
+  .login-button:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+
+  .login-button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .login-button:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+
+  .login-panel button:focus-visible,
+  .login-panel input:focus-visible {
+    outline: 3px solid rgba(193, 112, 255, 0.55);
+    outline-offset: 2px;
+  }
 }
