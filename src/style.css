@@ -7361,3 +7361,27 @@ input[type='date']:focus, select:focus, textarea:focus {
     transition: none;
   }
 }
+
+/* Desktop: a soft glow and accent in the photo's colours, so the form sits with the photo. */
+@media (min-width: 900px) {
+  /* Soft wash of the photo's violet and red behind the form. */
+  .login-shell {
+    background:
+      radial-gradient(ellipse 38% 46% at 30% 50%, rgba(193, 112, 255, 0.24), rgba(145, 0, 0, 0.08) 60%, rgba(255, 255, 255, 0) 100%),
+      #ffffff;
+  }
+
+  .login-title::before {
+    content: "";
+    display: block;
+    width: 44px;
+    height: 3px;
+    margin-bottom: 14px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #910000, #c170ff);
+  }
+
+  .login-button {
+    background: linear-gradient(90deg, #1f2f47, #5a1a4f);
+  }
+}
