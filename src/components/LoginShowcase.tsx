@@ -62,37 +62,18 @@ export const LoginShowcase: React.FC = () => {
       ))}
 
       {count > 1 && (
-        <>
-          <button
-            type="button"
-            className="login-showcase-arrow is-prev"
-            aria-label="Previous photo"
-            onClick={() => go(-1)}
-          >
-            <i className="bx bx-chevron-left" aria-hidden="true"></i>
-          </button>
-          <button
-            type="button"
-            className="login-showcase-arrow is-next"
-            aria-label="Next photo"
-            onClick={() => go(1)}
-          >
-            <i className="bx bx-chevron-right" aria-hidden="true"></i>
-          </button>
-
-          <div className="login-showcase-dots" role="group" aria-label="Choose a photo">
-            {SLIDES.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`login-showcase-dot${i === index ? ' is-active' : ''}`}
-                aria-label={`Show photo ${i + 1}`}
-                aria-pressed={i === index}
-                onClick={() => setIndex(i)}
-              />
-            ))}
-          </div>
-        </>
+        <div className="login-showcase-dots" role="group" aria-label="Choose a photo">
+          {SLIDES.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`login-showcase-dot${i === index ? ' is-active' : ''}`}
+              aria-label={`Show photo ${i + 1}`}
+              aria-pressed={i === index}
+              onClick={() => setIndex(i)}
+            />
+          ))}
+        </div>
       )}
     </section>
   );
