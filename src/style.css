@@ -7288,10 +7288,10 @@ input[type='date']:focus, select:focus, textarea:focus {
   content: "";
   position: absolute;
   left: 26%;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 28px 0 0 28px;
+  right: 20px;
+  top: 20px;
+  bottom: 20px;
+  border-radius: 28px;
   background: linear-gradient(170deg, #a30000 0%, #8c0a34 45%, #a8286f 75%, #b64bc4 100%);
 }
 
@@ -7299,9 +7299,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .login-showcase-slide {
   position: absolute;
   left: 1rem;
-  top: 20px;
-  width: calc(100% - 1rem - 20px);
-  height: calc(100% - 40px);
+  top: 0;
+  width: calc(100% - 2rem);
+  height: 100%;
   /* Fill the panel width and keep the head near the top, cropping the bottom. */
   object-fit: cover;
   object-position: center top;
