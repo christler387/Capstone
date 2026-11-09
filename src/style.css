@@ -7498,3 +7498,21 @@ input[type='date']:focus, select:focus, textarea:focus {
     outline-color: rgba(255, 255, 255, 0.9);
   }
 }
+
+/* Desktop: error message and text balance for the gradient card. */
+@media (min-width: 900px) {
+  .login-shell > .login-panel .login-alert {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+    box-shadow: none;
+  }
+
+  .login-shell > .login-panel .login-alert i {
+    color: #ffd6d6;
+  }
+
+  .login-subtitle {
+    text-wrap: balance;
+  }
+}
