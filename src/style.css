@@ -7814,3 +7814,40 @@ input[type='date']:focus, select:focus, textarea:focus {
     min-width: 0;
   }
 }
+
+/* Login brand: top left of the page, set in from the corner (not flush). */
+@media (min-width: 900px) {
+  .login-shell {
+    position: relative;
+  }
+
+  .login-shell > .brand-lockup {
+    position: absolute;
+    top: 36px;
+    left: 56px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+  }
+}
+
+/* Brand wordmark colour and size, wherever the brand sits. */
+.login-shell > .brand-lockup .brand-wordmark {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #111111;
+  -webkit-text-fill-color: #111111;
+  background: none;
+}
+
+/* Phones and tablets: the brand sits above the form in normal flow. */
+@media (max-width: 899px) {
+  .login-shell > .brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 24px 16px 0;
+  }
+}
