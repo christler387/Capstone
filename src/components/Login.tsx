@@ -2,7 +2,7 @@
 import { LoginShowcase } from './LoginShowcase';
 import { SessionNoticeDialog } from './SessionNoticeDialog';
 import { PasswordResetDialog } from './PasswordResetDialog';
-import logoMark from '../assets/login/logo-mark.jpg';
+import logoMark from '../assets/login/logo-mark.png';
 
 interface LoginProps {
   onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string, phone?: string, emailVerified?: boolean) => void;
