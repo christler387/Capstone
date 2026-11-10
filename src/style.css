@@ -7842,12 +7842,26 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: none;
 }
 
-/* Phones and tablets: the brand sits above the form in normal flow. */
+/* Phones and tablets: the logo and wordmark sit centred above the form. */
 @media (max-width: 899px) {
   .login-shell > .brand-lockup {
+    grid-column: 1;
+    grid-row: 1;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 24px 16px 0;
+    justify-content: center;
+    gap: 6px;
+    padding: 32px 16px 0;
+  }
+
+  .login-shell > .login-panel {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    margin-top: 48px;
+  }
+
+  .login-shell {
+    align-content: start;
   }
 }
