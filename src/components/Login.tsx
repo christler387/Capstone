@@ -2,6 +2,7 @@
 import { LoginShowcase } from './LoginShowcase';
 import { SessionNoticeDialog } from './SessionNoticeDialog';
 import { PasswordResetDialog } from './PasswordResetDialog';
+import logoMark from '../assets/login/logo-mark.jpg';
 
 interface LoginProps {
   onLoginSuccess: (username: string, role: 'admin' | 'staff', email?: string, phone?: string, emailVerified?: boolean) => void;
@@ -63,6 +64,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, notice }) => {
       {isResetOpen && <PasswordResetDialog onClose={() => setIsResetOpen(false)} />}
       <div className="login-panel">
         <div className="brand-lockup" aria-label="Skyrun brand">
+          <img src={logoMark} alt="" className="login-logo-mark" />
           <span className="brand-wordmark">SKYRUN</span>
         </div>
 

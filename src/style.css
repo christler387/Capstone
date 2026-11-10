@@ -7603,3 +7603,111 @@ input[type='date']:focus, select:focus, textarea:focus {
     left: 80px;
   }
 }
+
+/* Login (desktop): cream page, centred heading, light inputs and a black Sign in button.
+   The logo mark sits beside the wordmark. */
+@media (min-width: 900px) {
+  .login-shell {
+    background: #faf8f4;
+  }
+
+  .login-shell > .login-panel {
+    text-align: left;
+  }
+
+  .login-panel .brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+
+  .login-logo-mark {
+    width: 72px;
+    height: 72px;
+    margin: -16px -8px -16px -12px;
+    object-fit: contain;
+    /* Push the light backdrop to pure white, then blend it into the cream page. */
+    filter: contrast(10);
+    mix-blend-mode: multiply;
+  }
+
+  .login-panel .brand-wordmark {
+    color: #111111;
+    -webkit-text-fill-color: #111111;
+  }
+
+  .login-title {
+    text-align: center;
+    color: #111111;
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  .login-title::before {
+    display: none;
+  }
+
+  .login-subtitle {
+    text-align: center;
+    color: #8a8580;
+    margin: 0 0 32px;
+  }
+
+  .login-panel .input-block label {
+    color: #111111;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .login-panel .input-block input {
+    background: #ffffff;
+    border: 1px solid #e3dcd2;
+    border-radius: 6px;
+    height: 44px;
+    color: #111111;
+  }
+
+  .login-panel .input-block input::placeholder {
+    color: #b3ada6;
+  }
+
+  .login-panel .input-block input:hover:not(:disabled),
+  .login-panel .input-block input:focus {
+    border-color: #111111;
+    box-shadow: none;
+  }
+
+  .login-panel .password-toggle {
+    color: #6b6660;
+  }
+
+  .login-forgot {
+    color: #111111;
+    font-weight: 600;
+  }
+
+  .login-forgot:hover {
+    color: #111111;
+    text-decoration: underline;
+  }
+
+  .login-button {
+    background: #111111;
+    color: #ffffff;
+    border-radius: 4px;
+    height: 46px;
+    box-shadow: none;
+  }
+
+  .login-button span,
+  .login-button i {
+    color: #ffffff;
+  }
+
+  .login-button:hover:not(:disabled) {
+    background: #2b2b2b;
+    box-shadow: none;
+  }
+}
