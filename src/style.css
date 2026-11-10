@@ -7604,110 +7604,213 @@ input[type='date']:focus, select:focus, textarea:focus {
   }
 }
 
-/* Login (desktop): cream page, centred heading, light inputs and a black Sign in button.
-   The logo mark sits beside the wordmark. */
+/* ---- Login: refined form (UI pass). The photo panel and the backgrounds are unchanged. ---- */
+.login-panel {
+  -webkit-font-smoothing: antialiased;
+}
+
+.login-shell > .login-panel {
+  width: min(100%, 360px);
+  padding: 0;
+  text-align: left;
+}
+
+.login-panel .brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 40px;
+}
+
+.login-logo-mark {
+  width: 72px;
+  height: 72px;
+  margin: -16px -8px -16px -12px;
+  object-fit: contain;
+  /* Push the light backdrop to pure white, then blend it into the cream page. */
+  filter: contrast(10);
+  mix-blend-mode: multiply;
+}
+
+.login-panel .brand-wordmark {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #111111;
+  -webkit-text-fill-color: #111111;
+  background: none;
+}
+
+.login-title {
+  text-align: center;
+  font-size: 1.875rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #111111;
+  margin: 0 0 8px;
+}
+
+.login-title::before {
+  display: none;
+}
+
+.login-subtitle {
+  text-align: center;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #6b6660;
+  margin: 0 0 32px;
+}
+
+.login-form {
+  gap: 20px;
+}
+
+.login-panel .input-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.login-panel .input-block label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #3a3632;
+}
+
+.login-panel .input-block input {
+  height: 46px;
+  padding: 0 14px;
+  background: #ffffff;
+  border: 1px solid #dcd5ca;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: #111111;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-panel .password-wrap input {
+  padding-right: 44px;
+}
+
+.login-panel .input-block input::placeholder {
+  color: #aaa39a;
+}
+
+.login-panel .input-block input:hover:not(:disabled) {
+  border-color: #b9b1a5;
+}
+
+.login-panel .input-block input:focus {
+  outline: none;
+  border-color: #111111;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
+}
+
+.login-panel .password-toggle {
+  color: #8a847c;
+}
+
+.login-panel .password-toggle:hover {
+  color: #111111;
+}
+
+.login-forgot {
+  align-self: flex-end;
+  margin: -8px 0 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b6660;
+  cursor: pointer;
+}
+
+.login-forgot:hover {
+  color: #111111;
+  text-decoration: underline;
+}
+
+.login-button {
+  width: 100%;
+  height: 48px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #111111;
+  color: #ffffff;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.05s ease;
+}
+
+.login-button span,
+.login-button i {
+  color: #ffffff;
+}
+
+.login-button:hover:not(:disabled) {
+  background: #2b2b2b;
+  box-shadow: none;
+}
+
+.login-button:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-panel button:focus-visible,
+.login-panel input:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.login-alert {
+  padding: 10px 12px;
+  background: #fdf1f0;
+  border: 1px solid #f1c4bf;
+  border-radius: 8px;
+  color: #8a1c1c;
+  font-size: 0.875rem;
+  box-shadow: none;
+}
+
+.login-alert i {
+  color: #b42318;
+}
+
 @media (min-width: 900px) {
   .login-shell {
     background: #faf8f4;
   }
+}
+
+/* Phones and tablets: the form fills the column, centred, and never runs past the screen edge. */
+@media (max-width: 899px) {
+  .login-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
   .login-shell > .login-panel {
-    text-align: left;
-  }
-
-  .login-panel .brand-lockup {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 40px;
-  }
-
-  .login-logo-mark {
-    width: 72px;
-    height: 72px;
-    margin: -16px -8px -16px -12px;
-    object-fit: contain;
-    /* Push the light backdrop to pure white, then blend it into the cream page. */
-    filter: contrast(10);
-    mix-blend-mode: multiply;
-  }
-
-  .login-panel .brand-wordmark {
-    color: #111111;
-    -webkit-text-fill-color: #111111;
-  }
-
-  .login-title {
-    text-align: center;
-    color: #111111;
-    font-size: 2rem;
-    font-weight: 600;
-    margin: 0 0 8px;
-  }
-
-  .login-title::before {
-    display: none;
-  }
-
-  .login-subtitle {
-    text-align: center;
-    color: #8a8580;
-    margin: 0 0 32px;
-  }
-
-  .login-panel .input-block label {
-    color: #111111;
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-
-  .login-panel .input-block input {
-    background: #ffffff;
-    border: 1px solid #e3dcd2;
-    border-radius: 6px;
-    height: 44px;
-    color: #111111;
-  }
-
-  .login-panel .input-block input::placeholder {
-    color: #b3ada6;
-  }
-
-  .login-panel .input-block input:hover:not(:disabled),
-  .login-panel .input-block input:focus {
-    border-color: #111111;
-    box-shadow: none;
-  }
-
-  .login-panel .password-toggle {
-    color: #6b6660;
-  }
-
-  .login-forgot {
-    color: #111111;
-    font-weight: 600;
-  }
-
-  .login-forgot:hover {
-    color: #111111;
-    text-decoration: underline;
-  }
-
-  .login-button {
-    background: #111111;
-    color: #ffffff;
-    border-radius: 4px;
-    height: 46px;
-    box-shadow: none;
-  }
-
-  .login-button span,
-  .login-button i {
-    color: #ffffff;
-  }
-
-  .login-button:hover:not(:disabled) {
-    background: #2b2b2b;
-    box-shadow: none;
+    position: relative;
+    left: 0;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+    min-width: 0;
   }
 }
