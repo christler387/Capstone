@@ -7416,103 +7416,17 @@ input[type='date']:focus, select:focus, textarea:focus {
   }
 }
 
-/* Desktop: the form sits on a gradient card (violet to red, from the photo), with light text.
-   The card is the .login-panel element; Login.tsx has no separate card wrapper. */
+/* Desktop: the form sits directly on the white page, with no card colour.
+   Text keeps its normal dark colours. The card is the .login-panel element. */
 @media (min-width: 900px) {
   .login-shell > .login-panel {
     width: min(100%, 380px);
     padding: 40px 38px;
-    /* Frosted glass: a translucent version of the photo's gradient over a background blur. */
-    background: linear-gradient(160deg, rgba(111, 26, 110, 0.84) 0%, rgba(138, 10, 74, 0.82) 52%, rgba(150, 0, 0, 0.86) 100%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
-    backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    border-radius: 24px;
-    box-shadow: 0 24px 48px rgba(90, 10, 60, 0.28);
-  }
-
-  .login-panel .brand-wordmark {
-    color: #ffffff;
-    -webkit-text-fill-color: #ffffff;
     background: none;
-  }
-
-  .login-title {
-    color: #ffffff;
-  }
-
-  .login-subtitle {
-    color: rgba(255, 255, 255, 0.78);
-  }
-
-  .login-title::before {
-    background: rgba(255, 255, 255, 0.85);
-  }
-
-  .login-panel .input-block label {
-    color: rgba(255, 255, 255, 0.92);
-  }
-
-  .login-panel .input-block input {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.38);
-    color: #ffffff;
-  }
-
-  .login-panel .input-block input::placeholder {
-    color: rgba(255, 255, 255, 0.62);
-  }
-
-  .login-panel .input-block input:hover:not(:disabled) {
-    border-color: rgba(255, 255, 255, 0.6);
-  }
-
-  .login-panel .input-block input:focus {
-    border-color: #ffffff;
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22);
-  }
-
-  .login-panel .password-toggle {
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .login-forgot {
-    color: rgba(255, 255, 255, 0.88);
-  }
-
-  .login-forgot:hover {
-    color: #ffffff;
-    text-decoration: underline;
-  }
-
-  .login-button {
-    background: #ffffff;
-    color: #5a1a4f;
-    box-shadow: 0 10px 24px rgba(20, 0, 20, 0.25);
-  }
-
-  .login-button span,
-  .login-button i {
-    color: #5a1a4f;
-  }
-
-  .login-panel button:focus-visible,
-  .login-panel input:focus-visible {
-    outline-color: rgba(255, 255, 255, 0.9);
-  }
-}
-
-/* Desktop: error message and text balance for the gradient card. */
-@media (min-width: 900px) {
-  .login-shell > .login-panel .login-alert {
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    color: #ffffff;
+    border: 0;
     box-shadow: none;
-  }
-
-  .login-shell > .login-panel .login-alert i {
-    color: #ffd6d6;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .login-subtitle {
