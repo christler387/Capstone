@@ -411,6 +411,10 @@ const ITEM_DESCRIPTOR_FIELDS = [
 ];
 const ITEM_DESCRIPTOR_COLUMNS = ITEM_DESCRIPTOR_FIELDS.map(([, column]) => column);
 
+// Every table uses the character set of the inventory table, because a foreign key
+// must match it (MySQL error 150 otherwise). Set in initializeDatabase.
+let tableOptions = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
 async function initializeDatabase() {
   // Try to create the database. On shared hosting this is usually not permitted
   // (the DB already exists), so a failure here is only a warning.
@@ -449,7 +453,15 @@ async function initializeDatabase() {
     safety_stock INT NOT NULL DEFAULT 10,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
+  const [[idColumn]] = await pool.query(
+    `SELECT CHARACTER_SET_NAME AS charset, COLLATION_NAME AS collation
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventory' AND COLUMN_NAME = 'id'`,
+  );
+  if (/^[a-z0-9_]+$/i.test(idColumn?.charset || "") && /^[a-z0-9_]+$/i.test(idColumn?.collation || "")) {
+    tableOptions = `ENGINE=InnoDB DEFAULT CHARSET=${idColumn.charset} COLLATE=${idColumn.collation}`;
+  }
   await addColumnIfMissing(
     "inventory",
     "ordering_cost",
@@ -491,7 +503,7 @@ async function initializeDatabase() {
     item_data JSON NULL,
     created_by VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
   await addColumnIfMissing("inventory_audit", "item_data", "JSON NULL");
   await addColumnIfMissing("inventory_audit", "created_by", "VARCHAR(64) NULL");
 
@@ -503,7 +515,7 @@ async function initializeDatabase() {
     movement_date DATE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT movements_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
   await addColumnIfMissing(
     "movements",
     "created_by",
@@ -519,7 +531,7 @@ async function initializeDatabase() {
     password_hash VARCHAR(128) NOT NULL,
     role ENUM('admin', 'staff') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
   // The login route selects display_name, but the column never existed.
   await addColumnIfMissing("users", "display_name", "VARCHAR(100) NULL");
   await addColumnIfMissing("users", "email", "VARCHAR(255) NULL");
@@ -533,7 +545,7 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user_sessions_user (user_id),
     CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS email_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -547,14 +559,14 @@ async function initializeDatabase() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_email_codes_lookup (user_id, purpose, id),
     CONSTRAINT fk_email_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
 
   // Warehouse layout: floors, aisles and racks. inventory.rack keeps the "A-01" style code.
   await pool.query(`CREATE TABLE IF NOT EXISTS floors (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
   await pool.query(`CREATE TABLE IF NOT EXISTS aisles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     floor_id INT NOT NULL,
@@ -566,7 +578,7 @@ async function initializeDatabase() {
     grid_row INT NOT NULL,
     UNIQUE KEY uq_aisle_position (floor_id, grid_col, grid_row),
     CONSTRAINT fk_aisles_floor FOREIGN KEY (floor_id) REFERENCES floors(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
   await pool.query(`CREATE TABLE IF NOT EXISTS racks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     aisle_id INT NOT NULL,
@@ -574,7 +586,7 @@ async function initializeDatabase() {
     capacity INT NULL,
     UNIQUE KEY uq_rack_number (aisle_id, rack_number),
     CONSTRAINT fk_racks_aisle FOREIGN KEY (aisle_id) REFERENCES aisles(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
   await seedWarehouseLayout();
   await repairOldSeedPositions();
 
@@ -1584,7 +1596,6 @@ app.post(
     if (!itemId) {
       return res.status(400).json({ error: "Item ID is required." });
     }
-    const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
     // The signed-in user is recorded; the name sent by the browser is only a fallback.
     const actor = await getAuthenticatedUser(req);
     const createdBy = actor?.username || item.createdBy || "Unknown";
@@ -1657,7 +1668,6 @@ app.put(
     };
     const itemId = normalizeItemId(req.params.id);
     const submittedItemId = normalizeItemId(item.id || itemId);
-    const barcode = typeof item.barcode === "string" ? item.barcode.trim() : "";
     // The version the form was opened with. A save based on an older version would overwrite
     // someone else's change, so it is refused.
     const expectedVersion =
@@ -1888,7 +1898,7 @@ async function createStockCardTables() {
     created_by VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
 
   // One row per supplier and item. The supplier's own code is unique within that supplier only.
   await pool.query(`CREATE TABLE IF NOT EXISTS supplier_items (
@@ -1905,7 +1915,7 @@ async function createStockCardTables() {
     KEY idx_supplier_items_item (item_id),
     CONSTRAINT supplier_items_supplier_fk FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
     CONSTRAINT supplier_items_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
 
   // Every change to an item's quantity is written here, in the same transaction as the change.
   // source_id is unique, so the same change can never be recorded twice.
@@ -1927,7 +1937,7 @@ async function createStockCardTables() {
     KEY idx_stock_ledger_item_time (item_id, txn_time),
     KEY idx_stock_ledger_reference (reference),
     CONSTRAINT stock_ledger_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  ) ${tableOptions}`);
 }
 
 // Writes one stock card line. Call it inside the transaction that changed the quantity.
