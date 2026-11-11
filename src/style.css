@@ -8636,3 +8636,13 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
   }
 }
+
+/* Inventory: stock and cost figures and their headings are left-aligned. */
+.inv-head > .num,
+.inv-item > .inv-stock,
+.inv-item > .inv-price-cell,
+.inv-item > .inv-local {
+  text-align: left;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
