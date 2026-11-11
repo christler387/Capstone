@@ -8478,3 +8478,12 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 .stk-table .stk-total { font-weight: 700; }
+
+.inv-model {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

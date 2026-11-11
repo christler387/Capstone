@@ -246,7 +246,7 @@ export const Inventory: React.FC<InventoryProps> = ({
             const needsReorder = isAtReorderPoint(i, movements);
             const reorderQuantity = getReorderQuantity(i, movements);
             const discount = Number(i.discount) || 0;
-            const specs = [i.model, i.partNumber].filter(Boolean).join(' · ');
+            const details = [i.partNumber, i.color].filter(Boolean).join(' · ');
             return (
               <div
                 key={i.id}
@@ -297,8 +297,8 @@ export const Inventory: React.FC<InventoryProps> = ({
 
                 <div className="inv-brandmodel" role="cell">
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
-                  {specs && <span className="inv-sub">{specs}</span>}
-                  {i.color && <span className="inv-sub">{i.color}</span>}
+                  {i.model && <span className="inv-model">{i.model}</span>}
+                  {details && <span className="inv-sub">{details}</span>}
                 </div>
 
                 <div className="inv-location" role="cell">
