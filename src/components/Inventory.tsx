@@ -309,12 +309,6 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
                   {i.model && <span className="inv-model">{i.model}</span>}
                   {i.color && <span className="inv-sub">{i.color}</span>}
-                  {supplierLinks[i.id]?.count > 0 && (
-                    <span className="inv-supplier-count">
-                      <i className="bx bx-store" aria-hidden="true"></i>
-                      {supplierLinks[i.id].count} {supplierLinks[i.id].count === 1 ? 'supplier' : 'suppliers'}
-                    </span>
-                  )}
                 </div>
 
                 <span className={`inv-partno${i.partNumber ? '' : ' is-empty'}`} role="cell" title={i.partNumber || undefined}>
