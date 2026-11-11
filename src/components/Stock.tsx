@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Modal } from './Modal';
@@ -10,10 +10,20 @@ interface StockProps {
   selectedItemId?: string;
   userRole?: UserRole;
   userName?: string;
-  // Every rack code in the warehouse layout, for the Rack Location dropdown.
+  // Every rack code in the warehouse layout. Not used by this screen; kept so the app can pass it.
   rackLocations?: string[];
 }
 
+type Tab = 'in' | 'out';
+interface Line {
+  itemId: string;
+  qty: number;
+}
+
+const MAX_SUGGESTIONS = 8;
+
+const addLine = (lines: Line[], itemId: string): Line[] =>
+  lines.some((line) => line.itemId === itemId) ? lines : [...lines, { itemId, qty: 0 }];
 
 export const Stock: React.FC<StockProps> = ({
   inventory,
@@ -22,351 +32,379 @@ export const Stock: React.FC<StockProps> = ({
   selectedItemId,
   userRole = 'staff',
   userName,
-  rackLocations = []
 }) => {
-
-
-  const [tab, setTab] = useState<'in' | 'out'>('in');
+  const [tab, setTab] = useState<Tab>('in');
+  // Each tab keeps its own list, so switching tabs does not lose a half-finished sheet.
+  const [sheets, setSheets] = useState<Record<Tab, Line[]>>({ in: [], out: [] });
+  const [search, setSearch] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showConfirmOverdraw, setShowConfirmOverdraw] = useState<boolean>(false);
-  const [pendingMovement, setPendingMovement] = useState<Movement | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [itemSearch, setItemSearch] = useState('');
-  const [formData, setFormData] = useState({
-    itemId: selectedItemId || '',
-    name: '',
-    category: '',
-    rack: '',
-    compatibleVehicles: '',
-    qty: 0
+
+  const isIn = tab === 'in';
+  const lines = sheets[tab];
+  const itemById = useMemo(() => new Map(inventory.map((item) => [item.id, item])), [inventory]);
+
+  // Opened from the inventory list with an item: put it on the sheet.
+  useEffect(() => {
+    if (!selectedItemId || !itemById.has(selectedItemId)) return;
+    setSheets((prev) => ({ ...prev, [tab]: addLine(prev[tab], selectedItemId) }));
+  }, [selectedItemId, tab]);
+
+  const changeTab = (next: Tab) => {
+    setTab(next);
+    setSearch('');
+    setError(null);
+    setIsScannerOpen(false);
+  };
+
+  const updateSheet = (update: (current: Line[]) => Line[]) => {
+    setError(null);
+    setSheets((prev) => ({ ...prev, [tab]: update(prev[tab]) }));
+  };
+
+  const addItemToSheet = (itemId: string) => {
+    updateSheet((current) => addLine(current, itemId));
+    setSearch('');
+  };
+
+  const setQty = (itemId: string, value: string) => {
+    const parsed = value === '' ? 0 : Math.max(0, parseInt(value, 10) || 0);
+    updateSheet((current) => current.map((line) => (line.itemId === itemId ? { ...line, qty: parsed } : line)));
+  };
+
+  const removeLine = (itemId: string) => {
+    updateSheet((current) => current.filter((line) => line.itemId !== itemId));
+  };
+
+  const suggestions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return [];
+    const onSheet = new Set(lines.map((line) => line.itemId));
+    return inventory
+      .filter((item) => !onSheet.has(item.id) && `${item.id} ${item.name}`.toLowerCase().includes(query))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, MAX_SUGGESTIONS);
+  }, [search, inventory, lines]);
+
+  const exactMatch = (value: string) => {
+    const query = value.trim().toLowerCase();
+    return inventory.find((item) => item.id.toLowerCase() === query || `${item.id} - ${item.name}`.toLowerCase() === query);
+  };
+
+  const handleSearchKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const match = exactMatch(search) ?? (suggestions.length === 1 ? suggestions[0] : undefined);
+    if (match) addItemToSheet(match.id);
+  };
+
+  const handleScan = (value: string) => {
+    const code = value.trim();
+    const found = inventory.find((item) => item.id === code || (item.barcode ?? '').trim() === code);
+    if (!found) {
+      setError(`No item matches the code ${code}.`);
+      return;
+    }
+    addItemToSheet(found.id);
+    setIsScannerOpen(false);
+  };
+
+  const rows = lines.map((line) => {
+    const item = itemById.get(line.itemId);
+    const onHand = item?.quantity ?? 0;
+    const after = isIn ? onHand + line.qty : onHand - line.qty;
+    const short = !isIn && line.qty > onHand;
+    return { line, item, onHand, after, short };
   });
 
+  const totalUnits = lines.reduce((sum, line) => sum + line.qty, 0);
+  const shortRows = rows.filter((row) => row.short);
 
-  useEffect(() => {
+  const requestRecord = () => {
     setError(null);
-    setShowConfirmOverdraw(false);
-    if (selectedItemId) {
-      const item = inventory.find(i => i.id === selectedItemId);
-      if (item) {
-        setItemSearch(`${item.id} - ${item.name}`);
-        setFormData({
-          itemId: selectedItemId,
-          name: item.name,
-          category: item.category,
-          rack: item.rack || '',
-          compatibleVehicles: item.compatibleVehicles || '',
-          qty: 0
-        });
-      }
-    }
-  }, [selectedItemId, inventory]);
-
-
-  const handleItemSelect = (id: string, type: 'in' | 'out') => {
-    setError(null);
-    setShowConfirmOverdraw(false);
-    if (id === 'NEW') {
-      onAddItem();
+    if (lines.length === 0) {
+      setError('Add at least one item to the sheet.');
       return;
     }
-    const item = inventory.find(i => i.id === id);
-    setItemSearch(item ? `${item.id} - ${item.name}` : '');
-    setFormData({
-      itemId: id,
-      name: item?.name || '',
-      category: item?.category || '',
-      rack: item?.rack || '',
-      compatibleVehicles: item?.compatibleVehicles || '',
-      qty: 0
-    });
+    if (lines.some((line) => line.qty <= 0)) {
+      setError('Enter a quantity for every item.');
+      return;
+    }
+    setIsConfirmOpen(true);
   };
 
-  const handleItemSearch = (value: string, type: 'in' | 'out') => {
-    setItemSearch(value);
-    const query = value.trim().toLowerCase();
-    const exactMatch = inventory.find(item => `${item.id} - ${item.name}`.toLowerCase() === query);
-    if (exactMatch) {
-      handleItemSelect(exactMatch.id, type);
-      return;
-    }
-    setFormData(prev => ({ ...prev, itemId: '', name: '', category: '', rack: '', compatibleVehicles: '' }));
-  };
-
-
-  const handleRecord = (type: 'in' | 'out', force: boolean = false) => {
-    setError(null);
-    if (!formData.itemId || formData.qty <= 0) {
-      setError('Select an item and enter a valid quantity.');
-      return;
-    }
-    const item = inventory.find(i => i.id === formData.itemId);
-    if (!item && type === 'out') return;
-    
-    if (type === 'out' && formData.qty > (item?.quantity || 0) && !force) {
-      setShowConfirmOverdraw(true);
-      return;
-    }
-
-    const activeUserName = userName || sessionStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
-    const movement: Movement = {
-      // Unique per record, so two people recording at the same moment never share an ID.
-      id: `MOV-${crypto.randomUUID()}`,
-      itemId: formData.itemId,
-      type: type.toUpperCase() as 'IN' | 'OUT',
-      qty: formData.qty,
-      date: new Date().toISOString().split('T')[0],
-      timestamp: Date.now(),
-      createdBy: activeUserName
-    };
-    setPendingMovement(movement);
-  };
-
-  const confirmMovement = async () => {
-    if (!pendingMovement || isRecording) return;
+  const confirmRecord = async () => {
+    if (isRecording) return;
     setIsRecording(true);
     setError(null);
+    const recordingTab = tab;
+    const activeUserName = userName || sessionStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
+    const pending = [...sheets[recordingTab]];
+    let done = 0;
     try {
-      await onAddMovement(pendingMovement);
-      setFormData(prev => ({ ...prev, qty: 0 }));
-      setPendingMovement(null);
-      setShowConfirmOverdraw(false);
+      for (const line of pending) {
+        const movement: Movement = {
+          // Unique per record, so two people recording at the same moment never share an ID.
+          id: `MOV-${crypto.randomUUID()}`,
+          itemId: line.itemId,
+          type: recordingTab === 'in' ? 'IN' : 'OUT',
+          qty: line.qty,
+          date: new Date().toISOString().split('T')[0],
+          timestamp: Date.now(),
+          createdBy: activeUserName,
+        };
+        await onAddMovement(movement);
+        done += 1;
+        // Remove each line as soon as it is saved, so a failure later leaves only the unsaved ones.
+        setSheets((prev) => ({
+          ...prev,
+          [recordingTab]: prev[recordingTab].filter((item) => item.itemId !== line.itemId),
+        }));
+      }
+      setIsConfirmOpen(false);
     } catch (recordError) {
-      setError(recordError instanceof Error ? recordError.message : 'Could not record the movement. Please try again.');
+      const message = recordError instanceof Error ? recordError.message : 'Could not record the movement.';
+      setError(`Saved ${done} of ${pending.length}. ${message} The items not yet saved are still on the sheet.`);
+      setIsConfirmOpen(false);
     } finally {
       setIsRecording(false);
     }
   };
 
+  const clearSheet = () => {
+    setError(null);
+    setSheets((prev) => ({ ...prev, [tab]: [] }));
+  };
 
-  const renderFormFields = (type: 'in' | 'out') => {
-    const isIn = type === 'in';
-    const selectedItem = formData.itemId ? inventory.find(i => i.id === formData.itemId) : undefined;
-    const onHand = selectedItem?.quantity ?? 0;
-    const qty = Number(formData.qty) || 0;
-    const after = isIn ? onHand + qty : onHand - qty;
-    const canRecord = Boolean(selectedItem) && qty > 0;
-    const isShort = !isIn && qty > onHand;
+  const canAddNewItem = isIn && userRole === 'admin';
+  const title = isIn ? 'Stock in' : 'Stock out';
+  const subtitle = isIn
+    ? 'Record units received. Each line adds to the item’s stock on hand.'
+    : 'Record units that left the warehouse. Each line is deducted from stock on hand.';
 
-    return (
-      <div className="stock-form">
-        {error && (
-          <div className="stock-alert is-error" role="alert">
-            <i className="bx bx-error-circle" aria-hidden="true"></i>
-            <span>{error}</span>
+  return (
+    <div className="content-section stk">
+      <div className="stk-tabs" role="tablist" aria-label="Stock movement">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isIn}
+          className={`stk-tab ${isIn ? 'is-active' : ''}`}
+          onClick={() => changeTab('in')}
+        >
+          <i className="bx bx-log-in" aria-hidden="true"></i> Stock in
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!isIn}
+          className={`stk-tab ${!isIn ? 'is-active' : ''}`}
+          onClick={() => changeTab('out')}
+        >
+          <i className="bx bx-log-out" aria-hidden="true"></i> Stock out
+        </button>
+      </div>
+
+      <section className="stk-sheet" aria-labelledby="stk-title">
+        <header className="stk-head">
+          <div>
+            <h2 id="stk-title" className="stk-title">{title}</h2>
+            <p className="stk-subtitle">{subtitle}</p>
           </div>
-        )}
-
-        {showConfirmOverdraw && (
-          <div className="stock-alert is-warning" role="alert">
-            <i className="bx bx-error" aria-hidden="true"></i>
-            <div className="stock-alert-body">
-              <p>
-                Only <strong>{onHand.toLocaleString()}</strong> unit{onHand === 1 ? '' : 's'} are on hand, but you are deducting{' '}
-                <strong>{qty.toLocaleString()}</strong>. Deduct anyway?
-              </p>
-              <div className="stock-alert-actions">
-                <button type="button" className="olive-button btn-outline btn-mini" onClick={() => setShowConfirmOverdraw(false)}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="olive-button btn-danger btn-mini"
-                  onClick={() => { setShowConfirmOverdraw(false); handleRecord(type, true); }}
-                >
-                  Deduct anyway
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          <button
+            type="button"
+            className={`stk-scan ${isScannerOpen ? 'is-active' : ''}`}
+            onClick={() => setIsScannerOpen((open) => !open)}
+          >
+            <i className={`bx ${isScannerOpen ? 'bx-x' : 'bx-barcode-reader'}`} aria-hidden="true"></i>
+            {isScannerOpen ? 'Close scanner' : 'Scan barcode'}
+          </button>
+        </header>
 
         {isScannerOpen && (
-          <div className="stock-scanner">
-            <span className="stock-section-label"><i className="bx bx-camera" aria-hidden="true"></i> Scan item</span>
-            <BarcodeScanner
-              onScanSuccess={(val) => {
-                const found = inventory.find(i => i.id === val || i.barcode === val);
-                if (found) {
-                  handleItemSelect(found.id, type);
-                  setIsScannerOpen(false);
-                }
-              }}
-            />
+          <div className="stk-scanner">
+            <BarcodeScanner onScanSuccess={handleScan} />
           </div>
         )}
 
-        <div className="stock-field">
-          <label className="stock-section-label" htmlFor={`stock-search-${type}`}>
-            {isIn ? 'Item to restock' : 'Item to deduct'}
-          </label>
-
-          {selectedItem ? (
-            <div className="stock-selected">
-              <div className="stock-selected-main">
-                <span className="stock-selected-name">{selectedItem.name}</span>
-                <span className="stock-selected-meta">
-                  {selectedItem.id} · {selectedItem.category || 'No category'}
-                  {selectedItem.rack ? ` · ${selectedItem.rack}` : ''}
-                </span>
-                {formData.compatibleVehicles && (
-                  <span className="stock-selected-vehicles">{formData.compatibleVehicles}</span>
-                )}
-              </div>
-              <div className="stock-selected-onhand">
-                <span className="stock-selected-label">On hand</span>
-                <span className="stock-selected-value">{onHand.toLocaleString()}</span>
-              </div>
-              <button
-                type="button"
-                className="stock-change"
-                onClick={() => {
-                  setItemSearch('');
-                  setFormData(prev => ({ ...prev, itemId: '', name: '', category: '', rack: '', compatibleVehicles: '' }));
-                }}
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <div className="stock-item-search">
-              <input
-                id={`stock-search-${type}`}
-                type="search"
-                className="form-input stock-search"
-                value={itemSearch}
-                onChange={(e) => handleItemSearch(e.target.value, type)}
-                placeholder="Search by item name or ID"
-                aria-label={isIn ? 'Search item to restock' : 'Search item to deduct'}
-                autoComplete="off"
-              />
-              {itemSearch.trim() && (
-                <div className="stock-item-suggestions" role="listbox">
-                  {isIn && userRole === 'admin' && (
-                    <button type="button" className="stock-item-suggestion is-add" onClick={() => onAddItem()}>
-                      <i className="bx bx-plus" aria-hidden="true"></i> Add a new item
-                    </button>
-                  )}
-                  {[...inventory]
-                    .filter(item => `${item.id} ${item.name}`.toLowerCase().includes(itemSearch.trim().toLowerCase()))
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map(item => (
-                      <button type="button" className="stock-item-suggestion" key={item.id} onClick={() => handleItemSelect(item.id, type)}>
-                        <span className="stock-item-suggestion-name">{item.name}</span>
-                        <span className="stock-item-suggestion-meta">{item.id} · {item.quantity.toLocaleString()} on hand</span>
-                      </button>
-                    ))}
-                </div>
+        <div className="stk-add">
+          <label className="stk-add-label" htmlFor={`stk-search-${tab}`}>Add item</label>
+          <div className="stk-search">
+            <i className="bx bx-search" aria-hidden="true"></i>
+            <input
+              id={`stk-search-${tab}`}
+              type="search"
+              className="stk-search-input"
+              placeholder="Type an item ID or name, then press Enter"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={handleSearchKey}
+              autoComplete="off"
+            />
+          </div>
+          {search.trim() && (
+            <div className="stk-suggest" role="listbox" aria-label="Matching items">
+              {canAddNewItem && (
+                <button type="button" className="stk-suggest-row is-add" onClick={() => onAddItem()}>
+                  <i className="bx bx-plus" aria-hidden="true"></i> Add a new item
+                </button>
+              )}
+              {suggestions.map((item) => (
+                <button type="button" key={item.id} className="stk-suggest-row" onClick={() => addItemToSheet(item.id)}>
+                  <span className="stk-code">{item.id}</span>
+                  <span className="stk-suggest-name">{item.name}</span>
+                  <span className="stk-suggest-stock">{item.quantity.toLocaleString()} on hand</span>
+                </button>
+              ))}
+              {suggestions.length === 0 && !canAddNewItem && (
+                <p className="stk-suggest-empty">No matching items.</p>
               )}
             </div>
           )}
         </div>
 
-        <div className="stock-grid">
-          {isIn && (
-            <div className="stock-field">
-              <label className="stock-section-label" htmlFor="stock-rack">Rack location</label>
-              <select
-                id="stock-rack"
-                className="form-input font-mono"
-                value={formData.rack}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData(prev => ({ ...prev, rack: val }));
-                }}
-              >
-                <option value="">Not placed yet</option>
-                {rackLocations.map(rack => (
-                  <option key={rack} value={rack}>{rack}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="stock-field">
-            <label className="stock-section-label" htmlFor={`stock-qty-${type}`}>
-              Quantity to {isIn ? 'add' : 'deduct'} <span className="text-accent">*</span>
-            </label>
-            <input
-              id={`stock-qty-${type}`}
-              type="number"
-              inputMode="numeric"
-              className="form-input font-mono"
-              placeholder="0"
-              min="1"
-              disabled={!selectedItem}
-              value={formData.qty || ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                setFormData(prev => ({ ...prev, qty: val === '' ? 0 : parseInt(val, 10) || 0 }));
-              }}
-            />
-          </div>
-        </div>
-
-        {selectedItem && (
-          <div className={`stock-preview${isShort ? ' is-warning' : ''}`} aria-live="polite">
-            <span>{qty > 0 ? 'Stock after this change' : 'Stock on hand'}</span>
-            <span className="stock-preview-value">
-              {qty > 0 ? `${onHand.toLocaleString()} → ${Math.max(0, after).toLocaleString()}` : onHand.toLocaleString()}
-            </span>
+        {error && (
+          <div className="stk-alert" role="alert">
+            <i className="bx bx-error-circle" aria-hidden="true"></i>
+            <span>{error}</span>
           </div>
         )}
 
-        <button
-          type="button"
-          className={`olive-button stock-submit ${isIn ? '' : 'btn-danger'}`}
-          disabled={!canRecord}
-          onClick={() => handleRecord(type)}
-        >
-          {isIn ? 'Record stock in' : 'Record stock out'}
-        </button>
-      </div>
-    );
-  };
-
-
-  
-  return (
-    <div className="content-section">
-      <div className="actions-bar border-soft-no-pad">
-        <div className="flex-row-gap gap-2">
-          <button className={`tab-btn ${tab === 'in' ? 'active' : ''}`} onClick={() => setTab('in')}>Stock In</button>
-          <button className={`tab-btn ${tab === 'out' ? 'active' : ''}`} onClick={() => setTab('out')}>Stock Out</button>
+        <div className="stk-table-wrap">
+          <table className="stk-table">
+            <thead>
+              <tr>
+                <th scope="col">Item ID</th>
+                <th scope="col">Item</th>
+                <th scope="col" className="num">On hand</th>
+                <th scope="col" className="num">{isIn ? 'Add' : 'Deduct'}</th>
+                <th scope="col">UOM</th>
+                <th scope="col" className="num">After</th>
+                <th scope="col" aria-label="Remove line" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="stk-empty">
+                    No items yet. Search for an item above or scan its barcode.
+                  </td>
+                </tr>
+              )}
+              {rows.map(({ line, item, onHand, after, short }) => (
+                <tr key={line.itemId} className={short ? 'is-short' : ''}>
+                  <td><span className="stk-code">{line.itemId}</span></td>
+                  <td>
+                    <span className="stk-item-name">{item?.name ?? 'Unknown item'}</span>
+                    {item?.compatibleVehicles && <span className="stk-item-meta">{item.compatibleVehicles}</span>}
+                  </td>
+                  <td className="num">{onHand.toLocaleString()}</td>
+                  <td className="num">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      className="stk-qty"
+                      aria-label={`Quantity for ${item?.name ?? line.itemId}`}
+                      value={line.qty || ''}
+                      placeholder="0"
+                      onChange={(event) => setQty(line.itemId, event.target.value)}
+                    />
+                  </td>
+                  <td>{item?.unitOfMeasure || 'PCS'}</td>
+                  <td className="num">
+                    {line.qty > 0 ? (
+                      <span className={short ? 'stk-after is-short' : 'stk-after'}>{after.toLocaleString()}</span>
+                    ) : (
+                      <span className="stk-after is-idle">—</span>
+                    )}
+                  </td>
+                  <td className="stk-remove-cell">
+                    <button
+                      type="button"
+                      className="stk-remove"
+                      aria-label={`Remove ${item?.name ?? line.itemId}`}
+                      title="Remove from sheet"
+                      onClick={() => removeLine(line.itemId)}
+                    >
+                      <i className="bx bx-x" aria-hidden="true"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
-      <div className="stock-tab-content">
-        <div className="dash-card m-gap">
-          <div className="flex-row-between">
-            <div className="stock-heading">
-              <h2 className="stock-title">{tab === 'in' ? 'Record stock in' : 'Record stock out'}</h2>
-              <p className="stock-subtitle">{tab === 'in' ? 'Add units received for an existing item.' : 'Deduct units that left the warehouse.'}</p>
-            </div>
-            <button className={`barcode-pill-btn ${isScannerOpen ? 'active' : ''}`} onClick={() => setIsScannerOpen(!isScannerOpen)}>
-              <i className={`bx ${isScannerOpen ? 'bx-x' : 'bx-barcode-reader'}`} aria-hidden="true"></i>
-              <span>{isScannerOpen ? 'Close scanner' : 'Scan barcode'}</span>
+
+        <footer className="stk-foot">
+          <div className="stk-totals">
+            <span>Items <strong>{lines.length.toLocaleString()}</strong></span>
+            <span>Units <strong>{totalUnits.toLocaleString()}</strong></span>
+            {shortRows.length > 0 && (
+              <span className="stk-totals-warning">
+                <i className="bx bx-error" aria-hidden="true"></i>
+                {shortRows.length} over stock
+              </span>
+            )}
+          </div>
+          <div className="stk-foot-actions">
+            <button type="button" className="stk-btn is-ghost" onClick={clearSheet} disabled={lines.length === 0 || isRecording}>
+              Clear
+            </button>
+            <button
+              type="button"
+              className={`stk-btn ${isIn ? 'is-primary' : 'is-danger'}`}
+              onClick={requestRecord}
+              disabled={lines.length === 0 || isRecording}
+            >
+              {isIn ? 'Record stock in' : 'Record stock out'}
             </button>
           </div>
-          {renderFormFields(tab)}
-        </div>
-      </div>
+        </footer>
+      </section>
+
       <Modal
-        isOpen={!!pendingMovement}
-        onClose={() => setPendingMovement(null)}
-        title={`Confirm Stock ${pendingMovement?.type === 'IN' ? 'In' : 'Out'}`}
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        title={`Confirm stock ${isIn ? 'in' : 'out'}`}
         footer={
-          <div className="flex-row-gap" style={{ width: '100%' }}>
-            <button className="olive-button btn-outline" style={{ flex: 1 }} onClick={() => setPendingMovement(null)}>Cancel</button>
-            <button className={`olive-button ${pendingMovement?.type === 'OUT' ? 'btn-danger' : ''}`} style={{ flex: 1 }} onClick={confirmMovement} disabled={isRecording}>{isRecording ? 'Recording…' : 'Confirm'}</button>
+          <div className="stk-modal-actions">
+            <button type="button" className="stk-btn is-ghost" onClick={() => setIsConfirmOpen(false)} disabled={isRecording}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`stk-btn ${isIn ? 'is-primary' : 'is-danger'}`}
+              onClick={confirmRecord}
+              disabled={isRecording}
+            >
+              {isRecording ? 'Recording…' : shortRows.length > 0 ? 'Deduct anyway' : 'Confirm'}
+            </button>
           </div>
         }
       >
-        <div className="text-center">
-          <p className="label-micro text-lg mb-4">Record {pendingMovement?.qty || 0} unit{pendingMovement?.qty === 1 ? '' : 's'} {pendingMovement?.type === 'IN' ? 'into' : 'out of'} inventory?</p>
-          <p className="label-micro opacity-50">Item: {inventory.find(item => item.id === pendingMovement?.itemId)?.name || pendingMovement?.itemId}</p>
-        </div>
+        <p className="stk-modal-summary">
+          {lines.length} item{lines.length === 1 ? '' : 's'}, {totalUnits.toLocaleString()} unit{totalUnits === 1 ? '' : 's'} {isIn ? 'into' : 'out of'} stock.
+        </p>
+        {shortRows.length > 0 && (
+          <p className="stk-modal-warning">
+            <i className="bx bx-error" aria-hidden="true"></i>
+            {shortRows.length === 1 ? 'One item' : `${shortRows.length} items`} will go below zero on hand after this change.
+          </p>
+        )}
+        <ul className="stk-modal-list">
+          {rows.map(({ line, item, onHand, after, short }) => (
+            <li key={line.itemId} className={short ? 'is-short' : ''}>
+              <span className="stk-item-name">{item?.name ?? line.itemId}</span>
+              <span className="stk-modal-qty">
+                {isIn ? '+' : '−'}{line.qty.toLocaleString()} · {onHand.toLocaleString()} → {after.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
       </Modal>
     </div>
   );
 };
-
