@@ -163,12 +163,21 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
     }
   };
 
+  // The next free code for a supplier (VIS0001, VIS0002 …), filled in for a new link.
+  const fillNextCode = (supplierId: string | number, setCode: (code: string) => void) =>
+    apiRequest<{ code: string }>(`/suppliers/${supplierId}/next-code`)
+      .then((r) => setCode(r.code))
+      .catch(() => undefined);
+
   const openLink = (link?: SupplierLink) => {
     setLinkEditing(link ?? null);
     setLinkError(null);
     setItemSearch('');
     setLinkForm({ itemId: link?.itemId ?? '', supplierItemCode: link?.supplierItemCode ?? '' });
     setIsLinkOpen(true);
+    if (!link && detail) {
+      void fillNextCode(detail.id, (code) => setLinkForm((f) => ({ ...f, supplierItemCode: f.supplierItemCode || code })));
+    }
   };
 
   const saveLink = async () => {

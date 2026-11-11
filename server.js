@@ -2373,6 +2373,87 @@ app.delete(
   }),
 );
 
+// Short letters from the supplier name, used at the start of its item codes: "VISCO" gives "VIS".
+function supplierCodePrefix(name) {
+  const letters = String(name || "").toUpperCase().replace(/[^A-Z]/g, "");
+  return letters.slice(0, 3) || "SUP";
+}
+
+// The next free code for a supplier: VIS0001, then VIS0002, and so on, after the highest one used.
+app.get(
+  "/api/suppliers/:id/next-code",
+  ah(async (req, res) => {
+    const supplierId = toPositiveInt(req.params.id);
+    if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
+    const [[supplier]] = await pool.query("SELECT name FROM suppliers WHERE id=?", [supplierId]);
+    if (!supplier) return res.status(404).json({ error: "Supplier not found." });
+    const prefix = supplierCodePrefix(supplier.name);
+    const [rows] = await pool.query(
+      "SELECT supplier_item_code FROM supplier_items WHERE supplier_id=? AND supplier_item_code LIKE ?",
+      [supplierId, `${prefix}%`],
+    );
+    const pattern = new RegExp(`^${prefix}(\\d+)$`);
+    let highest = 0;
+    for (const row of rows) {
+      const match = pattern.exec(row.supplier_item_code);
+      if (match) highest = Math.max(highest, Number(match[1]));
+    }
+    res.json({ code: `${prefix}${String(highest + 1).padStart(4, "0")}` });
+  }),
+);
+
+// Makes one of the item's supplier codes its Skyrun Item ID. Every record that refers to the item moves with it.
+app.post(
+  "/api/items/:id/use-supplier-code",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const oldId = normalizeItemId(req.params.id);
+    const newId = normalizeItemId(req.body?.newId);
+    if (!newId) return res.status(400).json({ error: "Choose the supplier code to use as the Item ID." });
+    if (newId === oldId) return res.json({ id: oldId });
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [[item]] = await connection.query("SELECT id FROM inventory WHERE id=? FOR UPDATE", [oldId]);
+      if (!item) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Item not found." });
+      }
+      const [[taken]] = await connection.query("SELECT id FROM inventory WHERE id=?", [newId]);
+      if (taken) {
+        await connection.rollback();
+        return res.status(409).json({ error: `Item ID ${newId} is already used by another item.` });
+      }
+      const [[link]] = await connection.query(
+        "SELECT id FROM supplier_items WHERE item_id=? AND supplier_item_code=?",
+        [oldId, newId],
+      );
+      if (!link) {
+        await connection.rollback();
+        return res.status(400).json({ error: "That code is not one of this item's supplier codes. Link the supplier first." });
+      }
+
+      // The item ID is a key that other tables refer to. Those references are moved in the same transaction.
+      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+      await connection.query("UPDATE inventory SET id=?, version = version + 1 WHERE id=?", [newId, oldId]);
+      await connection.query("UPDATE movements SET item_id=? WHERE item_id=?", [newId, oldId]);
+      await connection.query("UPDATE inventory_audit SET item_id=? WHERE item_id=?", [newId, oldId]);
+      await connection.query("UPDATE stock_ledger SET item_id=? WHERE item_id=?", [newId, oldId]);
+      await connection.query("UPDATE supplier_items SET item_id=? WHERE item_id=?", [newId, oldId]);
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+      await connection.commit();
+      res.json({ id: newId });
+    } catch (error) {
+      await connection.query("SET FOREIGN_KEY_CHECKS = 1").catch(() => {});
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
 // The suppliers linked to each inventory item, for the Inventory list.
 app.get(
   "/api/supplier-links/counts",

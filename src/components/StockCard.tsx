@@ -9,6 +9,7 @@ interface StockCardProps {
   movements: Movement[];
   selectedItemId?: string;
   onSelectItem: (id: string) => void;
+  onItemRenamed?: (newId: string) => void;
   userRole: UserRole;
 }
 
@@ -68,7 +69,7 @@ const formatPeso = (value: number) =>
 
 const formatDateTime = (value: string) => value.slice(0, 16).replace(' ', ' · ');
 
-export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, selectedItemId, onSelectItem, userRole }) => {
+export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, selectedItemId, onSelectItem, onItemRenamed, userRole }) => {
   const isAdmin = userRole === 'admin';
   const [itemSearch, setItemSearch] = useState('');
   const [from, setFrom] = useState('');
@@ -146,6 +147,26 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
     setLinkError(null);
     setLinkForm({ supplierId: link ? String(link.supplierId) : '', supplierItemCode: link?.supplierItemCode ?? '' });
     setIsLinkOpen(true);
+  };
+
+  // The next free code for a supplier (VIS0001, VIS0002 …), filled in for a new link.
+  const fillNextCode = (supplierId: string | number, setCode: (code: string) => void) =>
+    apiRequest<{ code: string }>(`/suppliers/${supplierId}/next-code`)
+      .then((r) => setCode(r.code))
+      .catch(() => undefined);
+
+  const useCodeAsItemId = async (link: ItemSupplier) => {
+    if (!selectedItemId) return;
+    if (!window.confirm(`Change the Item ID from ${selectedItemId} to ${link.supplierItemCode}? All stock history moves with it.`)) return;
+    try {
+      const result = await apiRequest<{ id: string }>(`/items/${encodeURIComponent(selectedItemId)}/use-supplier-code`, {
+        method: 'POST',
+        body: JSON.stringify({ newId: link.supplierItemCode }),
+      });
+      onItemRenamed?.(result.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the Item ID.');
+    }
   };
 
   const saveLink = async () => {
@@ -335,6 +356,11 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
                         <td><span className="sc-code">{link.supplierItemCode}</span></td>
                         {isAdmin && (
                           <td className="sc-actions no-print">
+                            {link.supplierItemCode !== card.item.id && (
+                              <button type="button" className="sc-btn is-ghost" onClick={() => useCodeAsItemId(link)}>
+                                Use as Item ID
+                              </button>
+                            )}
                             <button type="button" className="sc-icon" aria-label={`Edit link to ${link.supplierName}`} onClick={() => openLinkModal(link)}>
                               <i className="bx bx-edit-alt" aria-hidden="true"></i>
                             </button>
@@ -442,7 +468,11 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
             <select
               value={linkForm.supplierId}
               disabled={Boolean(linkEditing)}
-              onChange={(e) => setLinkForm((f) => ({ ...f, supplierId: e.target.value }))}
+              onChange={(e) => {
+                const supplierId = e.target.value;
+                setLinkForm((f) => ({ ...f, supplierId }));
+                if (supplierId) void fillNextCode(supplierId, (code) => setLinkForm((f) => ({ ...f, supplierItemCode: code })));
+              }}
             >
               <option value="">Choose a supplier</option>
               {suppliers
