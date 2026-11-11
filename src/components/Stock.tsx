@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
+import { apiRequest } from '../apiClient';
 import { Modal } from './Modal';
 import { getLocalCost } from '../inventoryMetrics';
 
@@ -44,6 +45,32 @@ export const Stock: React.FC<StockProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  // Prices typed in the Cost column, by item, until they are saved on blur or Enter.
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const isAdmin = userRole === 'admin';
+
+  // Saves a purchase price typed on the sheet. It is the item's price, so it is saved on the item.
+  const savePrice = async (item: Item) => {
+    const draft = priceDrafts[item.id];
+    if (draft === undefined) return;
+    const price = draft.trim() === '' ? 0 : Number(draft);
+    if (!Number.isFinite(price) || price < 0) {
+      setError('Enter a price of zero or more.');
+      setPriceDrafts((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
+      return;
+    }
+    setPriceDrafts((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
+    if (price === item.price) return;
+    try {
+      await apiRequest(`/inventory/${encodeURIComponent(item.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...item, price, updatedBy: userName }),
+      });
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save the price.');
+    }
+  };
   const [isRecording, setIsRecording] = useState(false);
 
   const isIn = tab === 'in';
@@ -344,7 +371,22 @@ export const Stock: React.FC<StockProps> = ({
                     <td className="num">
                       {item ? (
                         <div className="inv-cost">
-                          <span className="inv-cost-main">{formatPeso(item.price)}</span>
+                          {isAdmin ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              className="stk-qty stk-price-input"
+                              aria-label={`Purchase price for ${item.name}`}
+                              value={priceDrafts[item.id] ?? String(item.price)}
+                              onChange={(e) => setPriceDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                              onBlur={() => void savePrice(item)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            />
+                          ) : (
+                            <span className="inv-cost-main">{formatPeso(item.price)}</span>
+                          )}
                           <span className="inv-cost-sub">
                             Local {formatPeso(localCost)}
                             {discount > 0 && <span className="inv-discount">−{discount}%</span>}

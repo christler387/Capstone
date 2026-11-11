@@ -9525,3 +9525,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-actions .inv-icon-btn {
   flex: 0 0 auto;
 }
+
+/* Stock sheet: the purchase price can be typed in the Cost column (admin). */
+.stk-price-input {
+  width: 130px;
+  text-align: right;
+}
