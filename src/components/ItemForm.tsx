@@ -445,8 +445,16 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           className={`form-input font-mono ${isMissing("id") ? "is-missing" : ""}`}
           value={formData.id}
           onChange={handleChange}
-          disabled={readOnly || idLocked}
-          title={idLocked ? "Linked to a supplier: the Item ID comes from the supplier code" : undefined}
+          // An existing item keeps its Item ID. Only a new item gets one; a copy is made with Duplicate.
+          // Saved items carry a version number; the blank form for a new item does not.
+          disabled={readOnly || idLocked || item?.version !== undefined}
+          title={
+            idLocked
+              ? "Linked to a supplier: the Item ID comes from the supplier code"
+              : item?.version !== undefined
+                ? "Item IDs cannot be changed. Use Duplicate to make a copy with a new ID"
+                : undefined
+          }
           aria-invalid={isMissing("id")}
           required
         />

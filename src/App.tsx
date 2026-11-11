@@ -58,6 +58,23 @@ const App: React.FC = () => {
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [stockCardItemId, setStockCardItemId] = useState('');
+  // After a duplicate: reload the list, then open the copy for editing.
+  const [openAfterReload, setOpenAfterReload] = useState<string | null>(null);
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const openId = (event as CustomEvent<{ openId?: string }>).detail?.openId ?? null;
+      if (openId) setOpenAfterReload(openId);
+      void reloadInventory();
+    };
+    window.addEventListener('inventory-changed', onChanged);
+    return () => window.removeEventListener('inventory-changed', onChanged);
+  }, []);
+  useEffect(() => {
+    if (openAfterReload && inventory.some((i) => i.id === openAfterReload)) {
+      setOpenAfterReload(null);
+      handleEditItem(openAfterReload);
+    }
+  }, [inventory, openAfterReload]);
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
   const [databaseError, setDatabaseError] = useState<string | null>(null);

@@ -1658,6 +1658,66 @@ app.post(
   }),
 );
 
+// Makes a copy of an item under a new Item ID. The copy has no stock and no barcode, so its stock card starts empty.
+// The duplication is written to the audit log.
+app.post(
+  "/api/inventory/:id/duplicate",
+  ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
+    const sourceId = normalizeItemId(req.params.id);
+    const newId = normalizeItemId(req.body?.newId);
+    if (!newId) return res.status(400).json({ error: "Enter the Item ID for the copy." });
+
+    const outcome = await withInventoryLock(async (connection) => {
+      await connection.beginTransaction();
+      try {
+        const [[source]] = await connection.query("SELECT * FROM inventory WHERE id=?", [sourceId]);
+        if (!source) {
+          await connection.rollback();
+          return { status: 404, error: "Item not found." };
+        }
+        const [[taken]] = await connection.query("SELECT id FROM inventory WHERE id=?", [newId]);
+        if (taken) {
+          const next = await nextFreeItemId(connection);
+          await connection.rollback();
+          return { status: 409, error: `Item ID ${newId} is already used by another item. The next free ID is ${next}.` };
+        }
+        const copy = {
+          ...toItem(source),
+          id: newId,
+          quantity: 0,
+          barcode: undefined,
+          version: 0,
+        };
+        await connection.query(
+          `INSERT INTO inventory (${INVENTORY_COLUMNS}) VALUES (${INVENTORY_PLACEHOLDERS})`,
+          inventoryValues(newId, copy),
+        );
+        await connection.query(
+          "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+          [
+            `AUDIT-DUP-${crypto.randomUUID()}`,
+            newId,
+            copy.name,
+            "ADD",
+            JSON.stringify({ ...copy, duplicatedFrom: sourceId }),
+            actor.username,
+          ],
+        );
+        await connection.commit();
+        return { status: 201, id: newId };
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
+    });
+
+    if (outcome.status !== 201) return res.status(outcome.status).json({ error: outcome.error });
+    res.status(201).json({ id: outcome.id });
+  }),
+);
+
 app.put(
   "/api/inventory/:id",
   ah(async (req, res) => {
@@ -1668,6 +1728,9 @@ app.put(
     };
     const itemId = normalizeItemId(req.params.id);
     const submittedItemId = normalizeItemId(item.id || itemId);
+    if (submittedItemId !== itemId) {
+      return res.status(400).json({ error: "The Item ID cannot be changed. Duplicate the item to make one with a new ID." });
+    }
     // The version the form was opened with. A save based on an older version would overwrite
     // someone else's change, so it is refused.
     const expectedVersion =

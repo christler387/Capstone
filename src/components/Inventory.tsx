@@ -56,6 +56,21 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [pageInput, setPageInput] = useState(String(currentPage));
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
 
+  // Makes a copy of an item under an ID the admin types. The copy is audited on the server.
+  const duplicateItem = async (item: Item) => {
+    const newId = window.prompt(`Item ID for the copy of ${item.name}:`, '');
+    if (!newId || !newId.trim()) return;
+    try {
+      const result = await apiRequest<{ id: string }>(`/inventory/${encodeURIComponent(item.id)}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify({ newId: newId.trim() }),
+      });
+      window.dispatchEvent(new CustomEvent('inventory-changed', { detail: { openId: result.id } }));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not duplicate the item.');
+    }
+  };
+
   // Copies the full web address of an item's picture.
   const copyPictureUrl = async (itemId: string, image: string) => {
     try {
@@ -382,6 +397,17 @@ export const Inventory: React.FC<InventoryProps> = ({
                       onClick={(e) => { e.stopPropagation(); void copyPictureUrl(i.id, i.image!); }}
                     >
                       <i className={`bx ${copiedItemId === i.id ? 'bx-check' : 'bx-link'}`} aria-hidden="true"></i>
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className="inv-icon-btn"
+                      title="Duplicate item"
+                      aria-label={`Duplicate ${i.name}`}
+                      onClick={(e) => { e.stopPropagation(); void duplicateItem(i); }}
+                    >
+                      <i className="bx bx-copy" aria-hidden="true"></i>
                     </button>
                   )}
                   {isAdmin ? (
