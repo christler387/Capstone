@@ -735,6 +735,15 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
     if (deletedItem) setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
+  // An item's Item ID changed: update the screen at once, then reload the data in the background.
+  const handleItemRenamed = (oldId: string, newId: string) => {
+    setInventory(prev => prev.map(i => (i.id === oldId ? { ...i, id: newId } : i)));
+    setMovements(prev => prev.map(m => (m.itemId === oldId ? { ...m, itemId: newId } : m)));
+    setStockCardItemId(newId);
+    void Promise.all([reloadInventory(), reloadMovements()]);
+    window.dispatchEvent(new Event('supplier-links-changed'));
+  };
+
   // Opens an item's stock card from another screen (the Inventory list or the Suppliers page).
   const handleOpenStockCard = (itemId: string) => {
     setStockCardItemId(itemId);
@@ -888,10 +897,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             movements={movements}
             selectedItemId={stockCardItemId}
             onSelectItem={setStockCardItemId}
-            onItemRenamed={async (newId) => {
-              await Promise.all([reloadInventory(), reloadMovements()]);
-              setStockCardItemId(newId);
-            }}
+            onItemRenamed={handleItemRenamed}
             userRole={userRole}
           />
         );
@@ -901,10 +907,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             inventory={inventory}
             userRole={userRole}
             onOpenStockCard={handleOpenStockCard}
-            onItemRenamed={async (newId) => {
-              await Promise.all([reloadInventory(), reloadMovements()]);
-              setStockCardItemId(newId);
-            }}
+            onItemRenamed={handleItemRenamed}
           />
         );
       case 'warehouse': 

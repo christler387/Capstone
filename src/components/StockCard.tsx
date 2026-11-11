@@ -9,7 +9,7 @@ interface StockCardProps {
   movements: Movement[];
   selectedItemId?: string;
   onSelectItem: (id: string) => void;
-  onItemRenamed?: (newId: string) => void;
+  onItemRenamed?: (oldId: string, newId: string) => void;
   userRole: UserRole;
 }
 
@@ -163,7 +163,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
         method: 'POST',
         body: JSON.stringify({ newId: link.supplierItemCode }),
       });
-      onItemRenamed?.(result.id);
+      onItemRenamed?.(selectedItemId, result.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not change the Item ID.');
     }
@@ -196,12 +196,14 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
         if (saved.note) window.alert(saved.note);
         if (saved.renamed) {
           setIsLinkOpen(false);
-          onItemRenamed?.(saved.itemId);
+          onItemRenamed?.(selectedItemId, saved.itemId);
+          window.dispatchEvent(new Event('supplier-links-changed'));
           return;
         }
       }
       setIsLinkOpen(false);
       loadLinks();
+      window.dispatchEvent(new Event('supplier-links-changed'));
     } catch (err) {
       setLinkError(err instanceof Error ? err.message : 'Could not save the supplier link.');
     } finally {
@@ -214,6 +216,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
     try {
       await apiRequest(`/supplier-items/${link.id}`, { method: 'DELETE' });
       loadLinks();
+      window.dispatchEvent(new Event('supplier-links-changed'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove the supplier link.');
     }

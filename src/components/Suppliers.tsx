@@ -39,7 +39,7 @@ interface SuppliersProps {
   inventory: Item[];
   userRole: UserRole;
   onOpenStockCard: (itemId: string) => void;
-  onItemRenamed?: (newId: string) => void;
+  onItemRenamed?: (oldId: string, newId: string) => void;
 }
 
 const EMPTY_FORM = { name: '', contactPerson: '', contactNumber: '', email: '', address: '', notes: '' };
@@ -215,13 +215,16 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
         if (saved.note) window.alert(saved.note);
         if (saved.renamed) {
           setIsLinkOpen(false);
-          onItemRenamed?.(saved.itemId);
+          onItemRenamed?.(linkForm.itemId, saved.itemId);
+          void loadDetail(detail.id);
+          void loadSuppliers();
+          window.dispatchEvent(new Event('supplier-links-changed'));
           return;
         }
       }
       setIsLinkOpen(false);
-      await loadDetail(detail.id);
-      await loadSuppliers();
+      window.dispatchEvent(new Event('supplier-links-changed'));
+      await Promise.all([loadDetail(detail.id), loadSuppliers()]);
     } catch (err) {
       setLinkError(err instanceof Error ? err.message : 'Could not save the link.');
     }
@@ -232,8 +235,8 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
     if (!window.confirm(`Remove ${link.itemName} from ${detail.name}? The inventory item is not deleted.`)) return;
     try {
       await apiRequest(`/supplier-items/${link.id}`, { method: 'DELETE' });
-      await loadDetail(detail.id);
-      await loadSuppliers();
+      window.dispatchEvent(new Event('supplier-links-changed'));
+      await Promise.all([loadDetail(detail.id), loadSuppliers()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove the link.');
     }

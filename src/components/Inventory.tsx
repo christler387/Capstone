@@ -37,9 +37,13 @@ export const Inventory: React.FC<InventoryProps> = ({
   // How many suppliers each item is linked to, shown on the row.
   const [supplierLinks, setSupplierLinks] = useState<Record<string, { count: number; suppliers: { name: string; code: string }[] }>>({});
   useEffect(() => {
-    apiRequest<Record<string, { count: number; suppliers: { name: string; code: string }[] }>>('/supplier-links/counts')
-      .then(setSupplierLinks)
-      .catch(() => setSupplierLinks({}));
+    const load = () =>
+      apiRequest<Record<string, { count: number; suppliers: { name: string; code: string }[] }>>('/supplier-links/counts')
+        .then(setSupplierLinks)
+        .catch(() => setSupplierLinks({}));
+    load();
+    window.addEventListener('supplier-links-changed', load);
+    return () => window.removeEventListener('supplier-links-changed', load);
   }, []);
 
 
