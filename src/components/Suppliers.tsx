@@ -39,13 +39,14 @@ interface SuppliersProps {
   inventory: Item[];
   userRole: UserRole;
   onOpenStockCard: (itemId: string) => void;
+  onItemRenamed?: (newId: string) => void;
 }
 
 const EMPTY_FORM = { name: '', contactPerson: '', contactNumber: '', email: '', address: '', notes: '' };
 const formatPeso = (value: number) =>
   `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpenStockCard }) => {
+export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpenStockCard, onItemRenamed }) => {
   const isAdmin = userRole === 'admin';
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [search, setSearch] = useState('');
@@ -199,10 +200,16 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
           body: JSON.stringify({ supplierItemCode: code }),
         });
       } else {
-        await apiRequest(`/suppliers/${detail.id}/items`, {
+        const saved = await apiRequest<{ itemId: string; renamed: boolean; note: string | null }>(`/suppliers/${detail.id}/items`, {
           method: 'POST',
           body: JSON.stringify({ itemId: linkForm.itemId, supplierItemCode: code }),
         });
+        if (saved.note) window.alert(saved.note);
+        if (saved.renamed) {
+          setIsLinkOpen(false);
+          onItemRenamed?.(saved.itemId);
+          return;
+        }
       }
       setIsLinkOpen(false);
       await loadDetail(detail.id);

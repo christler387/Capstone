@@ -901,6 +901,10 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             inventory={inventory}
             userRole={userRole}
             onOpenStockCard={handleOpenStockCard}
+            onItemRenamed={async (newId) => {
+              await Promise.all([reloadInventory(), reloadMovements()]);
+              setStockCardItemId(newId);
+            }}
           />
         );
       case 'warehouse': 

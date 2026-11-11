@@ -2283,7 +2283,7 @@ app.get(
 );
 
 const cleanSupplierItem = (body) => ({
-  supplierItemCode: cleanText(body.supplierItemCode, 64),
+  supplierItemCode: cleanText(body.supplierItemCode, 64).toUpperCase(),
   purchasePrice:
     body.purchasePrice === "" || body.purchasePrice === null || body.purchasePrice === undefined
       ? null
@@ -2300,35 +2300,55 @@ app.post(
     const data = cleanSupplierItem(req.body || {});
     if (!supplierId || !itemId) return res.status(400).json({ error: "Choose a supplier and an item." });
     if (!data.supplierItemCode) return res.status(400).json({ error: "Enter the supplier's item code." });
-    if (data.purchasePrice !== null && (!Number.isFinite(data.purchasePrice) || data.purchasePrice < 0)) {
-      return res.status(400).json({ error: "Purchase price must be zero or more." });
-    }
 
-    const [[supplier]] = await pool.query("SELECT id FROM suppliers WHERE id=?", [supplierId]);
-    if (!supplier) return res.status(404).json({ error: "Supplier not found." });
-    const [[item]] = await pool.query("SELECT id FROM inventory WHERE id=?", [itemId]);
-    if (!item) return res.status(404).json({ error: "Item not found." });
-
-    const [[sameCode]] = await pool.query(
-      "SELECT id FROM supplier_items WHERE supplier_id=? AND supplier_item_code=?",
-      [supplierId, data.supplierItemCode],
-    );
-    if (sameCode) {
-      return res.status(409).json({ error: "This supplier already uses that item code for another item." });
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [[supplier]] = await connection.query("SELECT id FROM suppliers WHERE id=?", [supplierId]);
+      if (!supplier) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Supplier not found." });
+      }
+      const [[item]] = await connection.query("SELECT id FROM inventory WHERE id=? FOR UPDATE", [itemId]);
+      if (!item) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Item not found." });
+      }
+      const [[sameCode]] = await connection.query(
+        "SELECT id FROM supplier_items WHERE supplier_id=? AND supplier_item_code=?",
+        [supplierId, data.supplierItemCode],
+      );
+      if (sameCode) {
+        await connection.rollback();
+        return res.status(409).json({ error: "This supplier already uses that item code for another item." });
+      }
+      const [[sameItem]] = await connection.query(
+        "SELECT id FROM supplier_items WHERE supplier_id=? AND item_id=?",
+        [supplierId, itemId],
+      );
+      if (sameItem) {
+        await connection.rollback();
+        return res.status(409).json({ error: "This item is already linked to this supplier. Edit the existing link instead." });
+      }
+      const [result] = await connection.query(
+        "INSERT INTO supplier_items (supplier_id, item_id, supplier_item_code) VALUES (?, ?, ?)",
+        [supplierId, itemId, data.supplierItemCode],
+      );
+      // The supplier's code becomes the Item ID, unless another item already has that ID.
+      const renamed = await renameItemId(connection, itemId, normalizeItemId(data.supplierItemCode));
+      await connection.commit();
+      res.status(201).json({
+        id: result.insertId,
+        itemId: renamed.id,
+        renamed: renamed.renamed,
+        note: renamed.reason || null,
+      });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-    const [[sameItem]] = await pool.query(
-      "SELECT id FROM supplier_items WHERE supplier_id=? AND item_id=?",
-      [supplierId, itemId],
-    );
-    if (sameItem) {
-      return res.status(409).json({ error: "This item is already linked to this supplier. Edit the existing link instead." });
-    }
-
-    const [result] = await pool.query(
-      `INSERT INTO supplier_items (supplier_id, item_id, supplier_item_code, purchase_price, notes) VALUES (?, ?, ?, ?, ?)`,
-      [supplierId, itemId, data.supplierItemCode, data.purchasePrice, data.notes],
-    );
-    res.status(201).json({ id: result.insertId });
   }),
 );
 
@@ -2402,7 +2422,29 @@ app.get(
   }),
 );
 
-// Makes one of the item's supplier codes its Skyrun Item ID. Every record that refers to the item moves with it.
+// Moves an item to a new Item ID, with every record that refers to it, in the caller's transaction.
+// Returns renamed: false, with a reason, when the new ID is already used by another item.
+async function renameItemId(connection, oldId, newId) {
+  if (newId === oldId) return { id: oldId, renamed: false };
+  const [[taken]] = await connection.query("SELECT id FROM inventory WHERE id=?", [newId]);
+  if (taken) {
+    return { id: oldId, renamed: false, reason: `Item ID ${newId} is already used by another item, so the Item ID was not changed.` };
+  }
+  // The item ID is a key that other tables refer to; SET FOREIGN_KEY_CHECKS lets them move together.
+  await connection.query("SET FOREIGN_KEY_CHECKS = 0");
+  try {
+    await connection.query("UPDATE inventory SET id=?, version = version + 1 WHERE id=?", [newId, oldId]);
+    await connection.query("UPDATE movements SET item_id=? WHERE item_id=?", [newId, oldId]);
+    await connection.query("UPDATE inventory_audit SET item_id=? WHERE item_id=?", [newId, oldId]);
+    await connection.query("UPDATE stock_ledger SET item_id=? WHERE item_id=?", [newId, oldId]);
+    await connection.query("UPDATE supplier_items SET item_id=? WHERE item_id=?", [newId, oldId]);
+  } finally {
+    await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+  }
+  return { id: newId, renamed: true };
+}
+
+// Makes one of the item's supplier codes its Skyrun Item ID (admin, from the stock card).
 app.post(
   "/api/items/:id/use-supplier-code",
   ah(async (req, res) => {
@@ -2410,8 +2452,6 @@ app.post(
     const oldId = normalizeItemId(req.params.id);
     const newId = normalizeItemId(req.body?.newId);
     if (!newId) return res.status(400).json({ error: "Choose the supplier code to use as the Item ID." });
-    if (newId === oldId) return res.json({ id: oldId });
-
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -2419,11 +2459,6 @@ app.post(
       if (!item) {
         await connection.rollback();
         return res.status(404).json({ error: "Item not found." });
-      }
-      const [[taken]] = await connection.query("SELECT id FROM inventory WHERE id=?", [newId]);
-      if (taken) {
-        await connection.rollback();
-        return res.status(409).json({ error: `Item ID ${newId} is already used by another item.` });
       }
       const [[link]] = await connection.query(
         "SELECT id FROM supplier_items WHERE item_id=? AND supplier_item_code=?",
@@ -2433,19 +2468,14 @@ app.post(
         await connection.rollback();
         return res.status(400).json({ error: "That code is not one of this item's supplier codes. Link the supplier first." });
       }
-
-      // The item ID is a key that other tables refer to. Those references are moved in the same transaction.
-      await connection.query("SET FOREIGN_KEY_CHECKS = 0");
-      await connection.query("UPDATE inventory SET id=?, version = version + 1 WHERE id=?", [newId, oldId]);
-      await connection.query("UPDATE movements SET item_id=? WHERE item_id=?", [newId, oldId]);
-      await connection.query("UPDATE inventory_audit SET item_id=? WHERE item_id=?", [newId, oldId]);
-      await connection.query("UPDATE stock_ledger SET item_id=? WHERE item_id=?", [newId, oldId]);
-      await connection.query("UPDATE supplier_items SET item_id=? WHERE item_id=?", [newId, oldId]);
-      await connection.query("SET FOREIGN_KEY_CHECKS = 1");
+      const result = await renameItemId(connection, oldId, newId);
+      if (!result.renamed) {
+        await connection.rollback();
+        return res.status(409).json({ error: result.reason || "The Item ID was not changed." });
+      }
       await connection.commit();
-      res.json({ id: newId });
+      res.json({ id: result.id });
     } catch (error) {
-      await connection.query("SET FOREIGN_KEY_CHECKS = 1").catch(() => {});
       await connection.rollback();
       throw error;
     } finally {

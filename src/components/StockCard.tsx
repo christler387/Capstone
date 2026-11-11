@@ -189,10 +189,16 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
           body: JSON.stringify({ supplierItemCode: code }),
         });
       } else {
-        await apiRequest(`/suppliers/${linkForm.supplierId}/items`, {
+        const saved = await apiRequest<{ itemId: string; renamed: boolean; note: string | null }>(`/suppliers/${linkForm.supplierId}/items`, {
           method: 'POST',
           body: JSON.stringify({ itemId: selectedItemId, supplierItemCode: code }),
         });
+        if (saved.note) window.alert(saved.note);
+        if (saved.renamed) {
+          setIsLinkOpen(false);
+          onItemRenamed?.(saved.itemId);
+          return;
+        }
       }
       setIsLinkOpen(false);
       loadLinks();
