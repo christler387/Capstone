@@ -7866,6 +7866,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 20px 1.75rem 2rem;
   font-family: var(--f-sans);
   color: var(--ink);
 }
