@@ -380,7 +380,7 @@ Each row is one item. The columns are:
 | **Location** | Rack code (for example H-03) and shelf level (for example Level: L1). |
 | **Qty** | Units currently in stock. |
 | **Reorder Qty** | How many units to reorder. Shows 00 when no reorder is needed. |
-| **Price** | Unit price in pesos (₱). |
+| **SRP** | Suggested retail price in pesos (₱). Shows '—' until one is entered. |
 | **Actions** | The trash icon, used to delete the item. |
 
 ### Red numbers
@@ -433,6 +433,8 @@ These values control when and how much to reorder.
 
 - **Quantity*** – Units in stock now.
 - **Price (₱)*** – Unit price in pesos.
+- **SRP (₱)** – Suggested retail price. This is the price shown in the inventory list.
+- **Supplier** – Where the item is bought from. Pick a supplier you have used before, or type a new one.
 
 ### Image
 Add a photo in one of two ways:

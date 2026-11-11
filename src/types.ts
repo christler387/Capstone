@@ -31,10 +31,13 @@ export interface Item {
   partNumber?: string;
   color?: string;
   unitOfMeasure?: string;
+  supplier?: string;
+  // Suggested retail price, shown in the inventory list.
+  srp?: number;
 }
 
 // Item fields that are typed in, with suggestions drawn from the values already saved.
-export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 'partNumber' | 'color' | 'unitOfMeasure';
+export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 'partNumber' | 'color' | 'unitOfMeasure' | 'supplier';
 
 export interface Movement {
   id: string;
