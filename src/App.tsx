@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { InventoryAuditEntry, Item, Movement, UserRole, WarehouseLayout } from './types';
 import { Modal } from './components/Modal';
+import { StockCard } from './components/StockCard';
+import { Suppliers } from './components/Suppliers';
 
 const API_BASE = '/api';
 
@@ -55,6 +57,7 @@ const App: React.FC = () => {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
+  const [stockCardItemId, setStockCardItemId] = useState('');
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
   const [databaseError, setDatabaseError] = useState<string | null>(null);
@@ -732,6 +735,12 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
     if (deletedItem) setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
+  // Opens an item's stock card from another screen (the Inventory list or the Suppliers page).
+  const handleOpenStockCard = (itemId: string) => {
+    setStockCardItemId(itemId);
+    setCurrentSection('stock-card');
+  };
+
   const addMovement = async (movement: Movement) => {
     const savedMovement = await requestJson<Movement>('/movements', {
       method: 'POST',
@@ -856,6 +865,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             onAddItem={() => handleAddItem()}
             onZoomImage={(url, name) => setZoomImage({ url, name })}
             onLocateOnMap={handleLocateOnMap}
+            onOpenStockCard={handleOpenStockCard}
             userRole={userRole}
           />
         );
@@ -869,6 +879,24 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             userRole={userRole}
             userName={user || undefined}
             rackLocations={rackLocations}
+          />
+        );
+      case 'stock-card':
+        return (
+          <StockCard
+            inventory={inventory}
+            movements={movements}
+            selectedItemId={stockCardItemId}
+            onSelectItem={setStockCardItemId}
+            userRole={userRole}
+          />
+        );
+      case 'suppliers':
+        return (
+          <Suppliers
+            inventory={inventory}
+            userRole={userRole}
+            onOpenStockCard={handleOpenStockCard}
           />
         );
       case 'warehouse': 
@@ -1042,7 +1070,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
             <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
             <h1 className="sr-only">
-              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation

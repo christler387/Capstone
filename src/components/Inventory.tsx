@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
+import { apiRequest } from '../apiClient';
 import { getLocalCost, getReorderQuantity, getStockTotal, isAtReorderPoint } from '../inventoryMetrics';
 
 interface InventoryProps {
@@ -12,6 +13,7 @@ interface InventoryProps {
   onAddItem: () => void;
   onZoomImage: (url: string, name: string) => void;
   onLocateOnMap: (rack: string) => void;
+  onOpenStockCard?: (itemId: string) => void;
   userRole?: UserRole;
 }
 
@@ -29,8 +31,17 @@ export const Inventory: React.FC<InventoryProps> = ({
   onAddItem,
   onZoomImage,
   onLocateOnMap,
-  userRole = 'staff'
+  userRole = 'staff',
+  onOpenStockCard,
 }) => {
+  // How many suppliers each item is linked to, shown on the row.
+  const [supplierCounts, setSupplierCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    apiRequest<Record<string, number>>('/supplier-links/counts')
+      .then(setSupplierCounts)
+      .catch(() => setSupplierCounts({}));
+  }, []);
+
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -298,6 +309,12 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
                   {i.model && <span className="inv-model">{i.model}</span>}
                   {i.color && <span className="inv-sub">{i.color}</span>}
+                  {supplierCounts[i.id] > 0 && (
+                    <span className="inv-supplier-count">
+                      <i className="bx bx-store" aria-hidden="true"></i>
+                      {supplierCounts[i.id]} {supplierCounts[i.id] === 1 ? 'supplier' : 'suppliers'}
+                    </span>
+                  )}
                 </div>
 
                 <span className={`inv-partno${i.partNumber ? '' : ' is-empty'}`} role="cell" title={i.partNumber || undefined}>
@@ -345,6 +362,15 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
 
                 <span className="inv-actions" role="cell">
+                  <button
+                    type="button"
+                    className="inv-icon-btn"
+                    title="Stock card"
+                    aria-label={`Open stock card for ${i.name}`}
+                    onClick={(e) => { e.stopPropagation(); onOpenStockCard?.(i.id); }}
+                  >
+                    <i className="bx bx-spreadsheet" aria-hidden="true"></i>
+                  </button>
                   {i.image && !i.image.startsWith('data:') && (
                     <button
                       type="button"

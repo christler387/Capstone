@@ -616,6 +616,8 @@ async function initializeDatabase() {
       [movementSeed],
     );
   }
+  await createStockCardTables();
+  await backfillStockLedger();
 }
 
 function toItem(row) {
@@ -1607,6 +1609,18 @@ app.post(
            VALUES (${INVENTORY_PLACEHOLDERS})`,
           inventoryValues(itemId, item),
         );
+        if (Number(item.quantity) > 0) {
+          await recordStockLedger(connection, {
+            sourceId: `BB-${itemId}`,
+            itemId,
+            type: "BEGINNING_BALANCE",
+            reference: `BB-${itemId}`,
+            description: "Opening balance",
+            qtyIn: Number(item.quantity),
+            balanceAfter: Number(item.quantity),
+            recordedBy: createdBy,
+          });
+        }
         await connection.query(
           "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
           [
@@ -1677,6 +1691,17 @@ app.put(
         const oldQuantity = Number(current.quantity);
         const newQuantity = Number(item.quantity) || 0;
         if (newQuantity !== oldQuantity) {
+          await recordStockLedger(connection, {
+            sourceId: `ADJ-${crypto.randomUUID()}`,
+            itemId,
+            type: "STOCK_ADJUSTMENT",
+            reference: `ADJ-${Date.now().toString().slice(-8)}`,
+            description: `Quantity changed from ${oldQuantity} to ${newQuantity}`,
+            qtyIn: Math.max(0, newQuantity - oldQuantity),
+            qtyOut: Math.max(0, oldQuantity - newQuantity),
+            balanceAfter: newQuantity,
+            recordedBy: actorName,
+          });
           await connection.query(
             "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
             [
@@ -1784,6 +1809,16 @@ app.patch(
           await connection.rollback();
           return res.status(404).json({ error: "Item not found." });
         }
+        await recordStockLedger(connection, {
+          sourceId: `UNDO-AUD-${audit.id}`,
+          itemId: audit.item_id,
+          type: "INVENTORY_CORRECTION",
+          reference: audit.id,
+          description: "Quantity change undone",
+          qtyIn: change.to < change.from ? change.from - change.to : 0,
+          qtyOut: change.to > change.from ? change.to - change.from : 0,
+          balanceAfter: await currentItemQuantity(connection, audit.item_id),
+        });
       } else {
         const item =
           typeof audit.item_data === "string"
@@ -1794,6 +1829,17 @@ app.patch(
            VALUES (${INVENTORY_PLACEHOLDERS})`,
           inventoryValues(audit.item_id, item),
         );
+        if (Number(item.quantity) > 0) {
+          await recordStockLedger(connection, {
+            sourceId: `BB-${audit.item_id}`,
+            itemId: audit.item_id,
+            type: "BEGINNING_BALANCE",
+            reference: `BB-${audit.item_id}`,
+            description: "Item restored, opening balance",
+            qtyIn: Number(item.quantity),
+            balanceAfter: Number(item.quantity),
+          });
+        }
       }
       await connection.query("DELETE FROM inventory_audit WHERE id=?", [
         req.params.id,
@@ -1806,6 +1852,525 @@ app.patch(
     } finally {
       connection.release();
     }
+  }),
+);
+
+/* ------------------- Stock card and suppliers (tables and helpers) ------------------- */
+
+const STOCK_TXN_TYPES = [
+  "BEGINNING_BALANCE",
+  "STOCK_IN",
+  "STOCK_OUT",
+  "PURCHASE_RETURN",
+  "CUSTOMER_RETURN",
+  "STOCK_ADJUSTMENT",
+  "DAMAGED_ITEMS",
+  "INVENTORY_CORRECTION",
+];
+
+// Local time as "YYYY-MM-DD HH:MM:SS", so the stock card shows the time the warehouse recorded it.
+function localDateTimeString(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+async function createStockCardTables() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS suppliers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier_code VARCHAR(32) NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    contact_person VARCHAR(120) NULL,
+    contact_number VARCHAR(40) NULL,
+    email VARCHAR(160) NULL,
+    address TEXT NULL,
+    notes TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+  // One row per supplier and item. The supplier's own code is unique within that supplier only.
+  await pool.query(`CREATE TABLE IF NOT EXISTS supplier_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier_id INT NOT NULL,
+    item_id VARCHAR(32) NOT NULL,
+    supplier_item_code VARCHAR(64) NOT NULL,
+    purchase_price DECIMAL(12,2) NULL,
+    notes VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_supplier_item_code (supplier_id, supplier_item_code),
+    UNIQUE KEY uq_supplier_item (supplier_id, item_id),
+    KEY idx_supplier_items_item (item_id),
+    CONSTRAINT supplier_items_supplier_fk FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+    CONSTRAINT supplier_items_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+  // Every change to an item's quantity is written here, in the same transaction as the change.
+  // source_id is unique, so the same change can never be recorded twice.
+  await pool.query(`CREATE TABLE IF NOT EXISTS stock_ledger (
+    id VARCHAR(64) PRIMARY KEY,
+    source_id VARCHAR(96) NOT NULL UNIQUE,
+    item_id VARCHAR(32) NOT NULL,
+    txn_date DATE NOT NULL,
+    txn_time DATETIME NOT NULL,
+    reference VARCHAR(64) NOT NULL,
+    txn_type VARCHAR(32) NOT NULL,
+    description VARCHAR(255) NULL,
+    supplier_id INT NULL,
+    qty_in INT NOT NULL DEFAULT 0,
+    qty_out INT NOT NULL DEFAULT 0,
+    balance_after INT NOT NULL,
+    recorded_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_stock_ledger_item_time (item_id, txn_time),
+    KEY idx_stock_ledger_reference (reference),
+    CONSTRAINT stock_ledger_item_fk FOREIGN KEY (item_id) REFERENCES inventory(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+}
+
+// Writes one stock card line. Call it inside the transaction that changed the quantity.
+async function recordStockLedger(connection, entry) {
+  const when = entry.time ? new Date(entry.time) : new Date();
+  await connection.query(
+    `INSERT IGNORE INTO stock_ledger
+      (id, source_id, item_id, txn_date, txn_time, reference, txn_type, description, supplier_id, qty_in, qty_out, balance_after, recorded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      `SL-${crypto.randomUUID()}`,
+      entry.sourceId,
+      entry.itemId,
+      localDateTimeString(when).slice(0, 10),
+      localDateTimeString(when),
+      String(entry.reference).slice(0, 64),
+      entry.type,
+      entry.description ? String(entry.description).slice(0, 255) : null,
+      entry.supplierId ?? null,
+      Math.max(0, Number(entry.qtyIn) || 0),
+      Math.max(0, Number(entry.qtyOut) || 0),
+      Number(entry.balanceAfter) || 0,
+      entry.recordedBy ? String(entry.recordedBy).slice(0, 64) : null,
+    ],
+  );
+}
+
+async function currentItemQuantity(connection, itemId) {
+  const [[row]] = await connection.query("SELECT quantity FROM inventory WHERE id=?", [itemId]);
+  return row ? Number(row.quantity) : 0;
+}
+
+// Runs once, when the stock card table is empty. It rebuilds each item's history from the
+// movements and quantity changes that were already recorded, so existing items start with a full card.
+async function backfillStockLedger() {
+  const [[existing]] = await pool.query("SELECT COUNT(*) AS count FROM stock_ledger");
+  if (existing.count > 0) return;
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [items] = await connection.query("SELECT id, quantity FROM inventory");
+    for (const item of items) {
+      const [movements] = await connection.query(
+        "SELECT id, type, qty, movement_date, created_at, created_by FROM movements WHERE item_id=?",
+        [item.id],
+      );
+      const [audits] = await connection.query(
+        "SELECT id, item_data, created_at FROM inventory_audit WHERE item_id=? AND action='QTY'",
+        [item.id],
+      );
+
+      const events = [];
+      for (const m of movements) {
+        const qty = Number(m.qty) || 0;
+        events.push({
+          sourceId: m.id,
+          time: new Date(m.created_at || m.movement_date),
+          type: m.type === "IN" ? "STOCK_IN" : "STOCK_OUT",
+          delta: m.type === "IN" ? qty : -qty,
+          reference: m.id,
+          recordedBy: m.created_by,
+        });
+      }
+      for (const a of audits) {
+        const data = typeof a.item_data === "string" ? JSON.parse(a.item_data) : a.item_data || {};
+        const delta = Number(data.delta) || 0;
+        if (!delta) continue;
+        events.push({
+          sourceId: `AUD-${a.id}`,
+          time: new Date(a.created_at),
+          type: "STOCK_ADJUSTMENT",
+          delta,
+          reference: a.id,
+          recordedBy: data.recordedBy || null,
+        });
+      }
+      events.sort((a, b) => a.time - b.time);
+
+      const net = events.reduce((sum, e) => sum + e.delta, 0);
+      const beginning = Number(item.quantity) - net;
+      const firstTime = events.length ? new Date(events[0].time.getTime() - 1000) : new Date();
+      await recordStockLedger(connection, {
+        sourceId: `BB-${item.id}`,
+        itemId: item.id,
+        type: "BEGINNING_BALANCE",
+        reference: `BB-${item.id}`,
+        description: "Opening balance",
+        qtyIn: Math.max(0, beginning),
+        balanceAfter: beginning,
+        recordedBy: "System",
+        time: firstTime,
+      });
+
+      let running = beginning;
+      for (const e of events) {
+        running += e.delta;
+        await recordStockLedger(connection, {
+          sourceId: e.sourceId,
+          itemId: item.id,
+          type: e.type,
+          reference: e.reference,
+          description: e.type === "STOCK_ADJUSTMENT" ? "Quantity changed on item" : null,
+          qtyIn: e.delta > 0 ? e.delta : 0,
+          qtyOut: e.delta < 0 ? -e.delta : 0,
+          balanceAfter: running,
+          recordedBy: e.recordedBy,
+          time: e.time,
+        });
+      }
+    }
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/* ----------------------------- Stock card ---------------------------- */
+
+const isIsoDate = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+app.get(
+  "/api/items/:id/stock-card",
+  ah(async (req, res) => {
+    const itemId = normalizeItemId(req.params.id);
+    const [[item]] = await pool.query("SELECT * FROM inventory WHERE id=?", [itemId]);
+    if (!item) return res.status(404).json({ error: "Item not found." });
+
+    const from = isIsoDate(req.query.from) ? req.query.from : "";
+    const to = isIsoDate(req.query.to) ? req.query.to : "";
+    const type = STOCK_TXN_TYPES.includes(req.query.type) ? req.query.type : "";
+    const reference = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64).toLowerCase() : "";
+
+    const [all] = await pool.query(
+      `SELECT id, DATE_FORMAT(txn_date, '%Y-%m-%d') AS txn_date, DATE_FORMAT(txn_time, '%Y-%m-%d %H:%i:%s') AS txn_time,
+              reference, txn_type, description, supplier_id, qty_in, qty_out, balance_after, recorded_by
+       FROM stock_ledger WHERE item_id=? ORDER BY txn_time, created_at, id`,
+      [itemId],
+    );
+
+    // Totals cover the whole history, whatever filter is applied to the table.
+    const summary = { beginning: 0, totalIn: 0, totalOut: 0, adjustments: 0, balance: Number(item.quantity) };
+    for (const row of all) {
+      const qtyIn = Number(row.qty_in) || 0;
+      const qtyOut = Number(row.qty_out) || 0;
+      if (row.txn_type === "BEGINNING_BALANCE") summary.beginning += qtyIn - qtyOut;
+      else if (row.txn_type === "STOCK_IN") summary.totalIn += qtyIn;
+      else if (row.txn_type === "STOCK_OUT") summary.totalOut += qtyOut;
+      else summary.adjustments += qtyIn - qtyOut;
+    }
+    if (all.length > 0) summary.balance = Number(all[all.length - 1].balance_after);
+
+    const rows = all
+      .filter((row) => (!from || row.txn_date >= from) && (!to || row.txn_date <= to))
+      .filter((row) => !type || row.txn_type === type)
+      .filter((row) => !reference || String(row.reference).toLowerCase().includes(reference))
+      .map((row) => ({
+        id: row.id,
+        date: row.txn_date,
+        time: row.txn_time,
+        reference: row.reference,
+        type: row.txn_type,
+        description: row.description || "",
+        supplierId: row.supplier_id ?? null,
+        qtyIn: Number(row.qty_in) || 0,
+        qtyOut: Number(row.qty_out) || 0,
+        balance: Number(row.balance_after),
+        recordedBy: row.recorded_by || "",
+      }));
+
+    res.json({
+      item: toItem(item),
+      summary,
+      rows,
+      types: STOCK_TXN_TYPES,
+    });
+  }),
+);
+
+/* ------------------------------ Suppliers ---------------------------- */
+
+const SUPPLIER_STATUS_ACTIVE = 1;
+
+function cleanSupplier(body) {
+  const email = cleanText(body.email, 160);
+  return {
+    name: cleanText(body.name, 150),
+    contactPerson: cleanText(body.contactPerson, 120) || null,
+    contactNumber: cleanText(body.contactNumber, 40) || null,
+    email: email || null,
+    address: cleanText(body.address, 1000) || null,
+    notes: cleanText(body.notes, 1000) || null,
+    emailOk: !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+  };
+}
+
+function toSupplier(row) {
+  return {
+    id: row.id,
+    supplierId: row.supplier_code || `SUP-${String(row.id).padStart(4, "0")}`,
+    name: row.name,
+    contactPerson: row.contact_person || "",
+    contactNumber: row.contact_number || "",
+    email: row.email || "",
+    address: row.address || "",
+    notes: row.notes || "",
+    isActive: Number(row.is_active) === SUPPLIER_STATUS_ACTIVE,
+    itemCount: Number(row.item_count) || 0,
+  };
+}
+
+function toSupplierItem(row) {
+  return {
+    id: row.id,
+    supplierId: row.supplier_id,
+    itemId: row.item_id,
+    supplierItemCode: row.supplier_item_code,
+    purchasePrice: row.purchase_price === null || row.purchase_price === undefined ? null : Number(row.purchase_price),
+    notes: row.notes || "",
+    itemName: row.item_name,
+    itemCategory: row.item_category,
+    itemBarcode: row.item_barcode || "",
+    itemPartNumber: row.item_part_number || "",
+    itemQuantity: Number(row.item_quantity) || 0,
+    itemUnit: row.item_unit || "PCS",
+  };
+}
+
+app.get(
+  "/api/suppliers",
+  ah(async (_req, res) => {
+    const [rows] = await pool.query(
+      `SELECT s.*, (SELECT COUNT(*) FROM supplier_items si WHERE si.supplier_id = s.id) AS item_count
+       FROM suppliers s ORDER BY s.name`,
+    );
+    res.json(rows.map(toSupplier));
+  }),
+);
+
+app.get(
+  "/api/suppliers/:id",
+  ah(async (req, res) => {
+    const supplierId = toPositiveInt(req.params.id);
+    if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
+    const [[row]] = await pool.query(
+      `SELECT s.*, (SELECT COUNT(*) FROM supplier_items si WHERE si.supplier_id = s.id) AS item_count
+       FROM suppliers s WHERE s.id=?`,
+      [supplierId],
+    );
+    if (!row) return res.status(404).json({ error: "Supplier not found." });
+    const [items] = await pool.query(
+      `SELECT si.*, i.name AS item_name, i.category AS item_category, i.barcode AS item_barcode,
+              i.part_number AS item_part_number, i.quantity AS item_quantity, i.unit_of_measure AS item_unit
+       FROM supplier_items si JOIN inventory i ON i.id = si.item_id
+       WHERE si.supplier_id=? ORDER BY i.name`,
+      [supplierId],
+    );
+    res.json({ ...toSupplier(row), items: items.map(toSupplierItem) });
+  }),
+);
+
+app.post(
+  "/api/suppliers",
+  ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
+    const data = cleanSupplier(req.body || {});
+    if (!data.name) return res.status(400).json({ error: "Supplier name is required." });
+    if (!data.emailOk) return res.status(400).json({ error: "Enter a valid email address." });
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.query(
+        `INSERT INTO suppliers (name, contact_person, contact_number, email, address, notes, is_active, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [data.name, data.contactPerson, data.contactNumber, data.email, data.address, data.notes, SUPPLIER_STATUS_ACTIVE, actor.username],
+      );
+      const supplierCode = `SUP-${String(result.insertId).padStart(4, "0")}`;
+      await connection.query("UPDATE suppliers SET supplier_code=? WHERE id=?", [supplierCode, result.insertId]);
+      await connection.commit();
+      res.status(201).json({ id: result.insertId, supplierId: supplierCode });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
+app.put(
+  "/api/suppliers/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const supplierId = toPositiveInt(req.params.id);
+    if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
+    const data = cleanSupplier(req.body || {});
+    if (!data.name) return res.status(400).json({ error: "Supplier name is required." });
+    if (!data.emailOk) return res.status(400).json({ error: "Enter a valid email address." });
+    const [result] = await pool.query(
+      `UPDATE suppliers SET name=?, contact_person=?, contact_number=?, email=?, address=?, notes=? WHERE id=?`,
+      [data.name, data.contactPerson, data.contactNumber, data.email, data.address, data.notes, supplierId],
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Supplier not found." });
+    res.json({ ok: true });
+  }),
+);
+
+app.patch(
+  "/api/suppliers/:id/status",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const supplierId = toPositiveInt(req.params.id);
+    if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
+    const active = req.body?.isActive ? 1 : 0;
+    const [result] = await pool.query("UPDATE suppliers SET is_active=? WHERE id=?", [active, supplierId]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Supplier not found." });
+    res.json({ ok: true, isActive: active === 1 });
+  }),
+);
+
+// Suppliers linked to one inventory item, with each supplier's own code and price.
+app.get(
+  "/api/items/:id/suppliers",
+  ah(async (req, res) => {
+    const itemId = normalizeItemId(req.params.id);
+    const [rows] = await pool.query(
+      `SELECT si.*, s.name AS supplier_name, s.supplier_code, s.is_active,
+              i.name AS item_name, i.category AS item_category, i.barcode AS item_barcode,
+              i.part_number AS item_part_number, i.quantity AS item_quantity, i.unit_of_measure AS item_unit
+       FROM supplier_items si
+       JOIN suppliers s ON s.id = si.supplier_id
+       JOIN inventory i ON i.id = si.item_id
+       WHERE si.item_id=? ORDER BY s.name`,
+      [itemId],
+    );
+    res.json(rows.map((row) => ({ ...toSupplierItem(row), supplierName: row.supplier_name, supplierCode: row.supplier_code, supplierActive: Number(row.is_active) === 1 })));
+  }),
+);
+
+const cleanSupplierItem = (body) => ({
+  supplierItemCode: cleanText(body.supplierItemCode, 64),
+  purchasePrice:
+    body.purchasePrice === "" || body.purchasePrice === null || body.purchasePrice === undefined
+      ? null
+      : Number(body.purchasePrice),
+  notes: cleanText(body.notes, 255) || null,
+});
+
+app.post(
+  "/api/suppliers/:id/items",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const supplierId = toPositiveInt(req.params.id);
+    const itemId = normalizeItemId(req.body?.itemId);
+    const data = cleanSupplierItem(req.body || {});
+    if (!supplierId || !itemId) return res.status(400).json({ error: "Choose a supplier and an item." });
+    if (!data.supplierItemCode) return res.status(400).json({ error: "Enter the supplier's item code." });
+    if (data.purchasePrice !== null && (!Number.isFinite(data.purchasePrice) || data.purchasePrice < 0)) {
+      return res.status(400).json({ error: "Purchase price must be zero or more." });
+    }
+
+    const [[supplier]] = await pool.query("SELECT id FROM suppliers WHERE id=?", [supplierId]);
+    if (!supplier) return res.status(404).json({ error: "Supplier not found." });
+    const [[item]] = await pool.query("SELECT id FROM inventory WHERE id=?", [itemId]);
+    if (!item) return res.status(404).json({ error: "Item not found." });
+
+    const [[sameCode]] = await pool.query(
+      "SELECT id FROM supplier_items WHERE supplier_id=? AND supplier_item_code=?",
+      [supplierId, data.supplierItemCode],
+    );
+    if (sameCode) {
+      return res.status(409).json({ error: "This supplier already uses that item code for another item." });
+    }
+    const [[sameItem]] = await pool.query(
+      "SELECT id FROM supplier_items WHERE supplier_id=? AND item_id=?",
+      [supplierId, itemId],
+    );
+    if (sameItem) {
+      return res.status(409).json({ error: "This item is already linked to this supplier. Edit the existing link instead." });
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO supplier_items (supplier_id, item_id, supplier_item_code, purchase_price, notes) VALUES (?, ?, ?, ?, ?)`,
+      [supplierId, itemId, data.supplierItemCode, data.purchasePrice, data.notes],
+    );
+    res.status(201).json({ id: result.insertId });
+  }),
+);
+
+app.put(
+  "/api/supplier-items/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const linkId = toPositiveInt(req.params.id);
+    const data = cleanSupplierItem(req.body || {});
+    if (!linkId) return res.status(400).json({ error: "Invalid link." });
+    if (!data.supplierItemCode) return res.status(400).json({ error: "Enter the supplier's item code." });
+    if (data.purchasePrice !== null && (!Number.isFinite(data.purchasePrice) || data.purchasePrice < 0)) {
+      return res.status(400).json({ error: "Purchase price must be zero or more." });
+    }
+    const [[link]] = await pool.query("SELECT supplier_id FROM supplier_items WHERE id=?", [linkId]);
+    if (!link) return res.status(404).json({ error: "Link not found." });
+    const [[sameCode]] = await pool.query(
+      "SELECT id FROM supplier_items WHERE supplier_id=? AND supplier_item_code=? AND id<>?",
+      [link.supplier_id, data.supplierItemCode, linkId],
+    );
+    if (sameCode) {
+      return res.status(409).json({ error: "This supplier already uses that item code for another item." });
+    }
+    await pool.query(
+      "UPDATE supplier_items SET supplier_item_code=?, purchase_price=?, notes=? WHERE id=?",
+      [data.supplierItemCode, data.purchasePrice, data.notes, linkId],
+    );
+    res.json({ ok: true });
+  }),
+);
+
+// Removes the link only. The inventory item and its stock card are not touched.
+app.delete(
+  "/api/supplier-items/:id",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const linkId = toPositiveInt(req.params.id);
+    if (!linkId) return res.status(400).json({ error: "Invalid link." });
+    const [result] = await pool.query("DELETE FROM supplier_items WHERE id=?", [linkId]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Link not found." });
+    res.status(204).end();
+  }),
+);
+
+// How many suppliers each inventory item is linked to (for the Inventory list).
+app.get(
+  "/api/supplier-links/counts",
+  ah(async (_req, res) => {
+    const [rows] = await pool.query(
+      "SELECT item_id, COUNT(*) AS count FROM supplier_items GROUP BY item_id",
+    );
+    res.json(Object.fromEntries(rows.map((row) => [row.item_id, Number(row.count)])));
   }),
 );
 
@@ -1880,6 +2445,16 @@ app.post(
         "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
         [delta, itemId],
       );
+      await recordStockLedger(connection, {
+        sourceId: id,
+        itemId,
+        type: movement.type === "IN" ? "STOCK_IN" : "STOCK_OUT",
+        reference: id,
+        qtyIn: movement.type === "IN" ? qty : 0,
+        qtyOut: movement.type === "OUT" ? qty : 0,
+        balanceAfter: await currentItemQuantity(connection, itemId),
+        recordedBy: actorName,
+      });
       await connection.commit();
       res
         .status(201)
@@ -1896,6 +2471,8 @@ app.post(
 app.delete(
   "/api/movements/:id",
   ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -1915,6 +2492,17 @@ app.delete(
         "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
         [delta, movement.item_id],
       );
+      await recordStockLedger(connection, {
+        sourceId: `DEL-${movement.id}`,
+        itemId: movement.item_id,
+        type: "INVENTORY_CORRECTION",
+        reference: movement.id,
+        description: "Stock movement deleted",
+        qtyIn: movement.type === "OUT" ? movement.qty : 0,
+        qtyOut: movement.type === "IN" ? movement.qty : 0,
+        balanceAfter: await currentItemQuantity(connection, movement.item_id),
+        recordedBy: actor.username,
+      });
       await connection.commit();
       res.status(204).end();
     } catch (error) {
@@ -1929,6 +2517,8 @@ app.delete(
 app.patch(
   "/api/movements/:id/undo",
   ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
     const requestedQty = Number(req.body?.qty);
     if (!Number.isInteger(requestedQty) || requestedQty < 1) {
       return res
@@ -1972,6 +2562,17 @@ app.patch(
         "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
         [delta, movement.item_id],
       );
+      await recordStockLedger(connection, {
+        sourceId: `UNDO-${crypto.randomUUID()}`,
+        itemId: movement.item_id,
+        type: "INVENTORY_CORRECTION",
+        reference: movement.id,
+        description: `Undo of ${requestedQty} unit(s)`,
+        qtyIn: movement.type === "OUT" ? requestedQty : 0,
+        qtyOut: movement.type === "IN" ? requestedQty : 0,
+        balanceAfter: await currentItemQuantity(connection, movement.item_id),
+        recordedBy: actor.username,
+      });
       await connection.commit();
 
       if (remainingQty === 0) {
