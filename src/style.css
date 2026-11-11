@@ -9491,3 +9491,23 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: rgba(56, 103, 168, 0.12);
   font-weight: 600;
 }
+
+/* Suppliers: the item list in the supplier card scrolls, with its header kept in view. */
+.sup-items-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+
+.sup-items-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.sup-items-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

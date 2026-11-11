@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Item, UserRole } from '../types';
 import { apiRequest } from '../apiClient';
 import { Modal } from './Modal';
@@ -66,6 +66,14 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
   const [linkForm, setLinkForm] = useState({ itemId: '', supplierItemCode: '' });
   const [itemSearch, setItemSearch] = useState('');
   const [linkError, setLinkError] = useState<string | null>(null);
+  // The items list scrolls inside the card; the button in its header moves between the top and the bottom.
+  const itemsScrollRef = useRef<HTMLDivElement>(null);
+  const [itemsAtBottom, setItemsAtBottom] = useState(false);
+  const scrollItems = () => {
+    const el = itemsScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: itemsAtBottom ? 0 : el.scrollHeight, behavior: 'smooth' });
+  };
 
   const loadSuppliers = () =>
     apiRequest<SupplierRow[]>('/suppliers')
@@ -344,16 +352,31 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
 
               <div className="sup-items-head">
                 <h4>Items from this supplier <span className="sup-muted">({detail.items.length})</span></h4>
-                {isAdmin && (
+                <div className="sup-items-head-actions">
+                  {detail.items.length > 4 && (
+                    <button type="button" className="sup-btn is-ghost" onClick={scrollItems}>
+                      <i className={`bx ${itemsAtBottom ? 'bx-up-arrow-alt' : 'bx-down-arrow-alt'}`} aria-hidden="true"></i>
+                      {itemsAtBottom ? 'Back to top' : 'Scroll down'}
+                    </button>
+                  )}
+                  {isAdmin && (
                   <button type="button" className="sup-btn is-ghost" onClick={() => openLink()}>
                     <i className="bx bx-link" aria-hidden="true"></i> Link item
                   </button>
                 )}
+                </div>
               </div>
               {detail.items.length === 0 ? (
                 <p className="sup-muted sup-pad">No items linked yet.</p>
               ) : (
-                <div className="sup-table-wrap">
+                <div
+                  className="sup-table-wrap sup-items-scroll"
+                  ref={itemsScrollRef}
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    setItemsAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 8);
+                  }}
+                >
                   <table className="sup-table">
                     <thead>
                       <tr>
