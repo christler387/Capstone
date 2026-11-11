@@ -8558,3 +8558,25 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-weight: 400;
   color: var(--ink-faint);
 }
+
+/* Inventory item cell: the name and the vehicles it fits show in full and wrap onto more lines if needed. */
+.inv-name-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.inv-fits {
+  display: flex;
+  align-items: flex-start;
+  overflow: visible;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.inv-fits i {
+  flex-shrink: 0;
+  margin-top: 0.15em;
+}
