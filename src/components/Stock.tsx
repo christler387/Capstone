@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Modal } from './Modal';
+import { getLocalCost } from '../inventoryMetrics';
+
+const formatPeso = (value: number) =>
+  `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 interface StockProps {
   inventory: Item[];
@@ -116,10 +120,13 @@ export const Stock: React.FC<StockProps> = ({
     const onHand = item?.quantity ?? 0;
     const after = isIn ? onHand + line.qty : onHand - line.qty;
     const short = !isIn && line.qty > onHand;
-    return { line, item, onHand, after, short };
+    const localCost = item ? getLocalCost(item) : 0;
+    const lineTotal = localCost * line.qty;
+    return { line, item, onHand, after, short, localCost, lineTotal };
   });
 
   const totalUnits = lines.reduce((sum, line) => sum + line.qty, 0);
+  const totalValue = rows.reduce((sum, row) => sum + row.lineTotal, 0);
   const shortRows = rows.filter((row) => row.short);
 
   const requestRecord = () => {
@@ -281,6 +288,10 @@ export const Stock: React.FC<StockProps> = ({
                 <th scope="col" className="num">On hand</th>
                 <th scope="col" className="num">{isIn ? 'Add' : 'Deduct'}</th>
                 <th scope="col">UOM</th>
+                <th scope="col" className="num">Discount</th>
+                <th scope="col" className="num">Purch. cost</th>
+                <th scope="col" className="num">Local cost</th>
+                <th scope="col" className="num">Total</th>
                 <th scope="col" className="num">After</th>
                 <th scope="col" aria-label="Remove line" />
               </tr>
@@ -288,12 +299,12 @@ export const Stock: React.FC<StockProps> = ({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="stk-empty">
+                  <td colSpan={11} className="stk-empty">
                     No items yet. Search for an item above or scan its barcode.
                   </td>
                 </tr>
               )}
-              {rows.map(({ line, item, onHand, after, short }) => (
+              {rows.map(({ line, item, onHand, after, short, localCost, lineTotal }) => (
                 <tr key={line.itemId} className={short ? 'is-short' : ''}>
                   <td><span className="stk-code">{line.itemId}</span></td>
                   <td>
@@ -314,6 +325,10 @@ export const Stock: React.FC<StockProps> = ({
                     />
                   </td>
                   <td>{item?.unitOfMeasure || 'PCS'}</td>
+                  <td className="num">{(item?.discount ?? 0) > 0 ? `${item?.discount}%` : '—'}</td>
+                  <td className="num">{item ? formatPeso(item.price) : '—'}</td>
+                  <td className="num">{item ? formatPeso(localCost) : '—'}</td>
+                  <td className="num stk-total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
                   <td className="num">
                     {line.qty > 0 ? (
                       <span className={short ? 'stk-after is-short' : 'stk-after'}>{after.toLocaleString()}</span>
@@ -342,6 +357,7 @@ export const Stock: React.FC<StockProps> = ({
           <div className="stk-totals">
             <span>Items <strong>{lines.length.toLocaleString()}</strong></span>
             <span>Units <strong>{totalUnits.toLocaleString()}</strong></span>
+            <span>Value <strong>{formatPeso(totalValue)}</strong></span>
             {shortRows.length > 0 && (
               <span className="stk-totals-warning">
                 <i className="bx bx-error" aria-hidden="true"></i>

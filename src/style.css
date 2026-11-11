@@ -8100,7 +8100,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 .stk-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 1080px;
   border-collapse: collapse;
   font-size: 0.9375rem;
 }
@@ -8366,3 +8366,5 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-total {
   font-weight: 700;
 }
+
+.stk-table .stk-total { font-weight: 700; }
