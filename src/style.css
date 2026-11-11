@@ -8347,11 +8347,12 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 /* ---- Inventory list: 9 columns. Related fields are grouped into one cell each. ---- */
 .inv-table {
-  min-width: 1200px;
+  min-width: 1100px;
 }
 
 .inv-row {
-  grid-template-columns: 64px minmax(200px, 2fr) 100px minmax(130px, 1.1fr) 150px 110px 110px 110px 110px 84px;
+  grid-template-columns: 64px 220px 120px 130px 130px 110px 105px 105px 105px 76px;
+  justify-content: start;
 }
 
 .inv-code {
