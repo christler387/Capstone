@@ -62,7 +62,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
 
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [linkEditing, setLinkEditing] = useState<SupplierLink | null>(null);
-  const [linkForm, setLinkForm] = useState({ itemId: '', supplierItemCode: '', purchasePrice: '', notes: '' });
+  const [linkForm, setLinkForm] = useState({ itemId: '', supplierItemCode: '' });
   const [itemSearch, setItemSearch] = useState('');
   const [linkError, setLinkError] = useState<string | null>(null);
 
@@ -167,12 +167,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
     setLinkEditing(link ?? null);
     setLinkError(null);
     setItemSearch('');
-    setLinkForm({
-      itemId: link?.itemId ?? '',
-      supplierItemCode: link?.supplierItemCode ?? '',
-      purchasePrice: link?.purchasePrice !== null && link?.purchasePrice !== undefined ? String(link.purchasePrice) : '',
-      notes: link?.notes ?? '',
-    });
+    setLinkForm({ itemId: link?.itemId ?? '', supplierItemCode: link?.supplierItemCode ?? '' });
     setIsLinkOpen(true);
   };
 
@@ -188,21 +183,16 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
       setLinkError("Enter the supplier's item code.");
       return;
     }
-    const price = linkForm.purchasePrice.trim() === '' ? null : Number(linkForm.purchasePrice);
-    if (price !== null && (!Number.isFinite(price) || price < 0)) {
-      setLinkError('Purchase price must be zero or more.');
-      return;
-    }
     try {
       if (linkEditing) {
         await apiRequest(`/supplier-items/${linkEditing.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ supplierItemCode: code, purchasePrice: price, notes: linkForm.notes }),
+          body: JSON.stringify({ supplierItemCode: code }),
         });
       } else {
         await apiRequest(`/suppliers/${detail.id}/items`, {
           method: 'POST',
-          body: JSON.stringify({ itemId: linkForm.itemId, supplierItemCode: code, purchasePrice: price, notes: linkForm.notes }),
+          body: JSON.stringify({ itemId: linkForm.itemId, supplierItemCode: code }),
         });
       }
       setIsLinkOpen(false);
@@ -353,8 +343,6 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
                       <tr>
                         <th>Item</th>
                         <th>Supplier code</th>
-                        <th className="num">Purchase price</th>
-                        <th>Notes</th>
                         <th aria-label="Actions" />
                       </tr>
                     </thead>
@@ -366,8 +354,6 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
                             <span className="sup-muted sup-small">{link.itemId} · {link.itemQuantity.toLocaleString()} {link.itemUnit}</span>
                           </td>
                           <td><span className="sup-code">{link.supplierItemCode}</span></td>
-                          <td className="num">{link.purchasePrice === null ? '—' : formatPeso(link.purchasePrice)}</td>
-                          <td>{link.notes || '—'}</td>
                           <td className="sup-actions">
                             {isAdmin && (
                               <>
@@ -452,24 +438,27 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
             <div className="sup-field">
               <span>Inventory item</span>
               <input type="search" placeholder="Search item by ID, name or barcode" value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
-              <select size={6} value={linkForm.itemId} onChange={(e) => setLinkForm((f) => ({ ...f, itemId: e.target.value }))}>
+              <div className="sup-pick-list" role="listbox" aria-label="Inventory items">
                 {linkableItems.map((i) => (
-                  <option key={i.id} value={i.id}>{i.id} · {i.name}</option>
+                  <button
+                    type="button"
+                    key={i.id}
+                    role="option"
+                    aria-selected={linkForm.itemId === i.id}
+                    className={`sup-pick-row ${linkForm.itemId === i.id ? 'is-selected' : ''}`}
+                    onClick={() => setLinkForm((f) => ({ ...f, itemId: i.id }))}
+                  >
+                    <span className="sup-code">{i.id}</span>
+                    <span>{i.name}</span>
+                  </button>
                 ))}
-              </select>
+                {linkableItems.length === 0 && <p className="sup-muted sup-pad">No items match.</p>}
+              </div>
             </div>
           )}
           <label className="sup-field">
             <span>This supplier's item code *</span>
             <input value={linkForm.supplierItemCode} onChange={(e) => setLinkForm((f) => ({ ...f, supplierItemCode: e.target.value }))} placeholder="e.g. VIS0001" />
-          </label>
-          <label className="sup-field">
-            <span>Purchase price (₱) <em className="sup-muted">optional</em></span>
-            <input type="number" min="0" step="0.01" inputMode="decimal" value={linkForm.purchasePrice} onChange={(e) => setLinkForm((f) => ({ ...f, purchasePrice: e.target.value }))} />
-          </label>
-          <label className="sup-field">
-            <span>Notes <em className="sup-muted">optional</em></span>
-            <input value={linkForm.notes} onChange={(e) => setLinkForm((f) => ({ ...f, notes: e.target.value }))} />
           </label>
         </div>
       </Modal>

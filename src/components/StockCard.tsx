@@ -82,7 +82,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
   const [loading, setLoading] = useState(false);
   const [linkEditing, setLinkEditing] = useState<ItemSupplier | null>(null);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
-  const [linkForm, setLinkForm] = useState({ supplierId: '', supplierItemCode: '', purchasePrice: '', notes: '' });
+  const [linkForm, setLinkForm] = useState({ supplierId: '', supplierItemCode: '' });
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSaving, setLinkSaving] = useState(false);
 
@@ -144,12 +144,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
   const openLinkModal = (link?: ItemSupplier) => {
     setLinkEditing(link ?? null);
     setLinkError(null);
-    setLinkForm({
-      supplierId: link ? String(link.supplierId) : '',
-      supplierItemCode: link?.supplierItemCode ?? '',
-      purchasePrice: link?.purchasePrice !== null && link?.purchasePrice !== undefined ? String(link.purchasePrice) : '',
-      notes: link?.notes ?? '',
-    });
+    setLinkForm({ supplierId: link ? String(link.supplierId) : '', supplierItemCode: link?.supplierItemCode ?? '' });
     setIsLinkOpen(true);
   };
 
@@ -165,22 +160,17 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
       setLinkError("Enter the supplier's item code.");
       return;
     }
-    const price = linkForm.purchasePrice.trim() === '' ? null : Number(linkForm.purchasePrice);
-    if (price !== null && (!Number.isFinite(price) || price < 0)) {
-      setLinkError('Purchase price must be zero or more.');
-      return;
-    }
     setLinkSaving(true);
     try {
       if (linkEditing) {
         await apiRequest(`/supplier-items/${linkEditing.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ supplierItemCode: code, purchasePrice: price, notes: linkForm.notes }),
+          body: JSON.stringify({ supplierItemCode: code }),
         });
       } else {
         await apiRequest(`/suppliers/${linkForm.supplierId}/items`, {
           method: 'POST',
-          body: JSON.stringify({ itemId: selectedItemId, supplierItemCode: code, purchasePrice: price, notes: linkForm.notes }),
+          body: JSON.stringify({ itemId: selectedItemId, supplierItemCode: code }),
         });
       }
       setIsLinkOpen(false);
@@ -332,8 +322,6 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
                     <tr>
                       <th>Supplier</th>
                       <th>Supplier code</th>
-                      <th className="num">Purchase price</th>
-                      <th>Notes</th>
                       {isAdmin && <th aria-label="Actions" />}
                     </tr>
                   </thead>
@@ -345,8 +333,6 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
                           <span className="sc-muted sc-small">{link.supplierCode}{link.supplierActive ? '' : ' · inactive'}</span>
                         </td>
                         <td><span className="sc-code">{link.supplierItemCode}</span></td>
-                        <td className="num">{link.purchasePrice === null ? '—' : formatPeso(link.purchasePrice)}</td>
-                        <td>{link.notes || '—'}</td>
                         {isAdmin && (
                           <td className="sc-actions no-print">
                             <button type="button" className="sc-icon" aria-label={`Edit link to ${link.supplierName}`} onClick={() => openLinkModal(link)}>
@@ -469,14 +455,6 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
           <label className="sc-field">
             <span>Supplier's item code</span>
             <input value={linkForm.supplierItemCode} onChange={(e) => setLinkForm((f) => ({ ...f, supplierItemCode: e.target.value }))} placeholder="e.g. VIS0001" />
-          </label>
-          <label className="sc-field">
-            <span>Purchase price (₱) <em className="sc-muted">optional</em></span>
-            <input type="number" min="0" step="0.01" inputMode="decimal" value={linkForm.purchasePrice} onChange={(e) => setLinkForm((f) => ({ ...f, purchasePrice: e.target.value }))} />
-          </label>
-          <label className="sc-field">
-            <span>Notes <em className="sc-muted">optional</em></span>
-            <input value={linkForm.notes} onChange={(e) => setLinkForm((f) => ({ ...f, notes: e.target.value }))} />
           </label>
         </div>
       </Modal>

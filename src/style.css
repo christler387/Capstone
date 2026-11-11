@@ -9453,3 +9453,41 @@ input[type='date']:focus, select:focus, textarea:focus {
     margin-bottom: 8px;
   }
 }
+
+/* Suppliers: the item picker in the link form is a plain list you click. */
+.sup-pick-list {
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+}
+
+.sup-pick-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sup-pick-row + .sup-pick-row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.sup-pick-row:hover {
+  background: var(--surface-hover);
+}
+
+.sup-pick-row.is-selected {
+  background: rgba(56, 103, 168, 0.12);
+  font-weight: 600;
+}
