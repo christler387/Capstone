@@ -283,14 +283,10 @@ export const Stock: React.FC<StockProps> = ({
           <table className="stk-table">
             <thead>
               <tr>
-                <th scope="col">Item ID</th>
                 <th scope="col">Item</th>
                 <th scope="col" className="num">On hand</th>
                 <th scope="col" className="num">{isIn ? 'Add' : 'Deduct'}</th>
-                <th scope="col">UOM</th>
-                <th scope="col" className="num">Discount</th>
-                <th scope="col" className="num">Purch. cost</th>
-                <th scope="col" className="num">Local cost</th>
+                <th scope="col" className="num">Cost</th>
                 <th scope="col" className="num">Total</th>
                 <th scope="col" className="num">After</th>
                 <th scope="col" aria-label="Remove line" />
@@ -299,56 +295,72 @@ export const Stock: React.FC<StockProps> = ({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="stk-empty">
+                  <td colSpan={7} className="stk-empty">
                     No items yet. Search for an item above or scan its barcode.
                   </td>
                 </tr>
               )}
-              {rows.map(({ line, item, onHand, after, short, localCost, lineTotal }) => (
-                <tr key={line.itemId} className={short ? 'is-short' : ''}>
-                  <td><span className="stk-code">{line.itemId}</span></td>
-                  <td>
-                    <span className="stk-item-name">{item?.name ?? 'Unknown item'}</span>
-                    {item?.compatibleVehicles && <span className="stk-item-meta">{item.compatibleVehicles}</span>}
-                  </td>
-                  <td className="num">{onHand.toLocaleString()}</td>
-                  <td className="num">
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="1"
-                      className="stk-qty"
-                      aria-label={`Quantity for ${item?.name ?? line.itemId}`}
-                      value={line.qty || ''}
-                      placeholder="0"
-                      onChange={(event) => setQty(line.itemId, event.target.value)}
-                    />
-                  </td>
-                  <td>{item?.unitOfMeasure || 'PCS'}</td>
-                  <td className="num">{(item?.discount ?? 0) > 0 ? `${item?.discount}%` : '—'}</td>
-                  <td className="num">{item ? formatPeso(item.price) : '—'}</td>
-                  <td className="num">{item ? formatPeso(localCost) : '—'}</td>
-                  <td className="num stk-total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
-                  <td className="num">
-                    {line.qty > 0 ? (
-                      <span className={short ? 'stk-after is-short' : 'stk-after'}>{after.toLocaleString()}</span>
-                    ) : (
-                      <span className="stk-after is-idle">—</span>
-                    )}
-                  </td>
-                  <td className="stk-remove-cell">
-                    <button
-                      type="button"
-                      className="stk-remove"
-                      aria-label={`Remove ${item?.name ?? line.itemId}`}
-                      title="Remove from sheet"
-                      onClick={() => removeLine(line.itemId)}
-                    >
-                      <i className="bx bx-x" aria-hidden="true"></i>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map(({ line, item, onHand, after, short, localCost, lineTotal }) => {
+                const discount = Number(item?.discount) || 0;
+                return (
+                  <tr key={line.itemId} className={short ? 'is-short' : ''}>
+                    <td>
+                      <span className="stk-item-name">{item?.name ?? 'Unknown item'}</span>
+                      <span className="stk-item-meta">
+                        <span className="stk-code">{line.itemId}</span>
+                        {item?.compatibleVehicles && <span> · {item.compatibleVehicles}</span>}
+                      </span>
+                    </td>
+                    <td className="num">
+                      {onHand.toLocaleString()} <span className="inv-uom">{item?.unitOfMeasure || 'PCS'}</span>
+                    </td>
+                    <td className="num">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        className="stk-qty"
+                        aria-label={`Quantity for ${item?.name ?? line.itemId}`}
+                        value={line.qty || ''}
+                        placeholder="0"
+                        onChange={(event) => setQty(line.itemId, event.target.value)}
+                      />
+                    </td>
+                    <td className="num">
+                      {item ? (
+                        <div className="inv-cost">
+                          <span className="inv-cost-main">{formatPeso(item.price)}</span>
+                          <span className="inv-cost-sub">
+                            Local {formatPeso(localCost)}
+                            {discount > 0 && <span className="inv-discount">−{discount}%</span>}
+                          </span>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="num inv-total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
+                    <td className="num">
+                      {line.qty > 0 ? (
+                        <span className={short ? 'stk-after is-short' : 'stk-after'}>{after.toLocaleString()}</span>
+                      ) : (
+                        <span className="stk-after is-idle">—</span>
+                      )}
+                    </td>
+                    <td className="stk-remove-cell">
+                      <button
+                        type="button"
+                        className="stk-remove"
+                        aria-label={`Remove ${item?.name ?? line.itemId}`}
+                        title="Remove from sheet"
+                        onClick={() => removeLine(line.itemId)}
+                      >
+                        <i className="bx bx-x" aria-hidden="true"></i>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

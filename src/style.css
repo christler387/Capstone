@@ -8100,7 +8100,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 .stk-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 780px;
   border-collapse: collapse;
   font-size: 0.9375rem;
 }
@@ -8345,13 +8345,13 @@ input[type='date']:focus, select:focus, textarea:focus {
   .stk-foot-actions .stk-btn { flex: 1; }
 }
 
-/* ---- Inventory: the table has 17 columns (picture to actions). Widths are set here so they match the cells. ---- */
+/* ---- Inventory list: 9 columns. Related fields are grouped into one cell each. ---- */
 .inv-table {
-  min-width: 2200px;
+  min-width: 1120px;
 }
 
 .inv-row {
-  grid-template-columns: 64px minmax(220px, 2fr) 110px 120px 120px 120px 170px 90px 150px 76px 116px 80px 90px 120px 120px 130px 84px;
+  grid-template-columns: 64px minmax(240px, 2.2fr) 120px minmax(150px, 1.2fr) 130px 130px 150px 130px 84px;
 }
 
 .inv-code {
@@ -8363,8 +8363,118 @@ input[type='date']:focus, select:focus, textarea:focus {
   white-space: nowrap;
 }
 
+.inv-brandmodel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inv-brand-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.inv-brand-name.is-empty {
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.inv-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.inv-stock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.inv-qty-big {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.inv-qty-big.is-alert {
+  color: var(--accent);
+}
+
+.inv-uom {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.inv-reorder-line {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.inv-reorder-line:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.inv-reorder-line.is-alert {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.inv-cost {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inv-cost-main {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.inv-cost-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.inv-discount {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(56, 103, 168, 0.12);
+  color: var(--button);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
 .inv-total {
   font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 .stk-table .stk-total { font-weight: 700; }

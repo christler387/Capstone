@@ -220,25 +220,17 @@ export const Inventory: React.FC<InventoryProps> = ({
               className="inv-sort"
               onClick={() => handleToggleSort('name')}
             >
-              Part name
+              Item
               <i
                 className={`bx bx-chevron-${sortDirection === 'asc' ? 'down' : 'up'} ${sortField === 'name' ? '' : 'is-hidden'}`}
                 aria-hidden="true"
               ></i>
             </button>
-            <span role="columnheader">Item ID</span>
             <span role="columnheader">Category</span>
-            <span role="columnheader">Brand</span>
-            <span role="columnheader">Model</span>
-            <span role="columnheader">Part no.</span>
-            <span role="columnheader">Color</span>
+            <span role="columnheader">Brand &amp; model</span>
             <span role="columnheader">Location</span>
-            <span role="columnheader" className="num">Qty</span>
-            <span role="columnheader" className="num is-centered">Reorder qty</span>
-            <span role="columnheader">UOM</span>
-            <span role="columnheader" className="num">Discount</span>
-            <span role="columnheader" className="num">Purch. cost</span>
-            <span role="columnheader" className="num">Local cost</span>
+            <span role="columnheader" className="num">Stock</span>
+            <span role="columnheader" className="num">Cost</span>
             <span role="columnheader" className="num">Total</span>
             <span role="columnheader" className="num">{isAdmin ? 'Actions' : 'Locate'}</span>
           </div>
@@ -253,6 +245,8 @@ export const Inventory: React.FC<InventoryProps> = ({
           {pageItems.map(i => {
             const needsReorder = isAtReorderPoint(i, movements);
             const reorderQuantity = getReorderQuantity(i, movements);
+            const discount = Number(i.discount) || 0;
+            const specs = [i.model, i.partNumber].filter(Boolean).join(' · ');
             return (
               <div
                 key={i.id}
@@ -293,34 +287,19 @@ export const Inventory: React.FC<InventoryProps> = ({
                     </span>
                   )}
                   <span className="inv-meta">
-                    ID {i.id}
+                    <span className="inv-code">{i.id}</span>
                     <span aria-hidden="true"> · </span>
                     BC {i.barcode || '---'}
                   </span>
                 </div>
 
-
-                <span className="inv-code" role="cell">{i.id}</span>
                 <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
-                <span className={`inv-brand${i.brand ? '' : ' is-empty'}`} role="cell">
-                  {i.brand || '—'}
-                </span>
 
-                <span className={`inv-brand${i.model ? '' : ' is-empty'}`} role="cell">
-                  {i.model || '—'}
-                </span>
-
-                <span
-                  className={`inv-part${i.partNumber ? '' : ' is-empty'}`}
-                  role="cell"
-                  title={i.partNumber || undefined}
-                >
-                  {i.partNumber || '—'}
-                </span>
-
-                <span className={`inv-brand${i.color ? '' : ' is-empty'}`} role="cell">
-                  {i.color || '—'}
-                </span>
+                <div className="inv-brandmodel" role="cell">
+                  <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
+                  {specs && <span className="inv-sub">{specs}</span>}
+                  {i.color && <span className="inv-sub">{i.color}</span>}
+                </div>
 
                 <div className="inv-location" role="cell">
                   <button
@@ -336,25 +315,30 @@ export const Inventory: React.FC<InventoryProps> = ({
                   {i.level && <span className="inv-level">Level {i.level}</span>}
                 </div>
 
-                <span className={`inv-num inv-qty ${needsReorder ? 'is-alert' : ''}`} role="cell">
-                  {i.quantity.toLocaleString()}
-                </span>
+                <div className="inv-stock" role="cell">
+                  <span className={`inv-qty-big ${needsReorder ? 'is-alert' : ''}`}>
+                    {i.quantity.toLocaleString()}
+                    <span className="inv-uom">{i.unitOfMeasure || 'PCS'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className={`inv-reorder-line ${needsReorder ? 'is-alert' : ''}`}
+                    title="Open stock-in for this item"
+                    onClick={(event) => { event.stopPropagation(); onGoToStock(i.id); }}
+                  >
+                    Reorder {reorderQuantity.toLocaleString()}
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  className={`inv-num inv-reorder ${needsReorder ? 'is-alert' : ''}`}
-                  role="cell"
-                  title="Open stock-in for this item"
-                  onClick={(event) => { event.stopPropagation(); onGoToStock(i.id); }}
-                >
-                  {reorderQuantity.toLocaleString()}
-                </button>
+                <div className="inv-cost" role="cell">
+                  <span className="inv-cost-main">{formatPeso(i.price)}</span>
+                  <span className="inv-cost-sub">
+                    Local {formatPeso(getLocalCost(i))}
+                    {discount > 0 && <span className="inv-discount">−{discount}%</span>}
+                  </span>
+                </div>
 
-                <span role="cell">{i.unitOfMeasure || 'PCS'}</span>
-                <span className="inv-num" role="cell">{(i.discount ?? 0) > 0 ? `${i.discount}%` : '—'}</span>
-                <span className="inv-num inv-price" role="cell">{formatPeso(i.price)}</span>
-                <span className="inv-num" role="cell">{formatPeso(getLocalCost(i))}</span>
-                <span className="inv-num inv-total" role="cell">{formatPeso(getStockTotal(i))}</span>
+                <span className="inv-total" role="cell">{formatPeso(getStockTotal(i))}</span>
 
                 <span className="inv-actions" role="cell">
                   {i.image && !i.image.startsWith('data:') && (
