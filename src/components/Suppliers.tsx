@@ -85,8 +85,18 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
       .then(setDetail)
       .catch((err: Error) => setError(err.message));
 
+  // Items that already have a supplier. One item can have only one, so these are not offered in the link form.
+  const [linkedItemIds, setLinkedItemIds] = useState<Set<string>>(new Set());
+  const loadLinkedItems = () =>
+    apiRequest<Record<string, { count: number }>>('/supplier-links/counts')
+      .then((counts) => setLinkedItemIds(new Set(Object.keys(counts))))
+      .catch(() => setLinkedItemIds(new Set()));
+
   useEffect(() => {
     loadSuppliers();
+    loadLinkedItems();
+    window.addEventListener('supplier-links-changed', loadLinkedItems);
+    return () => window.removeEventListener('supplier-links-changed', loadLinkedItems);
   }, []);
 
   useEffect(() => {
@@ -243,14 +253,14 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpe
   };
 
   const linkableItems = useMemo(() => {
-    const taken = new Set((detail?.items ?? []).map((l) => l.itemId));
+    const taken = linkedItemIds;
     const query = itemSearch.trim().toLowerCase();
     return inventory
       .filter((i) => !taken.has(i.id) || i.id === linkForm.itemId)
       .filter((i) => !query || `${i.id} ${i.name} ${i.barcode ?? ''}`.toLowerCase().includes(query))
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, 50);
-  }, [inventory, detail, itemSearch, linkForm.itemId]);
+  }, [inventory, linkedItemIds, itemSearch, linkForm.itemId]);
 
   return (
     <div className="content-section sup">

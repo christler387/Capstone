@@ -2314,21 +2314,23 @@ app.post(
         await connection.rollback();
         return res.status(404).json({ error: "Item not found." });
       }
+      // A supplier item code belongs to one supplier only: no other supplier can use it.
       const [[sameCode]] = await connection.query(
-        "SELECT id FROM supplier_items WHERE supplier_id=? AND supplier_item_code=?",
-        [supplierId, data.supplierItemCode],
+        "SELECT id FROM supplier_items WHERE supplier_item_code=?",
+        [data.supplierItemCode],
       );
       if (sameCode) {
         await connection.rollback();
-        return res.status(409).json({ error: "This supplier already uses that item code for another item." });
+        return res.status(409).json({ error: `The item code ${data.supplierItemCode} is already used by another supplier.` });
       }
+      // One item has one supplier.
       const [[sameItem]] = await connection.query(
-        "SELECT id FROM supplier_items WHERE supplier_id=? AND item_id=?",
-        [supplierId, itemId],
+        "SELECT id FROM supplier_items WHERE item_id=?",
+        [itemId],
       );
       if (sameItem) {
         await connection.rollback();
-        return res.status(409).json({ error: "This item is already linked to this supplier. Edit the existing link instead." });
+        return res.status(409).json({ error: "This item already has a supplier. One item can have only one supplier; remove its current link first." });
       }
       const [result] = await connection.query(
         "INSERT INTO supplier_items (supplier_id, item_id, supplier_item_code) VALUES (?, ?, ?)",
@@ -2366,11 +2368,11 @@ app.put(
     const [[link]] = await pool.query("SELECT supplier_id FROM supplier_items WHERE id=?", [linkId]);
     if (!link) return res.status(404).json({ error: "Link not found." });
     const [[sameCode]] = await pool.query(
-      "SELECT id FROM supplier_items WHERE supplier_id=? AND supplier_item_code=? AND id<>?",
-      [link.supplier_id, data.supplierItemCode, linkId],
+      "SELECT id FROM supplier_items WHERE supplier_item_code=? AND id<>?",
+      [data.supplierItemCode, linkId],
     );
     if (sameCode) {
-      return res.status(409).json({ error: "This supplier already uses that item code for another item." });
+      return res.status(409).json({ error: `The item code ${data.supplierItemCode} is already used by another supplier.` });
     }
     await pool.query(
       "UPDATE supplier_items SET supplier_item_code=?, purchase_price=?, notes=? WHERE id=?",
@@ -2408,9 +2410,10 @@ app.get(
     const [[supplier]] = await pool.query("SELECT name FROM suppliers WHERE id=?", [supplierId]);
     if (!supplier) return res.status(404).json({ error: "Supplier not found." });
     const prefix = supplierCodePrefix(supplier.name);
+    // Numbering continues across all suppliers, so a code is never handed out twice.
     const [rows] = await pool.query(
-      "SELECT supplier_item_code FROM supplier_items WHERE supplier_id=? AND supplier_item_code LIKE ?",
-      [supplierId, `${prefix}%`],
+      "SELECT supplier_item_code FROM supplier_items WHERE supplier_item_code LIKE ?",
+      [`${prefix}%`],
     );
     const pattern = new RegExp(`^${prefix}(\\d+)$`);
     let highest = 0;
