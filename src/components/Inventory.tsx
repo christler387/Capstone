@@ -229,6 +229,7 @@ export const Inventory: React.FC<InventoryProps> = ({
             <span role="columnheader">Category</span>
             <span role="columnheader">Brand &amp; model</span>
             <span role="columnheader">Part no.</span>
+            <span role="columnheader">Supplier</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Stock</span>
             <span role="columnheader" className="num">Purch. cost</span>
@@ -299,11 +300,14 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
                   {i.model && <span className="inv-model">{i.model}</span>}
                   {i.color && <span className="inv-sub">{i.color}</span>}
-                  {i.supplier && <span className="inv-supplier"><i className="bx bx-store" aria-hidden="true"></i>{i.supplier}</span>}
                 </div>
 
                 <span className={`inv-partno${i.partNumber ? '' : ' is-empty'}`} role="cell" title={i.partNumber || undefined}>
                   {i.partNumber || '—'}
+                </span>
+
+                <span className={`inv-supplier-cell${i.supplier ? '' : ' is-empty'}`} role="cell" title={i.supplier || undefined}>
+                  {i.supplier || '—'}
                 </span>
 
                 <div className="inv-location" role="cell">

@@ -8347,11 +8347,11 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 /* ---- Inventory list: 9 columns. Related fields are grouped into one cell each. ---- */
 .inv-table {
-  min-width: 1100px;
+  min-width: 1480px;
 }
 
 .inv-row {
-  grid-template-columns: 64px 220px 120px 130px 130px 110px 105px 105px 105px 76px;
+  grid-template-columns: 64px minmax(260px, 2.4fr) 110px minmax(130px, 1.1fr) 140px 150px 120px 100px 100px 100px 76px;
   justify-content: start;
 }
 
@@ -8541,5 +8541,20 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 .inv-supplier i {
   font-size: 0.9375rem;
+  color: var(--ink-faint);
+}
+
+/* Inventory: supplier column. Long names truncate with an ellipsis; the full value is in the tooltip. */
+.inv-supplier-cell {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inv-supplier-cell.is-empty {
+  font-weight: 400;
   color: var(--ink-faint);
 }
