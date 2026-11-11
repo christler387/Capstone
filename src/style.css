@@ -8347,11 +8347,11 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 /* ---- Inventory list: 9 columns. Related fields are grouped into one cell each. ---- */
 .inv-table {
-  min-width: 1120px;
+  min-width: 1200px;
 }
 
 .inv-row {
-  grid-template-columns: 64px minmax(240px, 2.2fr) 120px minmax(150px, 1.2fr) 120px 130px 120px 120px 120px 84px;
+  grid-template-columns: 64px minmax(200px, 2fr) 100px minmax(130px, 1.1fr) 150px 110px 110px 110px 110px 84px;
 }
 
 .inv-code {
@@ -8495,9 +8495,10 @@ input[type='date']:focus, select:focus, textarea:focus {
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Show the whole part number; long ones wrap at their hyphens. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .inv-partno.is-empty {
