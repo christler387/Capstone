@@ -63,6 +63,17 @@ const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
   safetyStock: "Safety stock",
 };
 
+// "30", "30%" and " 30 % " all mean 30. Returns null while the text is not a number yet.
+const parseDiscount = (text: string): number | null => {
+  const cleaned = text.replace('%', '').trim();
+  if (cleaned === '') return 0;
+  const value = Number(cleaned);
+  if (!Number.isFinite(value)) return null;
+  return Math.min(100, Math.max(0, value));
+};
+
+const formatDiscountText = (value?: number) => (value ? `${Number(value)}%` : '');
+
 const isEmptyValue = (value: unknown) =>
   value === undefined || value === null || (typeof value === "string" && value.trim() === "") || (typeof value === "number" && Number.isNaN(value));
 
@@ -95,6 +106,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  // The discount box accepts "30" or "30%". The text is kept while typing; the number is stored in formData.
+  const [discountText, setDiscountText] = useState(() => formatDiscountText(item?.discount));
   // Required fields are marked only after the user tries to save, so a new form does not start red.
   const [showMissing, setShowMissing] = useState(false);
   const isMissing = (key: keyof ItemFormData) => showMissing && isEmptyValue(formData[key]);
@@ -740,14 +753,24 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             Discount (%) <span className="field-optional">optional</span>
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             id="edit-discount"
             className="form-input font-mono"
-            value={formData.discount ?? 0}
-            onChange={handleChange}
-            min="0"
-            max="100"
-            step="0.01"
+            placeholder="0%"
+            value={discountText}
+            onChange={(event) => {
+              const text = event.target.value;
+              setDiscountText(text);
+              setError(null);
+              const parsed = parseDiscount(text);
+              if (parsed !== null) setFormData((prev) => ({ ...prev, discount: parsed }));
+            }}
+            onBlur={() => {
+              const parsed = parseDiscount(discountText) ?? 0;
+              setDiscountText(formatDiscountText(parsed));
+              setFormData((prev) => ({ ...prev, discount: parsed }));
+            }}
             disabled={readOnly}
           />
         </div>
