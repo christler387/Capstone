@@ -290,12 +290,9 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <span className="inv-meta">
                     <span className="inv-code">{i.id}</span>
                     <span aria-hidden="true"> · </span>
-                    BC {i.barcode || '---'}
+                    {i.category || '---'}
                   </span>
-                  <span className="inv-inline-extra">
-                    {i.category}
-                    {i.partNumber && <> · Part {i.partNumber}</>}
-                  </span>
+                  {i.partNumber && <span className="inv-inline-extra">Part {i.partNumber}</span>}
                 </div>
 
                 <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
