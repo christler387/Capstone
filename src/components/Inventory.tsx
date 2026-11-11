@@ -226,7 +226,6 @@ export const Inventory: React.FC<InventoryProps> = ({
                 aria-hidden="true"
               ></i>
             </button>
-            <span role="columnheader">Category</span>
             <span role="columnheader">Brand &amp; model</span>
             <span role="columnheader">Part no.</span>
             <span role="columnheader">Supplier</span>
@@ -294,8 +293,6 @@ export const Inventory: React.FC<InventoryProps> = ({
                   </span>
                   {i.partNumber && <span className="inv-inline-extra">Part {i.partNumber}</span>}
                 </div>
-
-                <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
 
                 <div className="inv-brandmodel" role="cell">
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>

@@ -7573,17 +7573,16 @@ input[type='date']:focus, select:focus, textarea:focus {
   }
 
   /* Picture on the left, spanning the card. */
-  .inv-item > :nth-child(1)  { grid-column: 1; grid-row: 1 / span 6; }
-  .inv-item > :nth-child(2)  { grid-column: 2 / span 2; grid-row: 1; }   /* item */
-  .inv-item > :nth-child(3)  { grid-column: 2; grid-row: 2; }            /* category */
-  .inv-item > :nth-child(4)  { grid-column: 3; grid-row: 2; }            /* brand & model */
-  .inv-item > :nth-child(5)  { grid-column: 2; grid-row: 3; }            /* part no. */
-  .inv-item > :nth-child(6)  { grid-column: 3; grid-row: 3; }            /* supplier */
-  .inv-item > :nth-child(7)  { grid-column: 2; grid-row: 4; }            /* location */
-  .inv-item > :nth-child(8)  { grid-column: 3; grid-row: 4; }            /* stock */
-  .inv-item > :nth-child(9)  { grid-column: 2; grid-row: 5; }            /* purchase cost */
-  .inv-item > :nth-child(10) { grid-column: 3; grid-row: 5; }            /* local cost */
-  .inv-item > :nth-child(11) { grid-column: 2 / span 2; grid-row: 6; justify-self: end; }  /* actions */
+  .inv-item > :nth-child(1)  { grid-column: 1; grid-row: 1 / span 5; }
+  .inv-item > :nth-child(2)  { grid-column: 2 / span 2; grid-row: 1; }   /* item (category is in its meta line) */
+  .inv-item > :nth-child(3)  { grid-column: 2; grid-row: 2; }            /* brand & model */
+  .inv-item > :nth-child(4)  { grid-column: 3; grid-row: 2; }            /* part no. */
+  .inv-item > :nth-child(5)  { grid-column: 2; grid-row: 3; }            /* supplier */
+  .inv-item > :nth-child(6)  { grid-column: 3; grid-row: 3; }            /* location */
+  .inv-item > :nth-child(7)  { grid-column: 2; grid-row: 4; }            /* stock */
+  .inv-item > :nth-child(8)  { grid-column: 3; grid-row: 4; }            /* purchase cost */
+  .inv-item > :nth-child(9)  { grid-column: 2; grid-row: 5; }            /* local cost */
+  .inv-item > :nth-child(10) { grid-column: 3; grid-row: 5; justify-self: end; }  /* actions */
 }
 
 /* Login photo: a horizontal swipe that does not block page scrolling. */
@@ -8347,7 +8346,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 .inv-row {
-  grid-template-columns: 64px minmax(200px, 2.2fr) 110px minmax(120px, 1.1fr) 130px 130px 120px 100px 130px 130px 76px;
+  grid-template-columns: 64px minmax(200px, 2.4fr) minmax(120px, 1.1fr) 130px 130px 120px 100px 130px 130px 76px;
   justify-content: start;
 }
 
@@ -8601,8 +8600,7 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: 64px minmax(220px, 2fr) 120px 130px 130px 100px 130px 130px 76px;
   }
 
-  .inv-row > :nth-child(3),
-  .inv-row > :nth-child(5) {
+  .inv-row > :nth-child(4) {
     display: none;
   }
 
