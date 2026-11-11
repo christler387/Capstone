@@ -228,10 +228,11 @@ export const Inventory: React.FC<InventoryProps> = ({
             </button>
             <span role="columnheader">Category</span>
             <span role="columnheader">Brand &amp; model</span>
+            <span role="columnheader">Part no.</span>
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Stock</span>
-            <span role="columnheader" className="num">Cost</span>
-            <span role="columnheader" className="num">Total</span>
+            <span role="columnheader" className="num">Purch. cost</span>
+            <span role="columnheader" className="num">Local cost</span>
             <span role="columnheader" className="num">{isAdmin ? 'Actions' : 'Locate'}</span>
           </div>
 
@@ -246,7 +247,6 @@ export const Inventory: React.FC<InventoryProps> = ({
             const needsReorder = isAtReorderPoint(i, movements);
             const reorderQuantity = getReorderQuantity(i, movements);
             const discount = Number(i.discount) || 0;
-            const details = [i.partNumber, i.color].filter(Boolean).join(' · ');
             return (
               <div
                 key={i.id}
@@ -298,8 +298,12 @@ export const Inventory: React.FC<InventoryProps> = ({
                 <div className="inv-brandmodel" role="cell">
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
                   {i.model && <span className="inv-model">{i.model}</span>}
-                  {details && <span className="inv-sub">{details}</span>}
+                  {i.color && <span className="inv-sub">{i.color}</span>}
                 </div>
+
+                <span className={`inv-partno${i.partNumber ? '' : ' is-empty'}`} role="cell" title={i.partNumber || undefined}>
+                  {i.partNumber || '—'}
+                </span>
 
                 <div className="inv-location" role="cell">
                   <button
@@ -330,15 +334,12 @@ export const Inventory: React.FC<InventoryProps> = ({
                   </button>
                 </div>
 
-                <div className="inv-cost" role="cell">
-                  <span className="inv-cost-main">{formatPeso(i.price)}</span>
-                  <span className="inv-cost-sub">
-                    Local {formatPeso(getLocalCost(i))}
-                    {discount > 0 && <span className="inv-discount">−{discount}%</span>}
-                  </span>
-                </div>
+                <span className="inv-price-cell" role="cell">{formatPeso(i.price)}</span>
 
-                <span className="inv-total" role="cell">{formatPeso(getStockTotal(i))}</span>
+                <div className="inv-local" role="cell">
+                  <span className="inv-local-value">{formatPeso(getLocalCost(i))}</span>
+                  {discount > 0 && <span className="inv-discount">−{discount}%</span>}
+                </div>
 
                 <span className="inv-actions" role="cell">
                   {i.image && !i.image.startsWith('data:') && (
