@@ -329,7 +329,7 @@ export const Stock: React.FC<StockProps> = ({
                     <td className="num">
                       {onHand.toLocaleString()} <span className="inv-uom">{item?.unitOfMeasure || 'PCS'}</span>
                     </td>
-                    <td className="num">
+                    <td className="num stk-qty-cell">
                       <input
                         type="number"
                         inputMode="numeric"

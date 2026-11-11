@@ -8138,8 +8138,16 @@ input[type='date']:focus, select:focus, textarea:focus {
   color: var(--ink-muted);
 }
 
+/* The quantity column has a fixed width, so the box never moves when its value changes. */
+.stk-table .stk-qty-cell {
+  width: 150px;
+  min-width: 150px;
+}
+
 .stk-qty {
-  width: 104px;
+  width: 120px;
+  appearance: textfield;
+  -moz-appearance: textfield;
   height: 36px;
   padding: 0 10px;
   text-align: right;
@@ -8682,4 +8690,11 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-item > .inv-local,
 .inv-item > .inv-price-cell {
   text-align: left;
+}
+
+/* Hide the spin arrows on the quantity box; the number keeps its place. */
+.stk-qty::-webkit-outer-spin-button,
+.stk-qty::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
