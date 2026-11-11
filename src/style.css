@@ -8646,3 +8646,42 @@ input[type='date']:focus, select:focus, textarea:focus {
   justify-content: flex-start;
   align-items: flex-start;
 }
+
+/* ---- Inventory list polish ---- */
+
+/* Category wraps instead of cutting off ("TRANSMISSION" stays whole). */
+.inv-category {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+}
+
+/* Pinned picture and name take the row's own colour, so they do not show a different box. */
+.inv-item {
+  --row-bg: #ffffff;
+}
+
+.inv-item:hover {
+  --row-bg: #f7f4ed;
+}
+
+/* Local cost: the figure on top, the discount badge underneath, never overlapping. */
+.inv-local {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+}
+
+.inv-local .inv-discount {
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 0;
+}
+
+.inv-item > .inv-local,
+.inv-item > .inv-price-cell {
+  text-align: left;
+}
