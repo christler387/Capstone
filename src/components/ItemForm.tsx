@@ -3,6 +3,7 @@ import { Item, ItemDescriptorField } from "../types";
 import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
 import { getLocalCost } from "../inventoryMetrics";
+import { apiRequest } from "../apiClient";
 
 // Typed fields that suggest values already saved on other items.
 const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
@@ -106,6 +107,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const errorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  // An item linked to a supplier takes its ID from the supplier code, so the Item ID is locked.
+  const [idLocked, setIdLocked] = useState(false);
+  useEffect(() => {
+    if (!item?.id) return;
+    apiRequest<unknown[]>(`/items/${encodeURIComponent(item.id)}/suppliers`)
+      .then((links) => setIdLocked(links.length > 0))
+      .catch(() => setIdLocked(false));
+  }, [item?.id]);
   // The discount box accepts "30" or "30%". The text is kept while typing; the number is stored in formData.
   const [discountText, setDiscountText] = useState(() => formatDiscountText(item?.discount));
   // Required fields are marked only after the user tries to save, so a new form does not start red.
@@ -436,7 +445,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           className={`form-input font-mono ${isMissing("id") ? "is-missing" : ""}`}
           value={formData.id}
           onChange={handleChange}
-          disabled={readOnly}
+          disabled={readOnly || idLocked}
+          title={idLocked ? "Linked to a supplier: the Item ID comes from the supplier code" : undefined}
           aria-invalid={isMissing("id")}
           required
         />
