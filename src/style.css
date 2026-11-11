@@ -8354,7 +8354,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 .inv-row {
-  grid-template-columns: 64px minmax(200px, 2.4fr) minmax(120px, 1.1fr) 130px 130px 120px 100px 130px 130px 76px;
+  grid-template-columns: 64px minmax(200px, 2.4fr) minmax(120px, 1.1fr) 130px 130px 120px 100px 130px 130px 168px;
   justify-content: start;
 }
 
@@ -8605,7 +8605,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 @media (min-width: 641px) and (max-width: 1499px) {
   .inv-row {
-    grid-template-columns: 64px minmax(220px, 2fr) 120px 130px 130px 100px 130px 130px 76px;
+    grid-template-columns: 64px minmax(220px, 2fr) 120px 130px 130px 100px 130px 130px 168px;
   }
 
   .inv-row > :nth-child(4) {
@@ -9510,4 +9510,17 @@ input[type='date']:focus, select:focus, textarea:focus {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Inventory: the action icons have their own space and never run into the cost columns. */
+.inv-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.inv-actions .inv-icon-btn {
+  flex: 0 0 auto;
 }
