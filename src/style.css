@@ -7534,7 +7534,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   }
 }
 
-/* Phones: each inventory row becomes a card instead of a sideways-scrolling table. */
+/* Phones: each inventory row becomes a card. Every field stays visible; nothing is hidden. */
 @media (max-width: 640px) {
   .inv-table-wrap {
     overflow: visible;
@@ -7553,7 +7553,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   .inv-row.inv-item {
     display: grid;
     grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
-    gap: 6px 12px;
+    gap: 8px 12px;
     align-items: center;
     margin-bottom: 10px;
     padding: 14px;
@@ -7569,25 +7569,21 @@ input[type='date']:focus, select:focus, textarea:focus {
     background: none !important;
     text-align: left;
     min-width: 0;
+    justify-self: stretch;
   }
 
   /* Picture on the left, spanning the card. */
-  .inv-item > :nth-child(1) { grid-column: 1; grid-row: 1 / span 5; }
-  .inv-item > :nth-child(2) { grid-column: 2 / span 2; grid-row: 1; }
-  .inv-item > :nth-child(3) { grid-column: 2; grid-row: 2; }
-  .inv-item > :nth-child(4) { grid-column: 3; grid-row: 2; }
-  .inv-item > :nth-child(5) { grid-column: 2 / span 2; grid-row: 3; }
-  .inv-item > :nth-child(8) { grid-column: 2; grid-row: 4; }
-  .inv-item > :nth-child(9) { grid-column: 3; grid-row: 4; }
-  .inv-item > :nth-child(11) { grid-column: 2; grid-row: 5; }
-  .inv-item > :nth-child(12) { grid-column: 3; grid-row: 5; }
-
-  /* Less useful on a phone: part number, colour and reorder quantity. */
-  .inv-item > :nth-child(6),
-  .inv-item > :nth-child(7),
-  .inv-item > :nth-child(10) {
-    display: none;
-  }
+  .inv-item > :nth-child(1)  { grid-column: 1; grid-row: 1 / span 6; }
+  .inv-item > :nth-child(2)  { grid-column: 2 / span 2; grid-row: 1; }   /* item */
+  .inv-item > :nth-child(3)  { grid-column: 2; grid-row: 2; }            /* category */
+  .inv-item > :nth-child(4)  { grid-column: 3; grid-row: 2; }            /* brand & model */
+  .inv-item > :nth-child(5)  { grid-column: 2; grid-row: 3; }            /* part no. */
+  .inv-item > :nth-child(6)  { grid-column: 3; grid-row: 3; }            /* supplier */
+  .inv-item > :nth-child(7)  { grid-column: 2; grid-row: 4; }            /* location */
+  .inv-item > :nth-child(8)  { grid-column: 3; grid-row: 4; }            /* stock */
+  .inv-item > :nth-child(9)  { grid-column: 2; grid-row: 5; }            /* purchase cost */
+  .inv-item > :nth-child(10) { grid-column: 3; grid-row: 5; }            /* local cost */
+  .inv-item > :nth-child(11) { grid-column: 2 / span 2; grid-row: 6; justify-self: end; }  /* actions */
 }
 
 /* Login photo: a horizontal swipe that does not block page scrolling. */
@@ -8347,11 +8343,11 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 /* ---- Inventory list: 9 columns. Related fields are grouped into one cell each. ---- */
 .inv-table {
-  min-width: 1480px;
+  min-width: 1240px;
 }
 
 .inv-row {
-  grid-template-columns: 64px minmax(260px, 2.4fr) 110px minmax(130px, 1.1fr) 140px 150px 120px 100px 100px 100px 76px;
+  grid-template-columns: 64px minmax(200px, 2.2fr) 110px minmax(120px, 1.1fr) 130px 130px 120px 100px 130px 130px 76px;
   justify-content: start;
 }
 
@@ -8579,4 +8575,64 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-fits i {
   flex-shrink: 0;
   margin-top: 0.15em;
+}
+
+/* Inventory: money and stock figures stay on one line. Column widths are fixed so the header and every row line up. */
+.inv-price-cell,
+.inv-local-value,
+.inv-qty-big,
+.inv-cost-main,
+.inv-reorder-line {
+  white-space: nowrap;
+}
+
+.inv-table .inv-row > * {
+  min-width: 0;
+}
+
+/* Inventory: category and part no. move under the item name between phone and wide-desktop widths,
+   so every column still fits without sideways scrolling. */
+.inv-inline-extra {
+  display: none;
+}
+
+@media (min-width: 641px) and (max-width: 1499px) {
+  .inv-row {
+    grid-template-columns: 64px minmax(220px, 2fr) 120px 130px 130px 100px 130px 130px 76px;
+  }
+
+  .inv-row > :nth-child(3),
+  .inv-row > :nth-child(5) {
+    display: none;
+  }
+
+  .inv-inline-extra {
+    display: block;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--ink-muted);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .inv-table {
+    min-width: 1000px;
+  }
+}
+
+/* Phones: the list and each card stay inside the screen width. */
+@media (max-width: 640px) {
+  .inv-table-wrap,
+  .inv-table {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .inv-row.inv-item {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
+  }
 }

@@ -292,6 +292,10 @@ export const Inventory: React.FC<InventoryProps> = ({
                     <span aria-hidden="true"> · </span>
                     BC {i.barcode || '---'}
                   </span>
+                  <span className="inv-inline-extra">
+                    {i.category}
+                    {i.partNumber && <> · Part {i.partNumber}</>}
+                  </span>
                 </div>
 
                 <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
