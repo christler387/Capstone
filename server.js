@@ -407,7 +407,6 @@ const ITEM_DESCRIPTOR_FIELDS = [
   ["partNumber", "part_number"],
   ["color", "color"],
   ["unitOfMeasure", "unit_of_measure"],
-  ["supplier", "supplier"],
 ];
 const ITEM_DESCRIPTOR_COLUMNS = ITEM_DESCRIPTOR_FIELDS.map(([, column]) => column);
 
@@ -476,8 +475,6 @@ async function initializeDatabase() {
   for (const column of ITEM_DESCRIPTOR_COLUMNS) {
     await addColumnIfMissing("inventory", column, "VARCHAR(100) NULL");
   }
-  // Suggested retail price (shown in the inventory list). Optional: older items start without one.
-  await addColumnIfMissing("inventory", "srp", "DECIMAL(12,2) NULL");
   // Existing databases may still have a TEXT image column, which is too small for uploaded images.
   await pool.query("ALTER TABLE inventory MODIFY COLUMN image LONGTEXT NULL");
   // A rack is optional, so an item can be saved before it is placed on the map.
@@ -644,8 +641,6 @@ function toItem(row) {
     partNumber: row.part_number || undefined,
     color: row.color || undefined,
     unitOfMeasure: row.unit_of_measure || undefined,
-    supplier: row.supplier || undefined,
-    srp: row.srp === null || row.srp === undefined ? undefined : Number(row.srp),
   };
 }
 
@@ -1526,7 +1521,7 @@ app.post(
 /* ----------------------------- Inventory ---------------------------- */
 
 const INVENTORY_COLUMNS =
-  "id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock, srp, " +
+  "id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock, " +
   ITEM_DESCRIPTOR_COLUMNS.join(", ");
 
 // One "?" per column in INVENTORY_COLUMNS.
@@ -1552,7 +1547,6 @@ function inventoryValues(id, item) {
     item.holdingCost > 0 ? item.holdingCost : price * 0.2,
     item.leadTimeDays ?? 7,
     item.safetyStock ?? 10,
-    item.srp === "" || item.srp === null || item.srp === undefined ? null : Number(item.srp),
     ...ITEM_DESCRIPTOR_FIELDS.map(([field]) => (item[field] || "").toString().trim() || null),
   ];
 }
@@ -1691,7 +1685,7 @@ app.put(
           }
         }
         await connection.query(
-          `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, srp=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
+          `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
           [...values, itemId],
         );
         const oldQuantity = Number(current.quantity);

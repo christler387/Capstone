@@ -4,7 +4,7 @@ import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
 
 // Typed fields that suggest values already saved on other items.
-const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure", "supplier"];
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -212,7 +212,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         "leadTimeDays",
         "safetyStock",
       ].includes(field)
-        ? (field === "safetyStock" || field === "srp") && value === ""
+        ? field === "safetyStock" && value === ""
           ? ""
           : parseFloat(value)
         : value,
@@ -742,31 +742,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             disabled={readOnly}
             required
           />
-        </div>
-      </div>
-      <div className="grid-2 border-soft-no-pad p-0">
-        <div className="form-group">
-          <label className="label-micro" htmlFor="edit-srp">
-            SRP (₱) <span className="field-optional">optional</span>
-          </label>
-          <input
-            type="number"
-            id="edit-srp"
-            className="form-input font-mono"
-            value={formData.srp ?? ""}
-            onChange={handleChange}
-            min="0"
-            step="0.01"
-            placeholder="0.00"
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="label-micro">
-            Supplier <span className="field-optional">optional</span>
-          </label>
-          {renderDescriptorField("supplier", "Supplier", "Type or pick")}
         </div>
       </div>
       <div className="grid-2 border-soft-no-pad p-0">

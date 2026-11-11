@@ -234,7 +234,7 @@ export const Inventory: React.FC<InventoryProps> = ({
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
             <span role="columnheader" className="num is-centered">Reorder qty</span>
-            <span role="columnheader" className="num">SRP</span>
+            <span role="columnheader" className="num">Price</span>
             <span role="columnheader" className="num">{isAdmin ? 'Actions' : 'Locate'}</span>
           </div>
 
@@ -344,7 +344,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                   {reorderQuantity.toLocaleString()}
                 </button>
 
-                <span className={`inv-num inv-price${i.srp == null ? ' is-empty' : ''}`} role="cell">{i.srp == null ? '—' : formatPeso(i.srp)}</span>
+                <span className="inv-num inv-price" role="cell">{formatPeso(i.price)}</span>
 
                 <span className="inv-actions" role="cell">
                   {i.image && !i.image.startsWith('data:') && (
