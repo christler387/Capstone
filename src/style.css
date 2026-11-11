@@ -8698,3 +8698,23 @@ input[type='date']:focus, select:focus, textarea:focus {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* Stock sheet: every column has a fixed width, so a figure changing never moves the columns. */
+.stk-table {
+  table-layout: fixed;
+}
+
+.stk-table th:nth-child(1),
+.stk-table td:nth-child(1) { width: auto; }
+.stk-table th:nth-child(2),
+.stk-table td:nth-child(2) { width: 130px; }
+.stk-table th:nth-child(3),
+.stk-table td:nth-child(3) { width: 150px; }
+.stk-table th:nth-child(4),
+.stk-table td:nth-child(4) { width: 170px; }
+.stk-table th:nth-child(5),
+.stk-table td:nth-child(5) { width: 150px; }
+.stk-table th:nth-child(6),
+.stk-table td:nth-child(6) { width: 120px; }
+.stk-table th:nth-child(7),
+.stk-table td:nth-child(7) { width: 56px; }
