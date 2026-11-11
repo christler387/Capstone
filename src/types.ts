@@ -31,6 +31,8 @@ export interface Item {
   partNumber?: string;
   color?: string;
   unitOfMeasure?: string;
+  // Supplier discount in percent (0 to 100).
+  discount?: number;
 }
 
 // Item fields that are typed in, with suggestions drawn from the values already saved.

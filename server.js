@@ -469,6 +469,8 @@ async function initializeDatabase() {
     "safety_stock",
     "INT NOT NULL DEFAULT 10",
   );
+  // Supplier discount in percent. Local cost = purchase cost less this discount.
+  await addColumnIfMissing("inventory", "discount", "DECIMAL(5,2) NOT NULL DEFAULT 0");
   // Bumped on every change to the item, so an edit made from an older copy is refused.
   await addColumnIfMissing("inventory", "version", "INT NOT NULL DEFAULT 0");
   // Descriptive fields shown in the item form (nullable: existing items start without them).
@@ -641,6 +643,7 @@ function toItem(row) {
     partNumber: row.part_number || undefined,
     color: row.color || undefined,
     unitOfMeasure: row.unit_of_measure || undefined,
+    discount: Number(row.discount || 0),
   };
 }
 
@@ -1521,7 +1524,7 @@ app.post(
 /* ----------------------------- Inventory ---------------------------- */
 
 const INVENTORY_COLUMNS =
-  "id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock, " +
+  "id, name, category, barcode, quantity, price, rack, level, size, weight, demand, compatible_vehicles, image, ordering_cost, holding_cost, lead_time_days, safety_stock, discount, " +
   ITEM_DESCRIPTOR_COLUMNS.join(", ");
 
 // One "?" per column in INVENTORY_COLUMNS.
@@ -1547,6 +1550,7 @@ function inventoryValues(id, item) {
     item.holdingCost > 0 ? item.holdingCost : price * 0.2,
     item.leadTimeDays ?? 7,
     item.safetyStock ?? 10,
+    Math.min(100, Math.max(0, Number(item.discount) || 0)),
     ...ITEM_DESCRIPTOR_FIELDS.map(([field]) => (item[field] || "").toString().trim() || null),
   ];
 }
@@ -1685,7 +1689,7 @@ app.put(
           }
         }
         await connection.query(
-          `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
+          `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, discount=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
           [...values, itemId],
         );
         const oldQuantity = Number(current.quantity);

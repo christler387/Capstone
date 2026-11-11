@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Item, ItemDescriptorField } from "../types";
 import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
+import { getLocalCost } from "../inventoryMetrics";
 
 // Typed fields that suggest values already saved on other items.
 const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
@@ -211,9 +212,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         "holdingCost",
         "leadTimeDays",
         "safetyStock",
+        "discount",
       ].includes(field)
         ? field === "safetyStock" && value === ""
           ? ""
+          : field === "discount" && value === ""
+          ? 0
           : parseFloat(value)
         : value,
     }));
@@ -741,6 +745,35 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             step="0.01"
             disabled={readOnly}
             required
+          />
+        </div>
+      </div>
+      <div className="grid-2 border-soft-no-pad p-0">
+        <div className="form-group">
+          <label className="label-micro" htmlFor="edit-discount">
+            Discount (%) <span className="field-optional">optional</span>
+          </label>
+          <input
+            type="number"
+            id="edit-discount"
+            className="form-input font-mono"
+            value={formData.discount ?? 0}
+            onChange={handleChange}
+            min="0"
+            max="100"
+            step="0.01"
+            disabled={readOnly}
+          />
+        </div>
+        <div className="form-group">
+          <label className="label-micro">Local cost (₱)</label>
+          <input
+            type="text"
+            className="form-input font-mono"
+            value={`₱${getLocalCost(formData).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+            readOnly
+            tabIndex={-1}
+            aria-readonly="true"
           />
         </div>
       </div>

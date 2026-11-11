@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
-import { getReorderQuantity, isAtReorderPoint } from '../inventoryMetrics';
+import { getLocalCost, getReorderQuantity, getStockTotal, isAtReorderPoint } from '../inventoryMetrics';
 
 interface InventoryProps {
   inventory: Item[];
@@ -76,7 +76,7 @@ export const Inventory: React.FC<InventoryProps> = ({
   const totalItems = inventory.length;
   // "All" plus every category in use, so a newly added category gets its own filter button.
   const categoryOptions = ['ALL', ...Array.from(new Set(inventory.map(i => (i.category || '').trim().toUpperCase()).filter(Boolean))).sort()];
-  const totalValue = inventory.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+  const totalValue = inventory.reduce((sum, i) => sum + getStockTotal(i), 0);
   const lowCount = inventory.filter(i => isAtReorderPoint(i, movements)).length;
 
   const filteredInventory = inventory
@@ -226,6 +226,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 aria-hidden="true"
               ></i>
             </button>
+            <span role="columnheader">Item ID</span>
             <span role="columnheader">Category</span>
             <span role="columnheader">Brand</span>
             <span role="columnheader">Model</span>
@@ -234,7 +235,11 @@ export const Inventory: React.FC<InventoryProps> = ({
             <span role="columnheader">Location</span>
             <span role="columnheader" className="num">Qty</span>
             <span role="columnheader" className="num is-centered">Reorder qty</span>
-            <span role="columnheader" className="num">Price</span>
+            <span role="columnheader">UOM</span>
+            <span role="columnheader" className="num">Discount</span>
+            <span role="columnheader" className="num">Purch. cost</span>
+            <span role="columnheader" className="num">Local cost</span>
+            <span role="columnheader" className="num">Total</span>
             <span role="columnheader" className="num">{isAdmin ? 'Actions' : 'Locate'}</span>
           </div>
 
@@ -295,6 +300,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
 
 
+                <span className="inv-code" role="cell">{i.id}</span>
                 <span className="inv-category" role="cell" title={i.category}>{i.category}</span>
                 <span className={`inv-brand${i.brand ? '' : ' is-empty'}`} role="cell">
                   {i.brand || '—'}
@@ -344,7 +350,11 @@ export const Inventory: React.FC<InventoryProps> = ({
                   {reorderQuantity.toLocaleString()}
                 </button>
 
+                <span role="cell">{i.unitOfMeasure || 'PCS'}</span>
+                <span className="inv-num" role="cell">{(i.discount ?? 0) > 0 ? `${i.discount}%` : '—'}</span>
                 <span className="inv-num inv-price" role="cell">{formatPeso(i.price)}</span>
+                <span className="inv-num" role="cell">{formatPeso(getLocalCost(i))}</span>
+                <span className="inv-num inv-total" role="cell">{formatPeso(getStockTotal(i))}</span>
 
                 <span className="inv-actions" role="cell">
                   {i.image && !i.image.startsWith('data:') && (

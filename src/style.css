@@ -8344,3 +8344,25 @@ input[type='date']:focus, select:focus, textarea:focus {
   .stk-foot-actions { width: 100%; }
   .stk-foot-actions .stk-btn { flex: 1; }
 }
+
+/* ---- Inventory: the table has 17 columns (picture to actions). Widths are set here so they match the cells. ---- */
+.inv-table {
+  min-width: 2200px;
+}
+
+.inv-row {
+  grid-template-columns: 64px minmax(220px, 2fr) 110px 120px 120px 120px 170px 90px 150px 76px 116px 80px 90px 120px 120px 130px 84px;
+}
+
+.inv-code {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.inv-total {
+  font-weight: 700;
+}

@@ -4,6 +4,17 @@ const DEFAULT_ORDERING_COST = 100;
 const DEFAULT_HOLDING_RATE = 0.2;
 const DEFAULT_LEAD_TIME_DAYS = 7;
 
+// Local cost: the purchase cost (item.price) less the supplier discount in percent.
+export function getLocalCost(item: { price?: number; discount?: number }): number {
+  const discount = Math.min(100, Math.max(0, Number(item.discount) || 0));
+  return (Number(item.price) || 0) * (1 - discount / 100);
+}
+
+// Total: quantity on hand times local cost. This is the stock value shown in the inventory.
+export function getStockTotal(item: { price?: number; discount?: number; quantity?: number }): number {
+  return getLocalCost(item) * (Number(item.quantity) || 0);
+}
+
 export function getAnnualDemand(item: Item, movements: Movement[]): number {
   const itemMovements = movements.filter(m => m.itemId === item.id && m.type === 'OUT');
   if (itemMovements.length === 0) return 0;

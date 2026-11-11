@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Item, Movement } from '../types';
-import { getEoq, getReorderQuantity, getRop, isAtReorderPoint } from '../inventoryMetrics';
+import { getEoq, getReorderQuantity, getRop, getStockTotal, isAtReorderPoint } from '../inventoryMetrics';
 
 interface DashboardProps {
   inventory: Item[];
@@ -67,7 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   const [categoryMetric, setCategoryMetric] = useState<'value' | 'units'>('value');
 
   const totalItems = inventory.length;
-  const totalValue = inventory.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const totalValue = inventory.reduce((sum, i) => sum + getStockTotal(i), 0);
   const lowStock = inventory
     .filter((i) => isAtReorderPoint(i, movements))
     .sort((a, b) => a.quantity - b.quantity || a.name.localeCompare(b.name));
@@ -76,7 +76,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
     const displayCategory = (i.category || '').trim().toUpperCase() || 'UNCATEGORIZED';
     if (!acc[displayCategory]) acc[displayCategory] = { qty: 0, val: 0 };
     acc[displayCategory].qty += i.quantity;
-    acc[displayCategory].val += i.price * i.quantity;
+    acc[displayCategory].val += getStockTotal(i);
     return acc;
   }, {} as Record<string, { qty: number; val: number }>);
 

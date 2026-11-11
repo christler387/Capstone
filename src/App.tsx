@@ -380,7 +380,12 @@ Each row is one item. The columns are:
 | **Location** | Rack code (for example H-03) and shelf level (for example Level: L1). |
 | **Qty** | Units currently in stock. |
 | **Reorder Qty** | How many units to reorder. Shows 00 when no reorder is needed. |
-| **Price** | Unit price in pesos (₱). |
+| **Item ID** | The item's ID number. |
+| **UOM** | Unit of measure, for example PCS. |
+| **Discount** | Supplier discount in percent. |
+| **Purch. cost** | Purchase cost per unit in pesos (₱), before discount. |
+| **Local cost** | Cost per unit after discount: purchase cost less the discount. |
+| **Total** | Quantity × local cost. |
 | **Actions** | The trash icon, used to delete the item. |
 
 ### Red numbers
@@ -432,7 +437,8 @@ These values control when and how much to reorder.
 ### Stock and price
 
 - **Quantity*** – Units in stock now.
-- **Price (₱)*** – Unit price in pesos.
+- **Price (₱)*** – Purchase cost per unit in pesos, before discount.
+- **Discount (%)** – Supplier discount. Local cost is the price less this discount.
 
 ### Image
 Add a photo in one of two ways:
