@@ -375,7 +375,7 @@ Each row is one item. The columns are:
 
 | Column | What it shows |
 | **Img** | Thumbnail photo of the part. A gray box means no image has been added. |
-| **Part Name** | The part's name. Underneath: the vehicles it fits (in green), the item **ID**, and its barcode (**BC**). |
+| **Part Name** | The part's name. Underneath: the vehicles it fits (in green), the item **ID**, and its barcode (**BC**). Several items can share a name or a barcode; each one still has its own ID. |
 | **Category** | Which category the part belongs to. |
 | **Location** | Rack code (for example H-03) and shelf level (for example Level: L1). |
 | **Qty** | Units currently in stock. |

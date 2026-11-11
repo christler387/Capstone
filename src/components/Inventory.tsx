@@ -81,7 +81,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const filteredInventory = inventory
     .filter(i => {
-      const matchesSearch = [i.name, i.id, i.category, i.brand || '', i.partNumber || '', i.barcode || '', i.compatibleVehicles || ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
+      const matchesSearch = [i.name, i.id, i.category, i.brand || '', i.partNumber || '', i.barcode || '', i.compatibleVehicles || '', i.supplier || ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
       const matchesCategory = categoryFilter === 'ALL' || (i.category || '').trim().toUpperCase() === categoryFilter;
       return matchesSearch && matchesCategory;
     })
@@ -157,7 +157,7 @@ export const Inventory: React.FC<InventoryProps> = ({
           <i className="bx bx-search" aria-hidden="true"></i>
           <input
             type="text"
-            placeholder="Search by name, ID, category, brand, part no., barcode or vehicle"
+            placeholder="Search by name, ID, category, brand, supplier, part no., barcode or vehicle"
             aria-label="Search inventory"
             value={search}
             onChange={(e) => {
@@ -299,6 +299,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
                   {i.model && <span className="inv-model">{i.model}</span>}
                   {i.color && <span className="inv-sub">{i.color}</span>}
+                  {i.supplier && <span className="inv-supplier"><i className="bx bx-store" aria-hidden="true"></i>{i.supplier}</span>}
                 </div>
 
                 <span className={`inv-partno${i.partNumber ? '' : ' is-empty'}`} role="cell" title={i.partNumber || undefined}>

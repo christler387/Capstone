@@ -33,10 +33,12 @@ export interface Item {
   unitOfMeasure?: string;
   // Supplier discount in percent (0 to 100).
   discount?: number;
+  // Where the item is bought from. The same item name can come from different suppliers.
+  supplier?: string;
 }
 
 // Item fields that are typed in, with suggestions drawn from the values already saved.
-export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 'partNumber' | 'color' | 'unitOfMeasure';
+export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 'partNumber' | 'color' | 'unitOfMeasure' | 'supplier';
 
 export interface Movement {
   id: string;

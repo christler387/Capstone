@@ -407,6 +407,7 @@ const ITEM_DESCRIPTOR_FIELDS = [
   ["partNumber", "part_number"],
   ["color", "color"],
   ["unitOfMeasure", "unit_of_measure"],
+  ["supplier", "supplier"],
 ];
 const ITEM_DESCRIPTOR_COLUMNS = ITEM_DESCRIPTOR_FIELDS.map(([, column]) => column);
 
@@ -644,6 +645,7 @@ function toItem(row) {
     color: row.color || undefined,
     unitOfMeasure: row.unit_of_measure || undefined,
     discount: Number(row.discount || 0),
+    supplier: row.supplier || undefined,
   };
 }
 
@@ -1600,16 +1602,6 @@ app.post(
             error: `Item ID ${itemId} is already used by another item. The next free ID is ${next}.`,
           };
         }
-        if (barcode) {
-          const [[sameBarcode]] = await connection.query(
-            "SELECT id FROM inventory WHERE TRIM(barcode)=? LIMIT 1",
-            [barcode],
-          );
-          if (sameBarcode) {
-            await connection.rollback();
-            return { status: 409, error: "That barcode is already registered to another item." };
-          }
-        }
         await connection.query(
           `INSERT INTO inventory (${INVENTORY_COLUMNS})
            VALUES (${INVENTORY_PLACEHOLDERS})`,
@@ -1677,16 +1669,6 @@ app.put(
             status: 409,
             error: "Someone else changed this item while you were editing it. Close the form, open the item again and make your change.",
           };
-        }
-        if (barcode) {
-          const [[sameBarcode]] = await connection.query(
-            "SELECT id FROM inventory WHERE TRIM(barcode)=? AND id<>? LIMIT 1",
-            [barcode, itemId],
-          );
-          if (sameBarcode) {
-            await connection.rollback();
-            return { status: 409, error: "That barcode is already registered to another item." };
-          }
         }
         await connection.query(
           `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, discount=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,

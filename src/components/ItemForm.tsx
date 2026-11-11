@@ -5,7 +5,7 @@ import { Combobox, normalizeDescriptor } from "./Combobox";
 import { getLocalCost } from "../inventoryMetrics";
 
 // Typed fields that suggest values already saved on other items.
-const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure", "supplier"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -225,14 +225,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
   const handleBarcodeScanned = (value: string) => {
     const barcode = value.trim();
-    const duplicateBarcode = existingItems.some(
-      (existingItem) =>
-        existingItem.id !== item?.id &&
-        (existingItem.barcode ?? "").trim() === barcode,
-    );
-    if (duplicateBarcode) {
-       return false;
-    }
 
     setFormData((prev) => ({
       ...prev,
@@ -306,18 +298,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     }
     setShowMissing(false);
 
-    // The barcode is optional. Only check for duplicates when one was entered.
-    const duplicateBarcode =
-      barcode !== "" &&
-      existingItems.some(
-        (existingItem) =>
-          existingItem.id !== item?.id &&
-          (existingItem.barcode ?? "").trim() === barcode,
-      );
-    if (duplicateBarcode) {
-      setError("That barcode is already registered to another item.");
-      return;
-    }
 
     const picture = (formData.image ?? "").trim();
     if (picture && !picture.startsWith("data:") && !isWebAddress(picture)) {
@@ -548,6 +528,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           </label>
           {renderDescriptorField("unitOfMeasure", "Unit of measure", "")}
         </div>
+      </div>
+      <div className="form-group">
+        <label className="label-micro">
+          Supplier <span className="field-optional">optional</span>
+        </label>
+        {renderDescriptorField("supplier", "Supplier", "Type or pick")}
       </div>
       <div className="form-group">
         <label className="label-micro">Compatible Vehicles</label>

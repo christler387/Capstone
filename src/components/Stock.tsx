@@ -73,6 +73,12 @@ export const Stock: React.FC<StockProps> = ({
     setSearch('');
   };
 
+  // Several items can share a barcode, so a scan or a barcode search can add more than one.
+  const addItemsToSheet = (itemIds: string[]) => {
+    updateSheet((current) => itemIds.reduce((list, id) => addLine(list, id), current));
+    setSearch('');
+  };
+
   const setQty = (itemId: string, value: string) => {
     const parsed = value === '' ? 0 : Math.max(0, parseInt(value, 10) || 0);
     updateSheet((current) => current.map((line) => (line.itemId === itemId ? { ...line, qty: parsed } : line)));
@@ -87,31 +93,37 @@ export const Stock: React.FC<StockProps> = ({
     if (!query) return [];
     const onSheet = new Set(lines.map((line) => line.itemId));
     return inventory
-      .filter((item) => !onSheet.has(item.id) && `${item.id} ${item.name}`.toLowerCase().includes(query))
+      .filter((item) => !onSheet.has(item.id) && `${item.id} ${item.name} ${item.barcode ?? ''} ${item.supplier ?? ''}`.toLowerCase().includes(query))
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, MAX_SUGGESTIONS);
   }, [search, inventory, lines]);
 
-  const exactMatch = (value: string) => {
+  // Every item whose ID or barcode is exactly this code. Barcodes can be shared, so this can return several.
+  const codeMatches = (value: string) => {
     const query = value.trim().toLowerCase();
-    return inventory.find((item) => item.id.toLowerCase() === query || `${item.id} - ${item.name}`.toLowerCase() === query);
+    if (!query) return [];
+    return inventory.filter((item) => item.id.toLowerCase() === query || (item.barcode ?? '').trim().toLowerCase() === query);
   };
 
   const handleSearchKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    const match = exactMatch(search) ?? (suggestions.length === 1 ? suggestions[0] : undefined);
-    if (match) addItemToSheet(match.id);
+    const matches = codeMatches(search);
+    if (matches.length > 0) {
+      addItemsToSheet(matches.map((item) => item.id));
+    } else if (suggestions.length === 1) {
+      addItemToSheet(suggestions[0].id);
+    }
   };
 
   const handleScan = (value: string) => {
     const code = value.trim();
-    const found = inventory.find((item) => item.id === code || (item.barcode ?? '').trim() === code);
-    if (!found) {
+    const matches = codeMatches(code);
+    if (matches.length === 0) {
       setError(`No item matches the code ${code}.`);
       return;
     }
-    addItemToSheet(found.id);
+    addItemsToSheet(matches.map((item) => item.id));
     setIsScannerOpen(false);
   };
 
@@ -262,7 +274,9 @@ export const Stock: React.FC<StockProps> = ({
                 <button type="button" key={item.id} className="stk-suggest-row" onClick={() => addItemToSheet(item.id)}>
                   <span className="stk-code">{item.id}</span>
                   <span className="stk-suggest-name">{item.name}</span>
-                  <span className="stk-suggest-stock">{item.quantity.toLocaleString()} on hand</span>
+                  <span className="stk-suggest-stock">
+                    {item.supplier ? `${item.supplier} · ` : ''}{item.quantity.toLocaleString()} on hand
+                  </span>
                 </button>
               ))}
               {suggestions.length === 0 && !canAddNewItem && (
@@ -309,6 +323,7 @@ export const Stock: React.FC<StockProps> = ({
                       <span className="stk-item-meta">
                         <span className="stk-code">{line.itemId}</span>
                         {item?.compatibleVehicles && <span> · {item.compatibleVehicles}</span>}
+                        {item?.supplier && <span> · {item.supplier}</span>}
                       </span>
                     </td>
                     <td className="num">

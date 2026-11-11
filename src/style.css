@@ -8527,3 +8527,19 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-weight: 700;
   color: var(--ink);
 }
+
+.inv-supplier {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inv-supplier i {
+  font-size: 0.9375rem;
+  color: var(--ink-faint);
+}
