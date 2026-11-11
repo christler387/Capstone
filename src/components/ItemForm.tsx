@@ -5,7 +5,7 @@ import { Combobox, normalizeDescriptor } from "./Combobox";
 import { getLocalCost } from "../inventoryMetrics";
 
 // Typed fields that suggest values already saved on other items.
-const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure", "supplier"];
+const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
 
 interface ItemFormProps {
   item?: Partial<Item>;
@@ -541,12 +541,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           </label>
           {renderDescriptorField("unitOfMeasure", "Unit of measure", "")}
         </div>
-      </div>
-      <div className="form-group">
-        <label className="label-micro">
-          Supplier <span className="field-optional">optional</span>
-        </label>
-        {renderDescriptorField("supplier", "Supplier", "Type or pick")}
       </div>
       <div className="form-group">
         <label className="label-micro">Compatible Vehicles</label>

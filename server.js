@@ -2373,14 +2373,22 @@ app.delete(
   }),
 );
 
-// How many suppliers each inventory item is linked to (for the Inventory list).
+// The suppliers linked to each inventory item, for the Inventory list.
 app.get(
   "/api/supplier-links/counts",
   ah(async (_req, res) => {
     const [rows] = await pool.query(
-      "SELECT item_id, COUNT(*) AS count FROM supplier_items GROUP BY item_id",
+      `SELECT si.item_id, s.name, si.supplier_item_code
+       FROM supplier_items si JOIN suppliers s ON s.id = si.supplier_id
+       ORDER BY s.name`,
     );
-    res.json(Object.fromEntries(rows.map((row) => [row.item_id, Number(row.count)])));
+    const byItem = {};
+    for (const row of rows) {
+      const entry = byItem[row.item_id] || (byItem[row.item_id] = { count: 0, suppliers: [] });
+      entry.count += 1;
+      entry.suppliers.push({ name: row.name, code: row.supplier_item_code });
+    }
+    res.json(byItem);
   }),
 );
 

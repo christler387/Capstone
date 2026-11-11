@@ -35,11 +35,11 @@ export const Inventory: React.FC<InventoryProps> = ({
   onOpenStockCard,
 }) => {
   // How many suppliers each item is linked to, shown on the row.
-  const [supplierCounts, setSupplierCounts] = useState<Record<string, number>>({});
+  const [supplierLinks, setSupplierLinks] = useState<Record<string, { count: number; suppliers: { name: string; code: string }[] }>>({});
   useEffect(() => {
-    apiRequest<Record<string, number>>('/supplier-links/counts')
-      .then(setSupplierCounts)
-      .catch(() => setSupplierCounts({}));
+    apiRequest<Record<string, { count: number; suppliers: { name: string; code: string }[] }>>('/supplier-links/counts')
+      .then(setSupplierLinks)
+      .catch(() => setSupplierLinks({}));
   }, []);
 
 
@@ -309,10 +309,10 @@ export const Inventory: React.FC<InventoryProps> = ({
                   <span className={`inv-brand-name${i.brand ? '' : ' is-empty'}`}>{i.brand || '—'}</span>
                   {i.model && <span className="inv-model">{i.model}</span>}
                   {i.color && <span className="inv-sub">{i.color}</span>}
-                  {supplierCounts[i.id] > 0 && (
+                  {supplierLinks[i.id]?.count > 0 && (
                     <span className="inv-supplier-count">
                       <i className="bx bx-store" aria-hidden="true"></i>
-                      {supplierCounts[i.id]} {supplierCounts[i.id] === 1 ? 'supplier' : 'suppliers'}
+                      {supplierLinks[i.id].count} {supplierLinks[i.id].count === 1 ? 'supplier' : 'suppliers'}
                     </span>
                   )}
                 </div>
@@ -321,8 +321,12 @@ export const Inventory: React.FC<InventoryProps> = ({
                   {i.partNumber || '—'}
                 </span>
 
-                <span className={`inv-supplier-cell${i.supplier ? '' : ' is-empty'}`} role="cell" title={i.supplier || undefined}>
-                  {i.supplier || '—'}
+                <span
+                  className={`inv-supplier-cell${supplierLinks[i.id] ? '' : ' is-empty'}`}
+                  role="cell"
+                  title={supplierLinks[i.id]?.suppliers.map((s) => `${s.name} (${s.code})`).join(', ') || undefined}
+                >
+                  {supplierLinks[i.id]?.suppliers.map((s) => s.name).join(', ') || '—'}
                 </span>
 
                 <div className="inv-location" role="cell">
