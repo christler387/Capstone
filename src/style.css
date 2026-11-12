@@ -10224,3 +10224,22 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Filter dropdowns match the filter inputs */
+.sal-field select {
+  height: 38px;
+  min-width: 180px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.sal-field select:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: var(--focus-ring);
+}
