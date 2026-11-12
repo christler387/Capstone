@@ -630,6 +630,7 @@ async function initializeDatabase() {
   }
   await createStockCardTables();
   await createSalesTable();
+  await createReceiptTables();
   await backfillStockLedger();
 }
 
@@ -2606,6 +2607,74 @@ async function createSalesTable() {
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const localDateString = (date) => localDateTimeString(date).slice(0, 10);
 
+/* ------------------------ Sales receipts ------------------------ */
+
+const PAYMENT_METHODS = ["CASH", "GCASH", "BANK_TRANSFER", "CHECK", "CREDIT", "OTHER"];
+const CUSTOMER_TYPES = ["WALK_IN", "REGULAR", "BUSINESS"];
+
+// Receipt header for each completed sale. The receipt number comes from a counter in the database,
+// so it is sequential and is never handed out twice; voided receipts keep their number.
+async function createReceiptTables() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS receipt_sequences (
+    year INT PRIMARY KEY,
+    last_no INT NOT NULL DEFAULT 0
+  ) ${tableOptions}`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    contact VARCHAR(40) NOT NULL DEFAULT '',
+    address VARCHAR(255) NULL,
+    customer_type VARCHAR(16) NOT NULL DEFAULT 'WALK_IN',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_customer_name_contact (name, contact)
+  ) ${tableOptions}`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS sales_receipts (
+    id VARCHAR(64) PRIMARY KEY,
+    receipt_no VARCHAR(20) NOT NULL UNIQUE,
+    receipt_year INT NOT NULL,
+    txn_date DATE NOT NULL,
+    txn_time DATETIME NOT NULL,
+    reference VARCHAR(64) NOT NULL,
+    customer_name VARCHAR(150) NULL,
+    customer_contact VARCHAR(40) NULL,
+    customer_address VARCHAR(255) NULL,
+    customer_type VARCHAR(16) NOT NULL DEFAULT 'WALK_IN',
+    subtotal DECIMAL(14,2) NOT NULL,
+    discount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    other_charges DECIMAL(14,2) NOT NULL DEFAULT 0,
+    total DECIMAL(14,2) NOT NULL,
+    amount_paid DECIMAL(14,2) NOT NULL,
+    balance DECIMAL(14,2) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL DEFAULT 'CASH',
+    payment_status VARCHAR(16) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED',
+    void_reason VARCHAR(255) NULL,
+    voided_by VARCHAR(64) NULL,
+    voided_at DATETIME NULL,
+    recorded_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_receipts_date (txn_date),
+    KEY idx_receipts_status (status),
+    KEY idx_receipts_customer (customer_name)
+  ) ${tableOptions}`);
+
+  await addColumnIfMissing("sales", "part_number", "VARCHAR(100) NULL");
+}
+
+const cleanContact = (value) => cleanText(String(value ?? ""), 40);
+
+// Next receipt number for a year, taken inside the caller's transaction.
+async function nextReceiptNumber(connection, year) {
+  await connection.query("INSERT IGNORE INTO receipt_sequences (year, last_no) VALUES (?, 0)", [year]);
+  const [[seq]] = await connection.query("SELECT last_no FROM receipt_sequences WHERE year=? FOR UPDATE", [year]);
+  const next = Number(seq.last_no) + 1;
+  await connection.query("UPDATE receipt_sequences SET last_no=? WHERE year=?", [next, year]);
+  return `SR-${year}-${String(next).padStart(6, "0")}`;
+}
+
 app.post(
   "/api/sales",
   ah(async (req, res) => {
@@ -2615,7 +2684,11 @@ app.post(
     const body = req.body || {};
     const batchId = cleanText(body.batchId, 64);
     const reference = cleanText(body.reference, 64);
-    const customer = cleanText(body.customer, 150) || null;
+    const customerName = cleanText(body.customer, 120);
+    const customerContact = cleanContact(body.customerContact);
+    const customerAddress = cleanText(body.customerAddress, 255) || null;
+    const customerType = CUSTOMER_TYPES.includes(body.customerType) ? body.customerType : "WALK_IN";
+    const paymentMethod = PAYMENT_METHODS.includes(body.paymentMethod) ? body.paymentMethod : "CASH";
     const rawLines = Array.isArray(body.lines) ? body.lines : [];
     if (!batchId) return res.status(400).json({ error: "Missing sale batch ID." });
     if (!reference) return res.status(400).json({ error: "Enter the invoice or reference number." });
@@ -2636,22 +2709,28 @@ app.post(
         return res.status(400).json({ error: "Enter a selling price above zero for every item." });
       }
     }
+    const discountInput = Number(body.discount) || 0;
+    const otherChargesInput = Number(body.otherCharges) || 0;
+    if (discountInput < 0 || otherChargesInput < 0) {
+      return res.status(400).json({ error: "Discount and other charges cannot be negative." });
+    }
 
     const outcome = await withInventoryLock(async (connection) => {
       await connection.beginTransaction();
       try {
         // The same sale sent twice (for example after a timeout) is recorded once.
-        const [[already]] = await connection.query("SELECT id FROM sales WHERE batch_id=? LIMIT 1", [batchId]);
+        const [[already]] = await connection.query("SELECT receipt_no FROM sales_receipts WHERE id=?", [batchId]);
         if (already) {
           await connection.rollback();
-          return { status: 200, duplicate: true };
+          return { status: 200, duplicate: true, receiptNo: already.receipt_no };
         }
 
+        const now = new Date();
         const saved = [];
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index];
           const [[item]] = await connection.query(
-            "SELECT id, name, price, discount, quantity FROM inventory WHERE id=? FOR UPDATE",
+            "SELECT id, name, part_number, price, discount, quantity FROM inventory WHERE id=? FOR UPDATE",
             [line.itemId],
           );
           if (!item) {
@@ -2663,7 +2742,6 @@ app.post(
             return { status: 400, error: `Only ${item.quantity} unit(s) of ${item.name} are on hand.` };
           }
 
-          const when = new Date();
           // Cost is the purchase price less the supplier discount, the same figure the stock sheet shows.
           const unitCost = round2(Number(item.price) * (1 - Math.min(100, Math.max(0, Number(item.discount) || 0)) / 100));
           const totalSales = round2(line.quantity * line.unitPrice);
@@ -2671,62 +2749,316 @@ app.post(
           const grossProfit = round2(totalSales - totalCost);
           const movementId = `MOV-${crypto.randomUUID()}`;
 
-          // Three records, one transaction: the stock deduction, the stock card line, the sale.
           await connection.query(
             "UPDATE inventory SET quantity = quantity - ?, version = version + 1 WHERE id=?",
             [line.quantity, line.itemId],
           );
           await connection.query(
             "INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, 'OUT', ?, ?, ?)",
-            [movementId, line.itemId, line.quantity, localDateString(when), actor.username],
+            [movementId, line.itemId, line.quantity, localDateString(now), actor.username],
           );
           await recordStockLedger(connection, {
             sourceId: movementId,
             itemId: line.itemId,
             type: "STOCK_OUT",
             reference,
-            description: customer ? `Sale to ${customer}` : "Sale",
+            description: customerName ? `Sale to ${customerName}` : "Sale",
             qtyOut: line.quantity,
             balanceAfter: await currentItemQuantity(connection, line.itemId),
             recordedBy: actor.username,
-            time: when,
+            time: now,
           });
           await connection.query(
-            `INSERT INTO sales (id, batch_id, movement_id, item_id, item_name, quantity, unit_cost, unit_price,
+            `INSERT INTO sales (id, batch_id, movement_id, item_id, item_name, part_number, quantity, unit_cost, unit_price,
                total_cost, total_sales, gross_profit, customer, reference, txn_date, txn_time, recorded_by, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED')`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED')`,
             [
               `${batchId}-${index + 1}`,
               batchId,
               movementId,
               line.itemId,
               item.name,
+              item.part_number || null,
               line.quantity,
               unitCost,
               round2(line.unitPrice),
               totalCost,
               totalSales,
               grossProfit,
-              customer,
+              customerName || null,
               reference,
-              localDateString(when),
-              localDateTimeString(when),
+              localDateString(now),
+              localDateTimeString(now),
               actor.username,
             ],
           );
-          saved.push({ itemId: line.itemId, quantity: line.quantity, totalSales, totalCost, grossProfit });
+          saved.push({ itemId: line.itemId, quantity: line.quantity, unitPrice: round2(line.unitPrice), totalSales, totalCost, grossProfit });
+        }
+
+        // Receipt totals. Discount and other charges are on the receipt; line profit uses the line selling prices.
+        const subtotal = round2(saved.reduce((sum, l) => sum + l.totalSales, 0));
+        const discount = round2(Math.min(discountInput, subtotal));
+        const otherCharges = round2(otherChargesInput);
+        const total = round2(subtotal - discount + otherCharges);
+        const paid = body.amountPaid === "" || body.amountPaid === undefined || body.amountPaid === null
+          ? total
+          : round2(Number(body.amountPaid));
+        if (!Number.isFinite(paid) || paid < 0 || paid > total) {
+          await connection.rollback();
+          return { status: 400, error: "Amount paid must be between zero and the total." };
+        }
+        const balance = round2(total - paid);
+        const paymentStatus = balance === 0 ? "PAID" : paid === 0 ? "UNPAID" : "PARTIAL";
+        const receiptNo = await nextReceiptNumber(connection, now.getFullYear());
+
+        await connection.query(
+          `INSERT INTO sales_receipts (id, receipt_no, receipt_year, txn_date, txn_time, reference, customer_name, customer_contact,
+             customer_address, customer_type, subtotal, discount, other_charges, total, amount_paid, balance, payment_method,
+             payment_status, status, recorded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)`,
+          [
+            batchId, receiptNo, now.getFullYear(), localDateString(now), localDateTimeString(now), reference,
+            customerName || null, customerContact || null, customerAddress, customerType,
+            subtotal, discount, otherCharges, total, paid, balance, paymentMethod, paymentStatus, actor.username,
+          ],
+        );
+        // Remember the customer for future sales. Walk-in customers without a name are not saved.
+        if (customerName) {
+          await connection.query(
+            `INSERT INTO customers (name, contact, address, customer_type) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE address = COALESCE(VALUES(address), address), customer_type = VALUES(customer_type)`,
+            [customerName, customerContact || "", customerAddress, customerType],
+          );
         }
         await connection.commit();
-        return { status: 201, lines: saved };
+        return { status: 201, receiptNo, id: batchId, lines: saved, total, paid, balance, paymentStatus };
       } catch (error) {
         await connection.rollback();
         throw error;
       }
     });
 
-    if (outcome.status === 200 && outcome.duplicate) return res.status(200).json({ duplicate: true });
+    if (outcome.status === 200 && outcome.duplicate) return res.status(200).json({ duplicate: true, receiptNo: outcome.receiptNo });
     if (outcome.status !== 201) return res.status(outcome.status).json({ error: outcome.error });
-    res.status(201).json({ lines: outcome.lines });
+    res.status(201).json({
+      id: outcome.id,
+      receiptNo: outcome.receiptNo,
+      lines: outcome.lines,
+      total: outcome.total,
+      paid: outcome.paid,
+      balance: outcome.balance,
+      paymentStatus: outcome.paymentStatus,
+    });
+  }),
+);
+
+// Receipts list: one row per receipt, with totals taken from its sale lines.
+const RECEIPT_STATUSES = ["COMPLETED", "VOIDED"];
+const PAYMENT_STATUSES = ["PAID", "PARTIAL", "UNPAID"];
+
+app.get(
+  "/api/sales/receipts",
+  ah(async (req, res) => {
+    if (!(await getAuthenticatedUser(req))) return res.status(401).json({ error: "Sign in to view receipts." });
+    const clauses = ["1 = 1"];
+    const params = [];
+    const from = SALES_DATE(req.query.from);
+    const to = SALES_DATE(req.query.to);
+    if (from) { clauses.push("r.txn_date >= ?"); params.push(from); }
+    if (to) { clauses.push("r.txn_date <= ?"); params.push(to); }
+    if (RECEIPT_STATUSES.includes(req.query.status)) { clauses.push("r.status = ?"); params.push(req.query.status); }
+    if (PAYMENT_STATUSES.includes(req.query.payment)) { clauses.push("r.payment_status = ?"); params.push(req.query.payment); }
+    const customer = typeof req.query.customer === "string" ? req.query.customer.trim().slice(0, 120) : "";
+    if (customer) { clauses.push("r.customer_name LIKE ?"); params.push(`%${customer}%`); }
+    const user = typeof req.query.user === "string" ? req.query.user.trim().slice(0, 64) : "";
+    if (user) { clauses.push("r.recorded_by = ?"); params.push(user); }
+    const search = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
+    if (search) {
+      clauses.push("(r.receipt_no LIKE ? OR r.reference LIKE ?)");
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    const [rows] = await pool.query(
+      `SELECT r.id, r.receipt_no, DATE_FORMAT(r.txn_date, '%Y-%m-%d') AS txn_date_str,
+              DATE_FORMAT(r.txn_time, '%Y-%m-%d %H:%i:%s') AS txn_time_str, r.reference, r.customer_name,
+              r.total, r.amount_paid, r.balance, r.payment_status, r.status, r.recorded_by,
+              COUNT(s.id) AS item_count, COALESCE(SUM(s.quantity), 0) AS quantity
+       FROM sales_receipts r
+       LEFT JOIN sales s ON s.batch_id = r.id
+       WHERE ${clauses.join(" AND ")}
+       GROUP BY r.id
+       ORDER BY r.txn_time DESC, r.receipt_no DESC
+       LIMIT 500`,
+      params,
+    );
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        receiptNo: r.receipt_no,
+        date: r.txn_date_str,
+        time: r.txn_time_str,
+        reference: r.reference,
+        customer: r.customer_name || "",
+        itemCount: Number(r.item_count) || 0,
+        quantity: Number(r.quantity) || 0,
+        total: round2(r.total),
+        amountPaid: round2(r.amount_paid),
+        balance: round2(r.balance),
+        paymentStatus: r.payment_status,
+        status: r.status,
+        recordedBy: r.recorded_by || "",
+      })),
+    );
+  }),
+);
+
+// One receipt in full, with the saved item lines. Used for viewing, printing and reprinting.
+app.get(
+  "/api/sales/receipts/:id",
+  ah(async (req, res) => {
+    if (!(await getAuthenticatedUser(req))) return res.status(401).json({ error: "Sign in to view receipts." });
+    const key = cleanText(req.params.id, 64);
+    const [[r]] = await pool.query(
+      `SELECT id, receipt_no, DATE_FORMAT(txn_date, '%Y-%m-%d') AS txn_date_str,
+              DATE_FORMAT(txn_time, '%Y-%m-%d %H:%i:%s') AS txn_time_str, reference, customer_name, customer_contact,
+              customer_address, customer_type, subtotal, discount, other_charges, total, amount_paid, balance,
+              payment_method, payment_status, status, void_reason, voided_by, DATE_FORMAT(voided_at, '%Y-%m-%d %H:%i') AS voided_at_str, recorded_by
+       FROM sales_receipts WHERE id=? OR receipt_no=? LIMIT 1`,
+      [key, key],
+    );
+    if (!r) return res.status(404).json({ error: "Receipt not found." });
+    const [lines] = await pool.query(
+      `SELECT id, item_id, item_name, part_number, quantity, unit_price, total_sales, unit_cost, total_cost, gross_profit
+       FROM sales WHERE batch_id=? ORDER BY id`,
+      [r.id],
+    );
+    res.json({
+      id: r.id,
+      receiptNo: r.receipt_no,
+      date: r.txn_date_str,
+      time: r.txn_time_str,
+      reference: r.reference,
+      customer: {
+        name: r.customer_name || "",
+        contact: r.customer_contact || "",
+        address: r.customer_address || "",
+        type: r.customer_type,
+      },
+      subtotal: round2(r.subtotal),
+      discount: round2(r.discount),
+      otherCharges: round2(r.other_charges),
+      total: round2(r.total),
+      amountPaid: round2(r.amount_paid),
+      balance: round2(r.balance),
+      paymentMethod: r.payment_method,
+      paymentStatus: r.payment_status,
+      status: r.status,
+      voidReason: r.void_reason || "",
+      voidedBy: r.voided_by || "",
+      voidedAt: r.voided_at_str || "",
+      recordedBy: r.recorded_by || "",
+      lines: lines.map((l) => ({
+        id: l.id,
+        itemId: l.item_id,
+        itemName: l.item_name,
+        partNumber: l.part_number || "",
+        quantity: Number(l.quantity) || 0,
+        unitPrice: round2(l.unit_price),
+        amount: round2(l.total_sales),
+      })),
+    });
+  }),
+);
+
+// Voids a receipt. Its stock goes back on the shelf, with a stock card line and a movement, and the
+// reason and the person are recorded. The receipt keeps its number and stays in the list.
+app.post(
+  "/api/sales/receipts/:id/void",
+  ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
+    const reason = cleanText(req.body?.reason, 255);
+    if (!reason) return res.status(400).json({ error: "Enter the reason for voiding this receipt." });
+    const key = cleanText(req.params.id, 64);
+
+    const outcome = await withInventoryLock(async (connection) => {
+      await connection.beginTransaction();
+      try {
+        const [[receipt]] = await connection.query(
+          "SELECT id, receipt_no, status FROM sales_receipts WHERE id=? OR receipt_no=? FOR UPDATE",
+          [key, key],
+        );
+        if (!receipt) {
+          await connection.rollback();
+          return { status: 404, error: "Receipt not found." };
+        }
+        if (receipt.status === "VOIDED") {
+          await connection.rollback();
+          return { status: 409, error: `${receipt.receipt_no} is already voided.` };
+        }
+        const [lines] = await connection.query(
+          "SELECT id, item_id, item_name, quantity, unit_cost, total_sales FROM sales WHERE batch_id=? AND status='COMPLETED' FOR UPDATE",
+          [receipt.id],
+        );
+        const now = new Date();
+        for (const line of lines) {
+          const qty = Number(line.quantity);
+          await connection.query("UPDATE inventory SET quantity = quantity + ?, version = version + 1 WHERE id=?", [qty, line.item_id]);
+          const movementId = `MOV-${crypto.randomUUID()}`;
+          await connection.query(
+            "INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, 'IN', ?, ?, ?)",
+            [movementId, line.item_id, qty, localDateString(now), actor.username],
+          );
+          await recordStockLedger(connection, {
+            sourceId: `VOID-${line.id}`,
+            itemId: line.item_id,
+            type: "INVENTORY_CORRECTION",
+            reference: receipt.receipt_no,
+            description: `Receipt voided: ${reason}`,
+            qtyIn: qty,
+            balanceAfter: await currentItemQuantity(connection, line.item_id),
+            recordedBy: actor.username,
+            time: now,
+          });
+        }
+        await connection.query("UPDATE sales SET status='VOIDED' WHERE batch_id=?", [receipt.id]);
+        await connection.query(
+          "UPDATE sales_receipts SET status='VOIDED', void_reason=?, voided_by=?, voided_at=? WHERE id=?",
+          [reason, actor.username, localDateTimeString(now), receipt.id],
+        );
+        await connection.query(
+          "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, 'QTY', ?, ?)",
+          [
+            `AUDIT-VOID-${crypto.randomUUID()}`,
+            lines[0]?.item_id || "",
+            receipt.receipt_no,
+            JSON.stringify({ receiptNo: receipt.receipt_no, reason, items: lines.length, voided: true }),
+            actor.username,
+          ],
+        );
+        await connection.commit();
+        return { status: 200, receiptNo: receipt.receipt_no };
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
+    });
+
+    if (outcome.status !== 200) return res.status(outcome.status).json({ error: outcome.error });
+    res.json({ receiptNo: outcome.receiptNo, status: "VOIDED" });
+  }),
+);
+
+// Customer names and details already saved, for suggestions while typing.
+app.get(
+  "/api/customers",
+  ah(async (req, res) => {
+    if (!(await getAuthenticatedUser(req))) return res.status(401).json({ error: "Sign in to view customers." });
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 60) : "";
+    const [rows] = await pool.query(
+      "SELECT name, contact, address, customer_type FROM customers WHERE name LIKE ? ORDER BY name LIMIT 20",
+      [`%${q}%`],
+    );
+    res.json(rows.map((r) => ({ name: r.name, contact: r.contact, address: r.address || "", type: r.customer_type })));
   }),
 );
 

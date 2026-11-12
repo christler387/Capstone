@@ -12,6 +12,7 @@ interface StockProps {
   inventory: Item[];
   onAddMovement: (movement: Movement) => Promise<void> | void;
   onAddItem: (rack?: string) => void;
+  onOpenReceipt?: (id: string) => void;
   selectedItemId?: string;
   userRole?: UserRole;
   userName?: string;
@@ -31,6 +32,7 @@ const addLine = (lines: Line[], itemId: string): Line[] =>
   lines.some((line) => line.itemId === itemId) ? lines : [...lines, { itemId, qty: 0 }];
 
 export const Stock: React.FC<StockProps> = ({
+  onOpenReceipt,
   inventory,
   onAddMovement,
   onAddItem,
@@ -48,6 +50,14 @@ export const Stock: React.FC<StockProps> = ({
   // Stock-out details: the invoice number, the customer, and each item's selling price.
   const [saleReference, setSaleReference] = useState('');
   const [saleCustomer, setSaleCustomer] = useState('');
+  const [saleContact, setSaleContact] = useState('');
+  const [saleAddress, setSaleAddress] = useState('');
+  const [saleCustomerType, setSaleCustomerType] = useState('WALK_IN');
+  const [salePaymentMethod, setSalePaymentMethod] = useState('CASH');
+  const [saleAmountPaid, setSaleAmountPaid] = useState('');
+  const [saleDiscount, setSaleDiscount] = useState('');
+  const [saleOtherCharges, setSaleOtherCharges] = useState('');
+  const [lastReceipt, setLastReceipt] = useState<{ id: string; receiptNo: string } | null>(null);
   const [sellPrices, setSellPrices] = useState<Record<string, string>>({});
   // One ID per sale, so a retried save cannot record the same sale twice.
   const saleBatchId = useRef<string | null>(null);
@@ -173,6 +183,8 @@ export const Stock: React.FC<StockProps> = ({
     return { line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit };
   });
   const saleSalesTotal = rows.reduce((sum, row) => sum + row.saleTotal, 0);
+  const saleDiscountValue = Math.min(Number(saleDiscount) || 0, saleSalesTotal);
+  const saleTotalDue = saleSalesTotal - saleDiscountValue + (Number(saleOtherCharges) || 0);
   const saleProfitTotal = rows.reduce((sum, row) => sum + row.saleProfit, 0);
 
   const totalUnits = lines.reduce((sum, line) => sum + line.qty, 0);
@@ -215,12 +227,19 @@ export const Stock: React.FC<StockProps> = ({
     setIsRecording(true);
     setError(null);
     try {
-      await apiRequest('/sales', {
+      const saved = await apiRequest<{ id: string; receiptNo: string }>('/sales', {
         method: 'POST',
         body: JSON.stringify({
           batchId: saleBatchId.current,
           reference: saleReference.trim(),
           customer: saleCustomer.trim(),
+          customerContact: saleContact.trim(),
+          customerAddress: saleAddress.trim(),
+          customerType: saleCustomerType,
+          paymentMethod: salePaymentMethod,
+          amountPaid: saleAmountPaid.trim() === '' ? undefined : Number(saleAmountPaid),
+          discount: Number(saleDiscount) || 0,
+          otherCharges: Number(saleOtherCharges) || 0,
           lines: lines.map((line) => ({ itemId: line.itemId, quantity: line.qty, unitPrice: Number(sellPrices[line.itemId]) })),
         }),
       });
@@ -229,6 +248,12 @@ export const Stock: React.FC<StockProps> = ({
       setSellPrices({});
       setSaleReference('');
       setSaleCustomer('');
+      setSaleContact('');
+      setSaleAddress('');
+      setSaleAmountPaid('');
+      setSaleDiscount('');
+      setSaleOtherCharges('');
+      setLastReceipt({ id: saved.id, receiptNo: saved.receiptNo });
       setIsConfirmOpen(false);
       window.dispatchEvent(new CustomEvent('inventory-changed'));
     } catch (err) {
@@ -378,6 +403,19 @@ export const Stock: React.FC<StockProps> = ({
           </div>
         )}
 
+        {lastReceipt && (
+          <div className="stk-receipt-banner" role="status">
+            <i className="bx bx-receipt" aria-hidden="true"></i>
+            <span>Sale saved. Receipt <strong>{lastReceipt.receiptNo}</strong>.</span>
+            {onOpenReceipt && (
+              <button type="button" className="stk-btn is-ghost" onClick={() => onOpenReceipt(lastReceipt.id)}>View receipt</button>
+            )}
+            <button type="button" className="stk-icon-close" aria-label="Dismiss" onClick={() => setLastReceipt(null)}>
+              <i className="bx bx-x" aria-hidden="true"></i>
+            </button>
+          </div>
+        )}
+
         {!isIn && (
           <div className="stk-sale-fields">
             <label className="stk-sale-field">
@@ -385,8 +423,47 @@ export const Stock: React.FC<StockProps> = ({
               <input value={saleReference} onChange={(e) => setSaleReference(e.target.value)} placeholder="e.g. INV-0001" maxLength={64} />
             </label>
             <label className="stk-sale-field">
-              <span>Customer <em>optional</em></span>
-              <input value={saleCustomer} onChange={(e) => setSaleCustomer(e.target.value)} placeholder="Customer name" maxLength={150} />
+              <span>Customer name <em>optional</em></span>
+              <input value={saleCustomer} onChange={(e) => setSaleCustomer(e.target.value)} placeholder="Walk-in if blank" maxLength={120} />
+            </label>
+            <label className="stk-sale-field">
+              <span>Contact number <em>optional</em></span>
+              <input value={saleContact} onChange={(e) => setSaleContact(e.target.value)} inputMode="tel" maxLength={40} />
+            </label>
+            <label className="stk-sale-field">
+              <span>Customer type</span>
+              <select value={saleCustomerType} onChange={(e) => setSaleCustomerType(e.target.value)}>
+                <option value="WALK_IN">Walk-in</option>
+                <option value="REGULAR">Regular</option>
+                <option value="BUSINESS">Business</option>
+              </select>
+            </label>
+            <label className="stk-sale-field">
+              <span>Address <em>optional</em></span>
+              <input value={saleAddress} onChange={(e) => setSaleAddress(e.target.value)} maxLength={255} />
+            </label>
+            <label className="stk-sale-field">
+              <span>Payment method</span>
+              <select value={salePaymentMethod} onChange={(e) => setSalePaymentMethod(e.target.value)}>
+                <option value="CASH">Cash</option>
+                <option value="GCASH">GCash</option>
+                <option value="BANK_TRANSFER">Bank transfer</option>
+                <option value="CHECK">Check</option>
+                <option value="CREDIT">Credit (on account)</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+            <label className="stk-sale-field">
+              <span>Discount (₱) <em>optional</em></span>
+              <input type="number" min="0" step="0.01" inputMode="decimal" value={saleDiscount} onChange={(e) => setSaleDiscount(e.target.value)} placeholder="0.00" />
+            </label>
+            <label className="stk-sale-field">
+              <span>Other charges (₱) <em>optional</em></span>
+              <input type="number" min="0" step="0.01" inputMode="decimal" value={saleOtherCharges} onChange={(e) => setSaleOtherCharges(e.target.value)} placeholder="0.00" />
+            </label>
+            <label className="stk-sale-field">
+              <span>Amount paid (₱) <em>blank = paid in full</em></span>
+              <input type="number" min="0" step="0.01" inputMode="decimal" value={saleAmountPaid} onChange={(e) => setSaleAmountPaid(e.target.value)} placeholder={saleTotalDue.toFixed(2)} />
             </label>
           </div>
         )}
@@ -533,6 +610,7 @@ export const Stock: React.FC<StockProps> = ({
               <>
                 <span>Sales <strong>{formatPeso(saleSalesTotal)}</strong></span>
                 <span>Gross profit <strong>{formatPeso(saleProfitTotal)}</strong></span>
+                <span>Total due <strong>{formatPeso(saleTotalDue)}</strong></span>
               </>
             )}
             {shortRows.length > 0 && (
