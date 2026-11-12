@@ -316,401 +316,222 @@ const App: React.FC = () => {
 
   const sectionInfo: Record<string, { title: string; description: string }> = {
     dashboard: {
-      title: 'Dashboard Manual',
-      description: `## Summary Bar
-Three headline figures run across the top of the dashboard.
+      title: 'Dashboard guide',
+      description: `## What you see here
+The dashboard is the starting point each day. It shows the state of the warehouse at a glance.
 
-- **Total Items** – The number of distinct items in the system (shown as \`011\`, meaning 11 items). This counts item types, not individual units.
-- **Inventory Value** – The total peso value (₱) of everything in stock. It equals the sum of the Category Prices panel below.
-- **Critical Alerts** – The number of items that need immediate attention (shown in red). It matches the number of entries in the Low Stock Alerts panel.
+- **Total items** – how many different items are on record.
+- **Inventory value** – price multiplied by quantity on hand, across all items.
+- **Low stock** – items at or below their reorder point. The card turns red when there are any.
+- **To reorder** – items that have a suggested order.
 
-## 4. Category Units
-This panel (green top border) shows how many units are in stock for each category:
+## Panels
+- **By category** – stock value or units per category. Use the **Value / Units** switch above the panel.
+- **Needs attention** – the items at or below their reorder point, lowest first. Select an item to open it in Stock.
+- **Summary** – number of categories, total units, the largest category by value, and the average unit value.
+- **Recent activity** – the latest stock movements, newest first, with the quantity in or out.
+- **Reorder plan** – the suggested order quantity for each item (EOQ). Select an item to open it in Stock.
 
-- Body
-- Brakes
-- Electrical
-- Misc
-- Suspension
-- Transmission
-Use it to see which categories hold the most stock and which are thin. The total across categories is your total unit count.
+Lists scroll inside their panel when they are longer than the panel. Counts beside each panel title show how many rows it holds.
 
-## 5. Category Prices
-This panel (purple top border) shows the peso value of the stock held in each category, using the same seven categories. Compare it with Category Units to see where your money is tied up. A category can have many units but low value (for example, Misc), or few units but high value.
-
-## 6. Low Stock Alerts
-This panel (red top border) lists items whose stock has fallen to a level that needs action. Each row shows:
-
-- **Item name** (left)
-- **Current quantity on hand** (right, in red)
-For example, if *Front Fender Panel* shows \`4\`, there are only 4 on hand. When this panel is empty, no items are below their reorder point.
-
-**What to do:** Review each listed item and check the EOQ & ROP Report to see how many to order.
-
-## 7. Recent Audit History
-This panel (yellow top border) is a log of the latest stock changes. Each entry shows:
-
-- **Item name**
-- **Date and time** of the change (for example, "Sep 24, 4:03 PM")
-- **Quantity change** – a red negative number (e.g. \`-5\`) for stock removed, or a green positive number (e.g. \`+10\`) for stock added
-Use this log to confirm that adjustments were recorded correctly and to trace unexpected drops in quantity. If you see entries with placeholder or test-like names, they are likely test records and can be reviewed with your administrator.
-
-## 8. EOQ & ROP Report
-This panel (blue top border) tells you what to buy and how much. Two terms are used:
-
-- **ROP (Reorder Point)** – The stock level at which you should place a new order.
-- **EOQ (Economic Order Quantity)** – The standard, cost-efficient order size for that item.
-Each row shows the item name, its EOQ and ROP values, and a red **BUY** recommendation on the right.
-
-## 9. Daily Routine
-
-1. Open the **Dashboard**.
-2. Check **Critical Alerts** in the summary bar.
-3. Review **Low Stock Alerts** to see which items are running low.
-4. Open the **EOQ & ROP Report** to see how many to order.
-5. Scan **Recent Audit History** for unexpected changes.
-6. Go to **Stock** to record any received or used items, then return to the Dashboard to confirm figures updated.`
+## Daily routine
+1. Check **Low stock** and **Needs attention**.
+2. Open **Reorder plan** and order what is suggested.
+3. Check **Recent activity** for anything unexpected.
+4. Record received or used stock in **Stock**, then come back here to confirm the figures.`
     },
-    
+
     inventory: {
-      title: 'Inventory Manual',
-      description: `## 1. Overview
-The Inventory tab is the master list of every part. Use it to find items, add new ones, edit their details, and remove ones you no longer carry.
+      title: 'Inventory guide',
+      description: `## Finding an item
+Type in the search box to filter by name, item ID, category, barcode, or supplier. Use the barcode button to scan an item's barcode with the camera.
 
-The screen has four areas: the **Inventory Ledger** header with search and the **+ Add Item** button, the **category filter**, the **item table**, and the pop-up forms for adding or editing an item.
+## Adding and editing an item
+Select **Add item** to create one. Each item needs an **Item ID** (filled in automatically), a part name, a category, a quantity, and a price.
 
-## 2. Finding Items
+- The **Item ID** cannot be changed once saved. To make a similar item with a new ID, use **Duplicate**.
+- The **quantity** of a saved item is changed only by **Stock in** and **Stock out**, so the stock card always matches the quantity. The quantity field is locked on saved items.
+- **Price** is the purchase price. **Discount** is the supplier discount in percent. The local cost is calculated from them.
+- A **picture** can be uploaded or given as a web address. Pictures are compressed automatically.
 
-### Search and scan
-The **Search items or scan…** box sits beside the Inventory Ledger title. Type a part name, ID, or barcode to narrow the list. The small scan icon at the right end of the box lets you search by barcode using a camera.
+## Row actions
+- **Stock card** – open the item's full history.
+- **Duplicate** – copy an item under a new ID (recorded in the audit trail).
+- **Locate** – show the item on the warehouse map.
+- **Edit** – change the item's details.
+- **Delete** – removes the item. Staff send deletes for approval, and an admin decides them in **Requests**.
 
-### Category filter
-The chips under the search box filter the table by category:
-
-- **All**
-- **Body**
-- **Brakes**
-- **Electrical**
-- **Engine**
-- **Suspension**
-- **Transmission**
-Click a chip to show only that category. Click **All** to see everything again.
-
-### Sorting
-The **Part Name** column header has a small arrow. Click it to change the sort order of the list.
-
-## 3. Reading the Item Table
-Each row is one item. The columns are:
-
-| Column | What it shows |
-| **Img** | Thumbnail photo of the part. A gray box means no image has been added. |
-| **Part Name** | The part's name. Underneath: the vehicles it fits (in green), the item **ID**, and its barcode (**BC**). Several items can share a name or a barcode; each one still has its own ID. |
-| **Category** | Which category the part belongs to. |
-| **Location** | Rack code (for example H-03) and shelf level (for example Level: L1). |
-| **Qty** | Units currently in stock. |
-| **Reorder Qty** | How many units to reorder. Shows 00 when no reorder is needed. |
-| **Item ID** | The item's ID number. |
-| **UOM** | Unit of measure, for example PCS. |
-| **Discount** | Supplier discount in percent. |
-| **Purch. cost** | Purchase cost per unit in pesos (₱), before discount. |
-| **Local cost** | Cost per unit after discount: purchase cost less the discount. |
-| **Total** | Quantity × local cost. |
-| **Actions** | The trash icon, used to delete the item. |
-
-### Red numbers
-When **Qty** and **Reorder Qty** appear in red, the item is low on stock. These match the BUY figures in the Dashboard's EOQ & ROP Reorder Report and the entries in Low Stock Alerts.
-
-## 4. Adding a New Item (ADMIN)
-
-1. Click **+ Add Item** (top right).
-2. The **Add New Item** form opens. The **Item ID** is filled in automatically with the next number (for example 014).
-3. Fill in the fields described in section 6. Fields marked with a red asterisk (*) are required.
-4. Click **Save Item**, or **Cancel** to close the form without saving.
-Some fields start with default values: Category is Body, Ordering Cost is 100, Holding Cost / Year is 0, and Lead Time is 7 days. Change these to match the real part.
-
-## 5. Editing an Item (ADMIN)
-
-1. Open the item from the table. The **Edit Item** form opens, titled with the item's ID (for example, Edit Item: 008).
-2. Change the fields you need. The form scrolls, so keep going down to reach every field.
-3. Click **Save Item** to apply your changes, or **Cancel** (or the **X** at the top right) to close without saving.
-
-## 6. Item Form Fields
-The Add and Edit forms share the same fields.
-
-### Identification
-
-- **Item ID*** – A unique number for the item (for example 008).
-- **Part Identification*** – The part's name (for example, 120A High Output Alternator).
-- **Barcode** – The barcode number printed on the part or shelf. You can use it later to find the item with the scanner.
-- **Category*** – Choose from the drop-down list.
-
-### Replenishment Settings*
-These values control when and how much to reorder.
-
-- **Ordering Cost (₱)*** – The cost of placing one order with your supplier.
-- **Holding Cost / Year (₱)*** – The yearly cost of keeping one unit in storage.
-- **Lead Time (days)*** – How many days a delivery takes after you order.
-- **Safety Stock*** – Extra units to keep on hand as a buffer.
-
-### Handling and demand
-
-- **Size** – Drop-down (for example, Medium).
-- **Weight** – Drop-down (for example, Heavy).
-- **Demand** – Drop-down for how quickly the part sells (for example, LOW).
-
-### Storage
-
-- **Rack Location** – The rack code (for example, H-03).
-- **Level** – The shelf level on that rack (for example, L1 (Bottom)).
-
-### Stock and price
-
-- **Quantity*** – Units in stock now.
-- **Price (₱)*** – Purchase cost per unit in pesos, before discount.
-- **Discount (%)** – Supplier discount. Local cost is the price less this discount.
-
-### Image
-Add a photo in one of two ways:
-
-- Click **Choose File** to upload an image from your device.
-- Paste an image web address (URL) into the box below it.
-
-### Compatible Vehicles
-Type the vehicles the part fits (for example, Toyota Fortuner). This text appears under the part name in the table.
-
-## 7. Scanning a Barcode
-When you start a scan, a camera panel opens with a white frame in the middle.
-
-1. Allow the browser to use your camera if asked.
-2. Under **Select Camera**, choose the camera you want from the drop-down (the screen shows how many cameras were found, for example 3).
-3. Hold the barcode inside the white frame until it is read.
-4. Click **Stop Scanning** when you are done to turn the camera off.
-For best results, use good lighting and keep the barcode steady and flat.
-
-## 8. Deleting an Item (ADMIN)
-Click the red trash icon in the **Actions** column to remove an item. Deleting cannot be assumed to be reversible, so check that you have the right row first.
-
-## 9. Locate (STAFF)
-Click the button in the **Locate** column of the item you want to find in the warehouse map.`
+## Staff and admins
+Staff can add and edit items. Price and discount changes are recorded on the stock card and in the audit trail; a staff member's price change is approved automatically.`
     },
 
     stock: {
-      title: 'Stock Manual',
-      description: `## 1. Overview
-The Stock tab is where you update quantities after parts are received or used. It has two sub-tabs at the top left:
+      title: 'Stock guide',
+      description: `## Stock in and Stock out
+Use the two tabs at the top of the page.
 
-- **Stock In** – add units to an item (deliveries, returns, restocking).
-- **Stock Out** – deduct units from an item (sales, installs, damaged or lost parts).
-The active sub-tab is underlined. Each one is a short form with a **Scan Barcode** button at the top right of the card.
+- **Stock in** – units received from a supplier.
+- **Stock out** – units that left the warehouse as a sale.
 
-## 2. Recording Stock In
-Use this when new units arrive.
+## Recording a sheet
+1. Type an item name or ID in the search box and pick it. If the item does not exist yet, pick **Add a new item** (Stock in only).
+2. Enter the **quantity** for each line. On Stock in, you can also enter the **cost** of the line.
+3. Enter the **invoice number**. Every line needs one.
+4. On Stock in, choose the **supplier** if you know it.
+5. Select **Record stock in** (or **Record sale** on Stock out), then **Confirm**. Each line updates the item's quantity and appears on its stock card.
 
-1. Open the **Stock** tab, then select **Stock In**.
-2. Find the item under **Select Item to Restock**. Type the item's ID or name in the search box, or click **Scan Barcode** (see section 4).
-3. Check that **Item Name** and **Category** show the part you meant. These fields fill in once an item is chosen.
-4. Enter the **Rack Location** where the units are being stored (for example, A1). Leave it as the item's current location unless the units are going to a new rack.
-5. Enter **Quantity to Add**. This field is required.
-6. Click **Record Stock In** (the dark blue button).
-The item's quantity goes up by the amount you entered.
+## Stock out and sales
+Stock out sheets are sales. Enter the selling price for each line. The sale is kept with its cost, so the profit can be reported later in **Sales**.
 
-## 3. Recording Stock Out
-Use this when units leave the warehouse.
+## Mistakes
+Do not try to correct a quantity on the item. Use **Stock in history** to undo or edit a line, or **Sales** to undo a sale. Staff send these changes for approval.`
+    },
 
-1. Open the **Stock** tab, then select **Stock Out**.
-2. Find the item under **Select Item to Deduct**. Type the item's ID or name, or click **Scan Barcode**.
-3. Check that **Item Name** and **Category** show the right part.
-4. Enter **Quantity to Deduct**. This field is required.
-5. Click **Record Stock Out** (the red button).
-The item's quantity goes down by the amount you entered. Stock Out has no Rack Location field, because units are taken from where the item is already stored.
+    'stock-card': {
+      title: 'Stock card guide',
+      description: `## What the stock card shows
+The stock card is the full record of one item, from its first entry to today.
 
-## 4. Scanning a Barcode
-Instead of typing, you can select an item by scanning its barcode.
+- **Summary** – beginning balance, total in, total out, adjustments, and the balance on hand.
+- **Rows** – every change, oldest first, with the date, the type, the reference, the quantity in or out, the balance after the change, and who recorded it.
 
-1. Click **Scan Barcode** at the top right of the form.
-2. Allow the browser to use your camera if asked.
-3. If you have more than one camera, choose the one you want under **Select Camera**.
-4. Hold the barcode inside the white frame until it is read. The item's details then fill in.
-5. Click **Stop Scanning** to turn the camera off if it is still running.
-Use good lighting and keep the barcode flat and steady.`
+## Entry types
+- **Beginning balance** – the first quantity when the item was recorded.
+- **Stock in** and **Stock out** – normal receipts and issues.
+- **Stock adjustment** – a change made by an earlier quantity edit.
+- **Inventory correction** – an undo or a deleted movement.
+- **Price change** – a change to the price or discount. Quantity does not change.
+
+## Supplier information
+The panel lists the suppliers linked to the item, with each supplier's own item code and purchase price. Use **Use as Item ID** to copy a supplier code into the item.
+
+## Tips
+Use the filters to narrow the rows by date or type. The running balance always matches the quantity shown on the item.`
+    },
+
+    'stock-in-history': {
+      title: 'Stock in history guide',
+      description: `## Invoices
+Each stock-in invoice is listed once, with its date, supplier, number of items, total units, and who recorded it. Select an invoice to see its lines.
+
+## Filtering
+- Use the date presets (for example, Today or This month) or pick **From** and **To** dates.
+- Filter by **Supplier**, **Item**, **Recorded by**, or type in **Search** for an invoice number.
+- The totals line below the filters shows the figures for what you are looking at.
+
+## Inside an invoice
+- Each line shows the item, quantity, time, and who recorded it.
+- **Edit** – change the quantity of the line. The stock is adjusted by the difference.
+- **Undo** – reverse part or all of a line. The units are taken back out and recorded on the stock card.
+- **Delete** – remove the line and take its stock back out.
+- **Add items to this invoice** – open **Stock** with the same invoice number, to add more lines.
+- **Delete invoice** – remove every line on the invoice.
+
+## Approvals
+Admins make these changes at once. Staff send them for approval; the request appears in **Requests**, and nothing changes until an admin approves it.`
+    },
+
+    sales: {
+      title: 'Sales guide',
+      description: `## Sales and profit
+Sales are walk-in sales recorded in **Stock** as stock out. Each sale keeps its selling price and its cost, so profit is exact.
+
+- **Gross profit** = selling price minus cost.
+- **Margin** = gross profit divided by sales.
+
+## Summary cards
+Sales today, gross profit today, sales this month and this year, with the change against yesterday.
+
+## Sales report
+Choose **Daily**, **Monthly**, or **Annually**, and a date range. The table shows units, sales, cost of goods, and gross profit for each period, with a bar chart.
+
+## Best-selling items
+The items with the most units sold in the chosen range, with their sales and gross profit.
+
+## Sales history
+- Every sale line, newest first, with its invoice number, item, quantity, prices, cost, profit, and who recorded it.
+- Filter by date, item, user, or search for an invoice number.
+- **Export to Excel (CSV)** downloads the rows shown.
+- **Undo** returns the stock to the warehouse and marks the sale as undone. Undone sales stay in the list, marked **Undone**, and are not counted in the totals.
+
+## Approvals
+Admins undo sales at once. Staff send the undo for approval in **Requests**.
+
+## Old sales
+Stock-out records from before sales tracking have no selling price. They are counted separately and are not treated as zero profit.`
+    },
+
+    suppliers: {
+      title: 'Supplier guide',
+      description: `## Suppliers
+Each supplier has a code (for example SUP-0001), contact details, an address, notes, and a status: **Active** or **Inactive**. Only active suppliers can be chosen on a stock-in sheet.
+
+## Linking items
+- Open a supplier and choose **Link item** to connect it to an inventory item.
+- Each item belongs to **one supplier**. An item that is already linked cannot be linked to another supplier.
+- Each link has the supplier's own **item code** and its **purchase price**. A code can be used only once for each supplier.
+- Use **Edit link** to change the code, price, or notes. The item ID stays the same.
+
+## Working with the list
+Search by supplier name, code, or contact. Select a supplier to see its linked items. The item list scrolls when it is longer than the panel.`
     },
 
     warehouse: {
-      title: 'Warehouse Map Manual',
-      description: `## 1. Overview
-The Warehouse Map tab shows the physical layout of the warehouse. Use it to see which aisles and racks hold stock, spot racks that need attention, inspect what sits on each shelf level, and check whether the layout suits demand.
+      title: 'Warehouse map guide',
+      description: `## Reading the map
+The map shows each floor of the warehouse, with its aisles, racks, and levels. Every rack shows the items stored on it.
 
-The screen has these parts:
+- Use the floor tabs to switch floors.
+- Select a rack to see its items and quantities.
+- **Locate** on the inventory list opens this map at the item's rack.
 
-- the **floor tabs** (one tab for each floor, such as Floor 1)
-- the **aisle map** for the selected floor
-- the **Rack Inspection** pop-up for a single rack
-- the **Warehouse Layout Optimizer** with Aisle Density Analytics
+## Making changes
+Admins can change the layout: add or rename floors, aisles, and racks, and move items to other racks. Staff can view the map and locate items.
 
-## 2. The Aisle Map
-The map shows the aisles of the floor whose tab is selected. Each aisle has a name (for example, **Aisle A**) and a category label with its own color, such as **High Demand Only**, **Body & Brakes**, **Electrical & Engine**, **Suspension & Transmission**, or **Misc**. Each aisle has one or more racks, numbered **Rack 1**, **Rack 2**, and so on. An aisle can run **portrait** (racks stacked top to bottom) or **landscape** (racks in a row).
+## Tips
+Keep the rack labels on the shelves identical to the rack names on the map. When an item moves, update its rack in its item details so the map stays correct.`
+    },
 
-**Floors**
-- Click a tab to show that floor. The tab shows how many aisles are on it. The floor you last selected is remembered on this computer.
-- Administrators can add a floor with **+ Add Floor**, and rename or delete one from the ⋯ menu on its tab. A floor can only be deleted when its racks hold no items, and the warehouse always keeps at least one floor.
+    requests: {
+      title: 'Requests guide',
+      description: `## What a request is
+Some changes by staff need approval before they take effect. They are listed in **Requests**, which opens as a pop-out from your profile menu.
 
-**Adding an aisle (administrators)**
-- Click **+ Add Aisle to [floor]**. The next free letter is suggested. Names must be unique across all floors.
-- Pick an existing category (it keeps its color), or choose **Create new category** and pick a color.
-- Choose Portrait or Landscape, and the number of racks (1 to 10, default 3).
+## Types of request
+- **Edit quantity** – a stock-in line quantity.
+- **Delete line** and **Delete invoice** – stock-in lines and invoices.
+- **Undo stock in** and **Undo sale** – a partial or full undo.
+- **Delete item** and **Delete movement**.
+- **Price change** – these are approved automatically and kept for the audit trail.
 
-**Edit Layout (administrators)**
-- Click **Edit Layout** to change the layout. Each aisle then shows a toolbar with a drag handle, rotate, a rack count (− and +), the aisle name, a floor selector, and delete.
-- Drag an aisle onto an empty spot to move it. Aisles snap to the grid and cannot overlap.
-- Nothing is saved until you click **Save Layout**. **Cancel** throws the changes away, after a confirmation.
-- Removing a rack that holds items asks you to choose the rack to move them to. The items are moved right away.
-- An aisle that holds items cannot be renamed or deleted until its items are moved.
+## Deciding a request (admins)
+- **Pending** lists the requests waiting for a decision.
+- **Approve** makes the change at once.
+- **Reject** asks for a reason, which is kept with the request. Nothing changes.
 
-Staff see the same map, but cannot change the layout.
+## The audit trail
+Every request and its decision stays in **Audit trail**, with who asked, who decided, when, and any note. Filter by status or search by invoice, item, or requester.
 
-A rack's code combines its aisle and rack number. For example, **B-02** is Aisle B, Rack 2. The same code appears in the **Location** column on the Inventory tab and in the **Rack Location** field of an item.
-
-### Red dots
-A small red dot on a rack means it holds an item that needs attention. Racks without a dot have no flagged items.
-
-## 3. Inspecting a Rack
-
-1. On the aisle map, click the rack you want to look at.
-2. The **Rack Inspection** pop-up opens. Its subtitle shows the rack code (for example, Cell Ident: B-R02), and the heading inside shows the aisle and rack (for example, Aisle B-02).
-3. Read the shelf levels, listed from top to bottom as **L4, L3, L2, L1**. L1 is the bottom shelf.
-
-### Reading the shelves
-
-- A level with a solid outline holds one or more items. Each item appears as a white tile with its part name.
-- A level with a dashed outline is empty.
-- A red dot on an item tile means that item is low on stock.
-In the sample, rack B-02 has Ceramic Brake Pads (Set) on level L2, with a red dot, and the other three levels are empty.
-
-## 4. Warehouse Layout Optimizer
-This section sits below the map. It helps you decide whether fast-selling parts are stored in the best places, with high-demand parts in the High Demand aisles and at the front slots.
-
-### Aisle Density Analytics
-This panel lists the aisles of the selected floor. Use the **This floor / All floors** switch at the top of the panel to include every floor. For each aisle you see:
-
-- the aisle name and, in brackets, the number of items stored there (for example, Aisle F (3))
-- a status tag (the sample shows **Optimal** for every aisle)
-- a bar and a percentage showing how full the aisle is (the sample ranges from 0% to 6%)
-Use it to find crowded aisles and aisles with free space. The item counts add up to your Total Items on the Dashboard.
-
-### Analyze and optimize
-
-1. Click **Analyze & Optimize Layout**.
-2. The **Demand-Based Layout Optimizer** pop-up opens. It states how many items are recommended for relocation.
-3. Review the table of recommendations. It lists each item and its category with its demand level, its **Current** location, and its **Optimized** (suggested) location.
-4. Click **Apply Relocations** to accept the suggested moves. The number in brackets is how many moves will be applied.
-5. Click **Discard** to close the pop-up without changing anything.
-When no changes are needed, the pop-up shows "0 items recommended for demand-based relocation" and an empty table, as in the sample. In that case there is nothing to apply.
-
-**Before you apply:** relocations change where items are recorded. Move the physical stock to match, so the map and the shelves agree.`
+## Staff
+Staff see only their own requests, with their status. Nothing changes until an admin approves it.`
     },
 
     user: {
-      title: 'User Manual',
-      description: `## 1. Overview
-The User tab is split into two panels:
+      title: 'Profile guide',
+      description: `## Your account
+- **Change username** and **Change password** – you will need your current password.
+- **Recovery email** – used for password reset codes.
+- **Requests** – opens the approval list as a pop-out, with no second sign-in.
 
-- **Active Session Profile** (left) – shows who is signed in and holds the account buttons.
-- **Session Audit History** (right) – a log of stock changes and item changes, with an **Undo** option on each entry.
+## Administration (admins only)
+- **Add new user** – create a staff or admin login.
+- **Manage accounts** – change roles and remove accounts.
 
-## 2. Active Session Profile
-The left panel shows your avatar, your username, and your role. Five buttons sit at the bottom:
+Staff cannot add or delete accounts.
 
-What it does
-
-**Change Username** - Rename your own account.
-
-**Change Password** - Set a new password for your own account.
-
-**Add New User** - Create an account for another person.
-
-**Manage Accounts** - Edit or delete other Staff and Admin accounts.
-
-**Log Out Operator** - Sign out of Skyrun (red button).
-
-Change Username, Change Password, Add New User and Manage Accounts are shown on an Admin account. Staff accounts may not see them. Admins can manage other Admin accounts as well as Staff accounts.
-
-## 3. Changing Your Username (ADMIN)
-
-1. Click **Change Username**.
-2. In **New Username**, type the name you want. The box starts with your current name.
-3. Enter your **Current Password** to confirm it is you.
-4. Click **Save**, or **Cancel** to close without changing anything.
-The new name appears in your profile and next to your future entries in the audit history.
-
-## 4. Changing Your Password (ADMIN)
-
-1. Click **Change Password**.
-2. Enter your **Current Password**.
-3. Enter your **New Password**.
-4. Enter it again under **Confirm Password**. Both entries must match.
-5. Click **Save**, or **Cancel** to close.
-
-## 5. Adding a New User (ADMIN)
-
-1. Click **Add New User**.
-2. Enter a **Username** for the person.
-3. Enter a **Password** for them.
-4. Choose a **Role** from the drop-down.
-5. Click **Create**, or **Cancel** to close.
-
-## 6. Managing Accounts (ADMIN)
-
-1. Sign in with an Admin account and open the **User** tab.
-2. Click **Manage Accounts**. The **Manage User Accounts** pop-up lists other accounts, including both Staff and Admin accounts, with each account's username and role.
-3. Use the buttons on each row:
-- **Edit** opens the row for editing (see below).
-- **Delete** (red) removes the account.
-
-### Editing an account
-1. Click **Edit** beside the account. The row turns into a form with these fields:
-
-- the **username**
-- the **role** drop-down (**Staff** or **Admin**)
-- a **New password** box
-2. Change the username or role as needed. To reset the password, enter a new password; leave that field blank to keep the existing password.
-3. Click **Save** to apply the changes, or **Cancel** to discard them.
-
-### Deleting an account
-1. Click **Delete** beside the account and confirm the prompt.
-2. That account will no longer be able to sign in.
-
-You cannot manage or delete your own account from this list. You also cannot demote or delete the last remaining Admin account, so the system always retains an administrator. Confirm the username and role before saving or deleting an account.
-
-## 7. Session Audit History
-The right panel logs changes made in the system. The number in brackets in the title is the total number of entries.
-
-### Filtering and searching
-
-- **All** shows every entry.
-- **Stock In** shows only items added to stock.
-- **Stock Out** shows only items taken out.
-- The search box (**Search audit entries by item name or ID…**) narrows the list to entries that match an item's name or ID.
-The counts on the filters do not add up to the total in the sample, because the list also holds other entries, such as items being added or deleted.
-
-### Reading an entry
-Each entry shows:
-
-- the **item name**, with a colored tag for the type of action: **IN** (green), **OUT** (red), **ADD** (green), or **DELETE** (red)
-- the item **ID** and who made the change (**By:** username)
-- the **quantity change**: a green **+** number for stock in, a red **-** number for stock out, or the word ADD or DELETE for item changes
-- the **date and time**
-- an **Undo** button
-The newest entries are at the top. The Dashboard's Recent Audit History shows the latest of these same entries.
-
-### Undoing an entry
-Use **Undo** to reverse a mistake, such as a wrong quantity or an item deleted by accident.
-
-1. Find the entry, using the filters or search if needed.
-2. Click **Undo**. For a stock entry, a small box appears showing a quantity (for example, 10) with **Confirm** and **Cancel** buttons.
-3. Check the quantity. Change it if you only want to reverse part of the entry.
-4. Click **Confirm** to apply the undo, or **Cancel** to keep things as they are.
-After an undo, check the **Qty** on the Inventory tab to make sure the number is what you expect.`
-    }
+## Signing out
+Use **Log out** at the bottom of the profile menu when you finish, especially on a shared computer.`
+    },
   };
 
   const handleGoToStock = (id: string) => {
