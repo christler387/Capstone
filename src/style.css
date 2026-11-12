@@ -6269,6 +6269,13 @@ input[type='date']:focus, select:focus, textarea:focus {
   border-top: 1px solid var(--line-soft);
 }
 
+/* Recent activity and Reorder plan keep the same height and scroll inside their cards. */
+.dash2-pair .dash2-list {
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .dash2-row-button,
 .dash2-row-static {
   display: flex;
