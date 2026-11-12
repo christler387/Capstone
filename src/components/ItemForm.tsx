@@ -124,6 +124,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   const [imageFileName, setImageFileName] = useState(() =>
     getImageFileName(item?.image),
   );
+  // A saved item's quantity changes only through stock in and stock out.
+  const isExistingItem = item?.version !== undefined;
   const [formData, setFormData] = useState<ItemFormData>({
     id: "",
     name: "",
@@ -736,9 +738,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             value={formData.quantity}
             onChange={handleChange}
             min="0"
-            disabled={readOnly}
-            required
+            disabled={readOnly || isExistingItem}
+            required={!isExistingItem}
           />
+          {isExistingItem && (
+            <span style={{ display: 'block', marginTop: 4, fontSize: '0.75rem', color: 'var(--ink-faint)' }}>
+              Changed only by stock in or stock out
+            </span>
+          )}
         </div>
 
         <div className="form-group">

@@ -1761,7 +1761,6 @@ app.put(
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const actorName = actor.username;
-    const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
 
     const outcome = await withInventoryLock(async (connection) => {
       await connection.beginTransaction();
@@ -1781,36 +1780,13 @@ app.put(
             error: "Someone else changed this item while you were editing it. Close the form, open the item again and make your change.",
           };
         }
+        // Quantity changes only through stock in and stock out, so the saved quantity is kept here.
+        item.quantity = current.quantity;
+        const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
         await connection.query(
           `UPDATE inventory SET name=?, category=?, barcode=?, quantity=?, price=?, rack=?, level=?, size=?, weight=?, demand=?, compatible_vehicles=?, image=?, ordering_cost=?, holding_cost=?, lead_time_days=?, safety_stock=?, discount=?, ${ITEM_DESCRIPTOR_COLUMNS.map((column) => `${column}=?`).join(", ")}, version = version + 1 WHERE id=?`,
           [...values, itemId],
         );
-        const oldQuantity = Number(current.quantity);
-        const newQuantity = Number(item.quantity) || 0;
-        if (newQuantity !== oldQuantity) {
-          await recordStockLedger(connection, {
-            sourceId: `ADJ-${crypto.randomUUID()}`,
-            itemId,
-            type: "STOCK_ADJUSTMENT",
-            reference: `ADJ-${Date.now().toString().slice(-8)}`,
-            description: `Quantity changed from ${oldQuantity} to ${newQuantity}`,
-            qtyIn: Math.max(0, newQuantity - oldQuantity),
-            qtyOut: Math.max(0, oldQuantity - newQuantity),
-            balanceAfter: newQuantity,
-            recordedBy: actorName,
-          });
-          await connection.query(
-            "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-            [
-              `AUDIT-QTY-${crypto.randomUUID()}`,
-              itemId,
-              item.name,
-              "QTY",
-              JSON.stringify({ oldQuantity, newQuantity, delta: newQuantity - oldQuantity }),
-              actorName,
-            ],
-          );
-        }
         const oldPrice = round2(Number(current.price));
         const newPrice = round2(Number(item.price) || 0);
         const oldDiscount = Number(current.discount) || 0;
