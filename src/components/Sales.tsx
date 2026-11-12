@@ -1,3 +1,4 @@
+import { askConfirm } from './AppDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserRole } from '../types';
 import { apiRequest } from '../apiClient';
@@ -146,8 +147,8 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
 
   // Undo returns the stock and marks the sale undone. Staff send it for approval.
   const undoSale = async (sale: SaleRecord) => {
-    if (!window.confirm(`Undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}? The stock goes back on hand.`)) return;
-    const reason = userRole === 'admin' ? '' : askReason(`undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}`);
+    if (!(await askConfirm(`Undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}? The stock goes back on hand.`))) return;
+    const reason = userRole === 'admin' ? '' : await askReason(`undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}`);
     if (reason === null) return;
     setError(null);
     setHistoryInfo(null);

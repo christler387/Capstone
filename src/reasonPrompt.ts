@@ -1,12 +1,12 @@
-// Asks for the note that goes with a request for approval.
-// Returns null when the person cancels or the note is too short.
-export const askReason = (action: string): string | null => {
-  const answer = window.prompt(`Why do you want to ${action}? The approver will see this note.`);
-  if (answer === null) return null;
-  const note = answer.trim();
-  if (note.length < 3) {
-    window.alert('Please write a short note explaining why (at least 3 characters).');
-    return null;
-  }
-  return note;
-};
+import { askText } from './components/AppDialog';
+
+// Asks for the note that goes with a request for approval. Resolves to null when cancelled.
+export const askReason = (action: string): Promise<string | null> =>
+  askText(`Why do you want to ${action}? The approver will see this note.`, '', {
+    title: 'Add a note',
+    label: 'Your note',
+    multiline: true,
+    minLength: 3,
+    placeholder: 'For example: the supplier sent a different count',
+    confirmLabel: 'Send for approval',
+  });

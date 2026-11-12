@@ -1,3 +1,4 @@
+import { askConfirm, askText } from './AppDialog';
 import { askReason } from '../reasonPrompt';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -295,7 +296,7 @@ const InvoiceModal: React.FC<{
       setError('Quantity must be a whole number of at least 1.');
       return;
     }
-    const reason = iAmAdmin ? '' : askReason(`change this line from ${line.qty} to ${qty}`);
+    const reason = iAmAdmin ? '' : await askReason(`change this line from ${line.qty} to ${qty}`);
     if (reason === null) return;
     try {
       const result = await apiRequest<{ requested?: boolean }>(`/stock-in/lines/${encodeURIComponent(line.id)}`, {
@@ -318,8 +319,8 @@ const InvoiceModal: React.FC<{
 
   // Admins only: removes the line and takes its stock back out.
   const deleteLine = async (line: InvoiceLine) => {
-    if (!window.confirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`)) return;
-    const reason = iAmAdmin ? '' : askReason(`delete ${line.qty} ${line.itemName} from this invoice`);
+    if (!(await askConfirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`))) return;
+    const reason = iAmAdmin ? '' : await askReason(`delete ${line.qty} ${line.itemName} from this invoice`);
     if (reason === null) return;
     setError(null);
     try {
@@ -341,14 +342,14 @@ const InvoiceModal: React.FC<{
 
   // Undo reverses part or all of a line's stock and keeps it on the stock card. Staff send it for approval.
   const undoLine = async (line: InvoiceLine) => {
-    const answer = window.prompt(`Units of ${line.itemName} to undo (1 to ${line.qty}):`, String(line.qty));
+    const answer = (await askText(`Units of ${line.itemName} to undo (1 to ${line.qty}):`, String(line.qty)));
     if (answer === null) return;
     const qty = Number(answer);
     if (!Number.isInteger(qty) || qty < 1 || qty > line.qty) {
       setError(`Enter a whole number from 1 to ${line.qty}.`);
       return;
     }
-    const reason = iAmAdmin ? '' : askReason(`undo ${qty} ${line.itemName}`);
+    const reason = iAmAdmin ? '' : await askReason(`undo ${qty} ${line.itemName}`);
     if (reason === null) return;
     setError(null);
     setInfo(null);
@@ -371,7 +372,7 @@ const InvoiceModal: React.FC<{
 
   // Changes the invoice number of this invoice. Staff send it for approval; admins make it at once.
   const renameInvoice = async () => {
-    const answer = window.prompt('New invoice number:', reference);
+    const answer = (await askText('New invoice number:', reference));
     if (answer === null) return;
     const newRef = answer.trim();
     if (!newRef) {
@@ -379,7 +380,7 @@ const InvoiceModal: React.FC<{
       return;
     }
     if (newRef === reference) return;
-    const reason = iAmAdmin ? '' : askReason(`change invoice ${invoiceLabel(reference)} to ${newRef}`);
+    const reason = iAmAdmin ? '' : await askReason(`change invoice ${invoiceLabel(reference)} to ${newRef}`);
     if (reason === null) return;
     setError(null);
     setInfo(null);
@@ -402,8 +403,8 @@ const InvoiceModal: React.FC<{
 
   // Admins only: removes every line on the invoice.
   const deleteInvoice = async () => {
-    if (!window.confirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`)) return;
-    const reason = iAmAdmin ? '' : askReason(`delete invoice ${invoiceLabel(reference)}`);
+    if (!(await askConfirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`))) return;
+    const reason = iAmAdmin ? '' : await askReason(`delete invoice ${invoiceLabel(reference)}`);
     if (reason === null) return;
     setError(null);
     try {

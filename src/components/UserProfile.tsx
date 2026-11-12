@@ -1,3 +1,4 @@
+import { askConfirm } from './AppDialog';
 import React, { useState } from "react";
 import { UserRole } from "../types";
 import { RecoveryEmailDialog } from "./RecoveryEmailDialog";
@@ -192,7 +193,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   };
 
   const deleteManagedUser = async (account: ManagedUser) => {
-    if (!window.confirm(`Delete ${account.username}?`)) return;
+    if (!(await askConfirm(`Delete ${account.username}?`))) return;
     try {
       await requestUserApi(`/users/${account.id}`, {
         method: "DELETE",

@@ -1,3 +1,4 @@
+import { askConfirm, askNotice } from './AppDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { getRop } from '../inventoryMetrics';
@@ -156,7 +157,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
 
   const useCodeAsItemId = async (link: ItemSupplier) => {
     if (!selectedItemId) return;
-    if (!window.confirm(`Change the Item ID from ${selectedItemId} to ${link.supplierItemCode}? All stock history moves with it.`)) return;
+    if (!(await askConfirm(`Change the Item ID from ${selectedItemId} to ${link.supplierItemCode}? All stock history moves with it.`))) return;
     try {
       const result = await apiRequest<{ id: string }>(`/items/${encodeURIComponent(selectedItemId)}/use-supplier-code`, {
         method: 'POST',
@@ -192,7 +193,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
           method: 'POST',
           body: JSON.stringify({ itemId: selectedItemId, supplierItemCode: code }),
         });
-        if (saved.note) window.alert(saved.note);
+        if (saved.note) (await askNotice(saved.note));
         if (saved.renamed) {
           setIsLinkOpen(false);
           onItemRenamed?.(selectedItemId, saved.itemId);
@@ -211,7 +212,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
   };
 
   const removeLink = async (link: ItemSupplier) => {
-    if (!window.confirm(`Remove ${link.supplierName} from this item? The item and its stock card stay.`)) return;
+    if (!(await askConfirm(`Remove ${link.supplierName} from this item? The item and its stock card stay.`))) return;
     try {
       await apiRequest(`/supplier-items/${link.id}`, { method: 'DELETE' });
       loadLinks();

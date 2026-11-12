@@ -1,3 +1,4 @@
+import { askConfirm, askText } from './AppDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../apiClient';
 
@@ -71,11 +72,11 @@ export const ChangeRequestsPage: React.FC = () => {
     setError(null);
     try {
       if (approve) {
-        if (!window.confirm(`Approve: ${TYPE_LABELS[request.type]} on ${request.invoice || 'no invoice'} (${request.itemName})?`)) return;
+        if (!(await askConfirm(`Approve: ${TYPE_LABELS[request.type]} on ${request.invoice || 'no invoice'} (${request.itemName})?`))) return;
         await apiRequest(`/change-requests/${encodeURIComponent(request.id)}/approve`, { method: 'POST' });
         window.dispatchEvent(new CustomEvent('inventory-changed'));
       } else {
-        const note = window.prompt('Reason for rejecting this request:');
+        const note = (await askText('Reason for rejecting this request:'));
         if (!note || !note.trim()) return;
         await apiRequest(`/change-requests/${encodeURIComponent(request.id)}/reject`, {
           method: 'POST',

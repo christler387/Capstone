@@ -1,3 +1,4 @@
+import { askText, askNotice } from './AppDialog';
 import React, { useEffect, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { Suspense, lazy } from 'react';
@@ -61,7 +62,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   // Makes a copy of an item under an ID the admin types. The copy is audited on the server.
   const duplicateItem = async (item: Item) => {
-    const newId = window.prompt(`Item ID for the copy of ${item.name}:`, '');
+    const newId = (await askText(`Item ID for the copy of ${item.name}:`, ''));
     if (!newId || !newId.trim()) return;
     try {
       const result = await apiRequest<{ id: string }>(`/inventory/${encodeURIComponent(item.id)}/duplicate`, {
@@ -70,7 +71,7 @@ export const Inventory: React.FC<InventoryProps> = ({
       });
       window.dispatchEvent(new CustomEvent('inventory-changed', { detail: { openId: result.id } }));
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not duplicate the item.');
+      (await askNotice(err instanceof Error ? err.message : 'Could not duplicate the item.'));
     }
   };
 
@@ -81,7 +82,7 @@ export const Inventory: React.FC<InventoryProps> = ({
       setCopiedItemId(itemId);
       window.setTimeout(() => setCopiedItemId(null), 1500);
     } catch {
-      window.alert('Could not copy the link. Open the item and copy the address from the Picture URL box.');
+      (await askNotice('Could not copy the link. Open the item and copy the address from the Picture URL box.'));
     }
   };
 

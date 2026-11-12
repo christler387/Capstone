@@ -1,3 +1,4 @@
+import { askConfirm, askNotice } from './AppDialog';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Item, UserRole } from '../types';
 import { apiRequest } from '../apiClient';
@@ -171,7 +172,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, onOpenStockCard
     if (!detail) return;
     const next = !detail.isActive;
     const verb = next ? 'activate' : 'deactivate';
-    if (!window.confirm(`${verb[0].toUpperCase() + verb.slice(1)} ${detail.name}? ${next ? '' : 'It stays in records but will not be offered for new links.'}`)) return;
+    if (!(await askConfirm(`${verb[0].toUpperCase() + verb.slice(1)} ${detail.name}? ${next ? '' : 'It stays in records but will not be offered for new links.'}`))) return;
     try {
       await apiRequest(`/suppliers/${detail.id}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: next }) });
       await loadSuppliers();
@@ -221,7 +222,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, onOpenStockCard
           method: 'POST',
           body: JSON.stringify({ itemId: linkForm.itemId, supplierItemCode: code }),
         });
-        if (saved.note) window.alert(saved.note);
+        if (saved.note) (await askNotice(saved.note));
         if (saved.renamed) {
           setIsLinkOpen(false);
           onItemRenamed?.(linkForm.itemId, saved.itemId);
@@ -241,7 +242,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ inventory, onOpenStockCard
 
   const removeLink = async (link: SupplierLink) => {
     if (!detail) return;
-    if (!window.confirm(`Remove ${link.itemName} from ${detail.name}? The inventory item is not deleted.`)) return;
+    if (!(await askConfirm(`Remove ${link.itemName} from ${detail.name}? The inventory item is not deleted.`))) return;
     try {
       await apiRequest(`/supplier-items/${link.id}`, { method: 'DELETE' });
       window.dispatchEvent(new Event('supplier-links-changed'));
