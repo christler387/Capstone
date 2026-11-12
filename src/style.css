@@ -10009,3 +10009,139 @@ input[type='date']:focus, select:focus, textarea:focus {
 .sin-nowrap {
   white-space: nowrap;
 }
+
+/* Stock in history: invoices, and the invoice view */
+.sin-muted {
+  margin: 2px 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.sin-row {
+  cursor: pointer;
+}
+
+.sin-row:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.sin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 20, 20, 0.45);
+}
+
+.sin-dialog {
+  width: min(880px, 100%);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: var(--bg);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(20, 20, 20, 0.25);
+  overflow: hidden;
+}
+
+.sin-dialog .stk-table-wrap {
+  overflow: auto;
+}
+
+.sin-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sin-dialog-head h3 {
+  margin: 2px 0 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.sin-kicker {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.sin-close {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.sin-close:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.sin-alert {
+  padding: 10px 12px;
+  background: #fdf1f0;
+  border: 1px solid #f1c4bf;
+  border-radius: 10px;
+  color: #8a1c1c;
+  font-size: 0.875rem;
+}
+
+.sin-qty {
+  width: 96px;
+}
+
+.sin-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sin-btn {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sin-btn.is-ghost {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.sin-btn.is-primary {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.sin-dialog-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sin-foot-actions {
+  display: flex;
+  gap: 8px;
+}

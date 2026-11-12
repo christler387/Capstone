@@ -2899,9 +2899,9 @@ app.get(
 
 /* ----------------------------- Movements ---------------------------- */
 
-// Stock-in history: every stock-in with its invoice number and supplier.
+// Stock in, grouped by invoice number, newest first.
 app.get(
-  "/api/stock-in",
+  "/api/stock-in/invoices",
   ah(async (req, res) => {
     if (!(await getAuthenticatedUser(req))) return res.status(401).json({ error: "Sign in to view stock in." });
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
@@ -2912,30 +2912,128 @@ app.get(
       params.push(`%${q}%`, `%${q}%`, normalizeItemId(q), `%${q}%`);
     }
     const [rows] = await pool.query(
-      `SELECT m.id, DATE_FORMAT(m.movement_date, '%Y-%m-%d') AS date_str,
-              DATE_FORMAT(m.created_at, '%H:%i') AS time_str, m.reference, m.qty,
-              m.item_id, i.name AS item_name, s.name AS supplier_name, m.created_by
+      `SELECT COALESCE(m.reference, '') AS reference, MAX(s.name) AS supplier_name, MAX(m.supplier_id) AS supplier_id,
+              DATE_FORMAT(MIN(m.movement_date), '%Y-%m-%d') AS date_str,
+              DATE_FORMAT(MAX(m.created_at), '%Y-%m-%d %H:%i') AS last_str,
+              COUNT(*) AS line_count, COALESCE(SUM(m.qty), 0) AS total_qty, MIN(m.created_by) AS recorded_by
        FROM movements m
        JOIN inventory i ON i.id = m.item_id
        LEFT JOIN suppliers s ON s.id = m.supplier_id
        WHERE m.type = 'IN'${filter}
-       ORDER BY m.created_at DESC, m.id DESC
-       LIMIT 300`,
+       GROUP BY COALESCE(m.reference, '')
+       ORDER BY MAX(m.created_at) DESC
+       LIMIT 200`,
       params,
     );
     res.json(
       rows.map((r) => ({
-        id: r.id,
-        date: r.date_str,
-        time: r.time_str,
-        reference: r.reference || "",
-        itemId: r.item_id,
-        itemName: r.item_name,
-        qty: Number(r.qty) || 0,
+        reference: r.reference,
         supplier: r.supplier_name || "",
-        recordedBy: r.created_by || "",
+        supplierId: r.supplier_id ?? null,
+        date: r.date_str,
+        lastRecorded: r.last_str,
+        lineCount: Number(r.line_count) || 0,
+        totalQty: Number(r.total_qty) || 0,
+        recordedBy: r.recorded_by || "",
       })),
     );
+  }),
+);
+
+// One invoice with its lines (items). An empty reference means stock in recorded before invoice numbers.
+app.get(
+  "/api/stock-in/invoice",
+  ah(async (req, res) => {
+    if (!(await getAuthenticatedUser(req))) return res.status(401).json({ error: "Sign in to view stock in." });
+    const reference = cleanText(req.query.ref, 64);
+    const [rows] = await pool.query(
+      `SELECT m.id, m.item_id, i.name AS item_name, i.part_number, i.unit_of_measure, m.qty,
+              DATE_FORMAT(m.movement_date, '%Y-%m-%d') AS date_str, DATE_FORMAT(m.created_at, '%H:%i') AS time_str,
+              m.created_by, m.supplier_id, s.name AS supplier_name
+       FROM movements m
+       JOIN inventory i ON i.id = m.item_id
+       LEFT JOIN suppliers s ON s.id = m.supplier_id
+       WHERE m.type = 'IN' AND COALESCE(m.reference, '') = ?
+       ORDER BY m.created_at, m.id`,
+      [reference],
+    );
+    res.json({
+      reference,
+      supplier: rows[0]?.supplier_name || "",
+      supplierId: rows[0]?.supplier_id ?? null,
+      date: rows[0]?.date_str || "",
+      lines: rows.map((r) => ({
+        id: r.id,
+        itemId: r.item_id,
+        itemName: r.item_name,
+        partNumber: r.part_number || "",
+        unit: r.unit_of_measure || "PCS",
+        qty: Number(r.qty) || 0,
+        time: r.time_str,
+        recordedBy: r.created_by || "",
+      })),
+    });
+  }),
+);
+
+// Changes the quantity of one stock-in line (admin). Stock moves by the difference, and the change is
+// recorded on the item's stock card with the person who made it.
+app.patch(
+  "/api/stock-in/lines/:id",
+  ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
+    const newQty = Number(req.body?.qty);
+    if (!Number.isInteger(newQty) || newQty < 1) {
+      return res.status(400).json({ error: "Quantity must be a positive whole number." });
+    }
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [[line]] = await connection.query(
+        "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN' FOR UPDATE",
+        [cleanText(req.params.id, 64)],
+      );
+      if (!line) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Stock-in line not found." });
+      }
+      const oldQty = Number(line.qty);
+      const diff = newQty - oldQty;
+      if (diff === 0) {
+        await connection.rollback();
+        return res.json({ id: line.id, qty: oldQty });
+      }
+      const [[inv]] = await connection.query("SELECT quantity FROM inventory WHERE id=? FOR UPDATE", [line.item_id]);
+      if (!inv) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Item not found." });
+      }
+      if (Number(inv.quantity) + diff < 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "This change would make the stock on hand negative." });
+      }
+      await connection.query("UPDATE inventory SET quantity = quantity + ?, version = version + 1 WHERE id=?", [diff, line.item_id]);
+      await connection.query("UPDATE movements SET qty=? WHERE id=?", [newQty, line.id]);
+      await recordStockLedger(connection, {
+        sourceId: `EDIT-${line.id}-${crypto.randomUUID()}`,
+        itemId: line.item_id,
+        type: "INVENTORY_CORRECTION",
+        reference: line.reference || line.id,
+        description: `Stock-in line changed from ${oldQty} to ${newQty}`,
+        qtyIn: diff > 0 ? diff : 0,
+        qtyOut: diff < 0 ? -diff : 0,
+        balanceAfter: Number(inv.quantity) + diff,
+        recordedBy: actor.username,
+      });
+      await connection.commit();
+      res.json({ id: line.id, qty: newQty });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }),
 );
 
