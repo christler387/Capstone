@@ -246,7 +246,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
       {isScannerOpen && renderScannerDrawer()}
 
-      <main className="inv-table-wrap">
+      <div className="inv-table-wrap">
         <div className="inv-table" role="table" aria-label="Inventory items">
           <div className="inv-row inv-head" role="row">
             <span role="columnheader">Picture</span>
@@ -444,7 +444,7 @@ export const Inventory: React.FC<InventoryProps> = ({
             );
           })}
         </div>
-      </main>
+      </div>
 
       <footer className="inv-pager">
         <span className="inv-pager-summary">

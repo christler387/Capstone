@@ -55,6 +55,9 @@ export const LoginShowcase: React.FC = () => {
           key={src}
           src={src}
           alt=""
+          loading={i === 0 ? 'eager' : 'lazy'}
+          fetchPriority={i === 0 ? 'high' : 'low'}
+          decoding="async"
           draggable={false}
           aria-hidden={i !== index}
           className={`login-showcase-slide${i === index ? ' is-active' : ''}`}

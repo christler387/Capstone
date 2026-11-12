@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import mysql from "mysql2/promise";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
@@ -64,18 +65,21 @@ export const pool = mysql.createPool({
 app.set("trust proxy", 1);
 
 // Security headers for every response. Pictures, fonts and icons are the only things loaded from other sites.
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), payment=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  // Browsers are told to use HTTPS only, once the site has been reached over HTTPS.
+  if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   res.setHeader(
     "Content-Security-Policy",
     [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
-      "font-src 'self' data: https://fonts.gstatic.com https://unpkg.com",
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self' data:",
       "img-src 'self' data: blob: https:",
       "connect-src 'self'",
       "object-src 'none'",
@@ -93,6 +97,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)) }));
+app.use(compression());
 app.use(express.json({ limit: "10mb" }));
 
 // Express 4 does not catch rejected promises in async handlers; this forwards them to the error handler.

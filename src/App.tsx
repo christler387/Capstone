@@ -23,14 +23,7 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
 
   return response.status === 204 ? (undefined as T) : response.json();
 }
-import { ItemForm } from './components/ItemForm';
-import { Navigation } from './components/Navigation';
-import { Dashboard } from './components/Dashboard';
-import { StaffDashboard } from './components/StaffDashboard';
-import { Inventory } from './components/Inventory';
-import { Stock } from './components/Stock';
 import { Login } from './components/Login';
-import { UserProfile } from './components/UserProfile';
 import skyrunLogo from './assets/Skyrun.webp';
 import { isAtReorderPoint } from './inventoryMetrics';
 
@@ -40,6 +33,13 @@ const Suppliers = React.lazy(() => import('./components/Suppliers').then((m) => 
 const Sales = React.lazy(() => import('./components/Sales').then((m) => ({ default: m.Sales })));
 const StockInHistoryPage = React.lazy(() => import('./components/StockInHistory').then((m) => ({ default: m.StockInHistoryPage })));
 const ChangeRequestsPage = React.lazy(() => import('./components/ChangeRequests').then((m) => ({ default: m.ChangeRequestsPage })));
+const ItemForm = React.lazy(() => import('./components/ItemForm').then((m) => ({ default: m.ItemForm })));
+const Navigation = React.lazy(() => import('./components/Navigation').then((m) => ({ default: m.Navigation })));
+const Dashboard = React.lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })));
+const StaffDashboard = React.lazy(() => import('./components/StaffDashboard').then((m) => ({ default: m.StaffDashboard })));
+const Inventory = React.lazy(() => import('./components/Inventory').then((m) => ({ default: m.Inventory })));
+const Stock = React.lazy(() => import('./components/Stock').then((m) => ({ default: m.Stock })));
+const UserProfile = React.lazy(() => import('./components/UserProfile').then((m) => ({ default: m.UserProfile })));
 const WarehouseMap = React.lazy(() => import('./components/WarehouseMap').then((m) => ({ default: m.WarehouseMap })));
 
 // The session is kept in sessionStorage, so closing the tab signs the user out.
@@ -123,10 +123,12 @@ const App: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
     refreshLayout().catch(() => setLayout([]));
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (!user) return;
     let active = true;
     Promise.all([
       requestJson<Item[]>('/inventory'),
@@ -141,7 +143,7 @@ const App: React.FC = () => {
         if (active) setDatabaseError(`Database unavailable: ${error.message}`);
       });
     return () => { active = false; };
-  }, []);
+  }, [user]);
 
   const handleLoginSuccess = (username: string, role: UserRole, email?: string, _phone?: string, emailVerified?: boolean) => {
     sessionStorage.setItem('skyrun_session_user', username);
@@ -769,15 +771,17 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
         type="landscape"
         title={editingItem?.name ? `Edit Item: ${editingItem.id}` : 'Add New Item'}
       >
-        <ItemForm 
-          item={editingItem} 
-          existingItems={inventory}
-          onSave={handleSaveItem} 
-          onCancel={() => setIsItemModalOpen(false)} 
-          rackLocations={rackLocations}
-          rackFloors={rackFloors}
-          floors={layout.map(floor => ({ id: floor.id, name: floor.name }))}
-        />
+        <React.Suspense fallback={null}>
+          <ItemForm
+            item={editingItem}
+            existingItems={inventory}
+            onSave={handleSaveItem}
+            onCancel={() => setIsItemModalOpen(false)}
+            rackLocations={rackLocations}
+            rackFloors={rackFloors}
+            floors={layout.map(floor => ({ id: floor.id, name: floor.name }))}
+          />
+        </React.Suspense>
       </Modal>
   
       <Modal 
@@ -896,6 +900,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     <div className="app-container">
       <div className="content-wrapper">
         {databaseError && <div className="alert-text mb-4">{databaseError}</div>}
+        <React.Suspense fallback={null}>
         <header className="app-header">
           <div className="header-info">
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
@@ -913,8 +918,11 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
             userName={user || ''}
           />
         </header>
+        </React.Suspense>
 
-        <React.Suspense fallback={null}>{renderComponentRouter()}</React.Suspense>
+        <main className="app-content">
+          <React.Suspense fallback={null}>{renderComponentRouter()}</React.Suspense>
+        </main>
       </div>
 
       {renderGlobalModals()}
