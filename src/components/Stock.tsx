@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { apiRequest } from '../apiClient';
@@ -803,7 +804,7 @@ const InvoiceModal: React.FC<{
 
   const total = detail ? detail.lines.reduce((sum, l) => sum + l.qty, 0) : 0;
 
-  return (
+  const dialog = (
     <div className="sin-overlay" role="dialog" aria-modal="true" aria-label={`Invoice ${invoiceLabel(reference)}`} onClick={onClose}>
       <div className="sin-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="sin-dialog-head">
@@ -825,11 +826,11 @@ const InvoiceModal: React.FC<{
           <table className="stk-table">
             <thead>
               <tr>
-                <th>Item</th>
-                <th className="num">Qty</th>
-                <th>Time</th>
-                <th>Recorded by</th>
-                <th aria-label="Actions" />
+                <th className="sin-col-item">Item</th>
+                <th className="num sin-col-qty">Qty</th>
+                <th className="sin-col-time">Time</th>
+                <th className="sin-col-by">Recorded by</th>
+                <th className="sin-col-actions" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -888,4 +889,5 @@ const InvoiceModal: React.FC<{
       </div>
     </div>
   );
+  return createPortal(dialog, document.body);
 };
