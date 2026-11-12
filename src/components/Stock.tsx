@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { apiRequest } from '../apiClient';
@@ -45,6 +45,12 @@ export const Stock: React.FC<StockProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  // Stock-out details: the invoice number, the customer, and each item's selling price.
+  const [saleReference, setSaleReference] = useState('');
+  const [saleCustomer, setSaleCustomer] = useState('');
+  const [sellPrices, setSellPrices] = useState<Record<string, string>>({});
+  // One ID per sale, so a retried save cannot record the same sale twice.
+  const saleBatchId = useRef<string | null>(null);
   // Prices typed in the Cost column, by item, until they are saved on blur or Enter.
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const isAdmin = userRole === 'admin';
@@ -161,8 +167,13 @@ export const Stock: React.FC<StockProps> = ({
     const short = !isIn && line.qty > onHand;
     const localCost = item ? getLocalCost(item) : 0;
     const lineTotal = localCost * line.qty;
-    return { line, item, onHand, after, short, localCost, lineTotal };
+    const sellPrice = Number(sellPrices[line.itemId]) || 0;
+    const saleTotal = sellPrice * line.qty;
+    const saleProfit = saleTotal - lineTotal;
+    return { line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit };
   });
+  const saleSalesTotal = rows.reduce((sum, row) => sum + row.saleTotal, 0);
+  const saleProfitTotal = rows.reduce((sum, row) => sum + row.saleProfit, 0);
 
   const totalUnits = lines.reduce((sum, line) => sum + line.qty, 0);
   const totalValue = rows.reduce((sum, row) => sum + row.lineTotal, 0);
@@ -178,7 +189,54 @@ export const Stock: React.FC<StockProps> = ({
       setError('Enter a quantity for every item.');
       return;
     }
+    if (!isIn) {
+      if (!saleReference.trim()) {
+        setError('Enter the invoice or reference number.');
+        return;
+      }
+      const noPrice = rows.find((row) => !(row.sellPrice > 0));
+      if (noPrice) {
+        setError(`Enter the selling price for ${noPrice.item?.name ?? noPrice.line.itemId}.`);
+        return;
+      }
+      const overStock = rows.find((row) => row.line.qty > row.onHand);
+      if (overStock) {
+        setError(`Only ${overStock.onHand} unit(s) of ${overStock.item?.name ?? overStock.line.itemId} are on hand.`);
+        return;
+      }
+      saleBatchId.current = saleBatchId.current ?? crypto.randomUUID();
+    }
     setIsConfirmOpen(true);
+  };
+
+  // Records a stock-out sale. The stock deduction, the stock card line and the sale are saved together on the server.
+  const confirmSale = async () => {
+    if (isRecording) return;
+    setIsRecording(true);
+    setError(null);
+    try {
+      await apiRequest('/sales', {
+        method: 'POST',
+        body: JSON.stringify({
+          batchId: saleBatchId.current,
+          reference: saleReference.trim(),
+          customer: saleCustomer.trim(),
+          lines: lines.map((line) => ({ itemId: line.itemId, quantity: line.qty, unitPrice: Number(sellPrices[line.itemId]) })),
+        }),
+      });
+      saleBatchId.current = null;
+      setSheets((prev) => ({ ...prev, out: [] }));
+      setSellPrices({});
+      setSaleReference('');
+      setSaleCustomer('');
+      setIsConfirmOpen(false);
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not record the sale.');
+      setIsConfirmOpen(false);
+    } finally {
+      setIsRecording(false);
+    }
   };
 
   const confirmRecord = async () => {
@@ -320,6 +378,19 @@ export const Stock: React.FC<StockProps> = ({
           </div>
         )}
 
+        {!isIn && (
+          <div className="stk-sale-fields">
+            <label className="stk-sale-field">
+              <span>Invoice / reference no. <em>*</em></span>
+              <input value={saleReference} onChange={(e) => setSaleReference(e.target.value)} placeholder="e.g. INV-0001" maxLength={64} />
+            </label>
+            <label className="stk-sale-field">
+              <span>Customer <em>optional</em></span>
+              <input value={saleCustomer} onChange={(e) => setSaleCustomer(e.target.value)} placeholder="Customer name" maxLength={150} />
+            </label>
+          </div>
+        )}
+
         <div className="stk-table-wrap">
           <table className="stk-table">
             <thead>
@@ -328,7 +399,15 @@ export const Stock: React.FC<StockProps> = ({
                 <th scope="col" className="num">On hand</th>
                 <th scope="col" className="num">{isIn ? 'Add' : 'Deduct'}</th>
                 <th scope="col" className="num">Cost</th>
-                <th scope="col" className="num">Total</th>
+                {isIn ? (
+                  <th scope="col" className="num">Total</th>
+                ) : (
+                  <>
+                    <th scope="col" className="num">Selling price</th>
+                    <th scope="col" className="num">Sales</th>
+                    <th scope="col" className="num">Profit</th>
+                  </>
+                )}
                 <th scope="col" className="num">After</th>
                 <th scope="col" aria-label="Remove line" />
               </tr>
@@ -336,12 +415,12 @@ export const Stock: React.FC<StockProps> = ({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="stk-empty">
+                  <td colSpan={isIn ? 7 : 9} className="stk-empty">
                     No items yet. Search for an item above or scan its barcode.
                   </td>
                 </tr>
               )}
-              {rows.map(({ line, item, onHand, after, short, localCost, lineTotal }) => {
+              {rows.map(({ line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit }) => {
                 const discount = Number(item?.discount) || 0;
                 return (
                   <tr key={line.itemId} className={short ? 'is-short' : ''}>
@@ -371,7 +450,7 @@ export const Stock: React.FC<StockProps> = ({
                     <td className="num">
                       {item ? (
                         <div className="inv-cost">
-                          {isAdmin ? (
+                          {isAdmin && isIn ? (
                             <input
                               type="number"
                               min="0"
@@ -396,7 +475,29 @@ export const Stock: React.FC<StockProps> = ({
                         '—'
                       )}
                     </td>
-                    <td className="num inv-total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
+                    {isIn ? (
+                      <td className="num inv-total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
+                    ) : (
+                      <>
+                        <td className="num">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            className="stk-qty stk-price-input"
+                            aria-label={`Selling price for ${item?.name ?? line.itemId}`}
+                            placeholder="0.00"
+                            value={sellPrices[line.itemId] ?? ''}
+                            onChange={(e) => setSellPrices((prev) => ({ ...prev, [line.itemId]: e.target.value }))}
+                          />
+                        </td>
+                        <td className="num inv-total">{sellPrice > 0 && line.qty > 0 ? formatPeso(saleTotal) : '—'}</td>
+                        <td className={`num ${saleProfit < 0 ? 'stk-loss' : ''}`}>
+                          {sellPrice > 0 && line.qty > 0 ? formatPeso(saleProfit) : '—'}
+                        </td>
+                      </>
+                    )}
                     <td className="num">
                       {line.qty > 0 ? (
                         <span className={short ? 'stk-after is-short' : 'stk-after'}>{after.toLocaleString()}</span>
@@ -426,7 +527,14 @@ export const Stock: React.FC<StockProps> = ({
           <div className="stk-totals">
             <span>Items <strong>{lines.length.toLocaleString()}</strong></span>
             <span>Units <strong>{totalUnits.toLocaleString()}</strong></span>
-            <span>Value <strong>{formatPeso(totalValue)}</strong></span>
+            {isIn ? (
+              <span>Value <strong>{formatPeso(totalValue)}</strong></span>
+            ) : (
+              <>
+                <span>Sales <strong>{formatPeso(saleSalesTotal)}</strong></span>
+                <span>Gross profit <strong>{formatPeso(saleProfitTotal)}</strong></span>
+              </>
+            )}
             {shortRows.length > 0 && (
               <span className="stk-totals-warning">
                 <i className="bx bx-error" aria-hidden="true"></i>
@@ -444,7 +552,7 @@ export const Stock: React.FC<StockProps> = ({
               onClick={requestRecord}
               disabled={lines.length === 0 || isRecording}
             >
-              {isIn ? 'Record stock in' : 'Record stock out'}
+              {isIn ? 'Record stock in' : 'Record sale'}
             </button>
           </div>
         </footer>
@@ -462,10 +570,10 @@ export const Stock: React.FC<StockProps> = ({
             <button
               type="button"
               className={`stk-btn ${isIn ? 'is-primary' : 'is-danger'}`}
-              onClick={confirmRecord}
+              onClick={isIn ? confirmRecord : confirmSale}
               disabled={isRecording}
             >
-              {isRecording ? 'Recording…' : shortRows.length > 0 ? 'Deduct anyway' : 'Confirm'}
+              {isRecording ? 'Recording…' : isIn ? 'Confirm' : 'Record sale'}
             </button>
           </div>
         }

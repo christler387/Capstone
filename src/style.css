@@ -9531,3 +9531,56 @@ input[type='date']:focus, select:focus, textarea:focus {
   width: 130px;
   text-align: right;
 }
+
+/* Stock-out: invoice and customer fields, and loss in red. */
+.stk-sale-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.stk-sale-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stk-sale-field span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.stk-sale-field em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.stk-sale-field input {
+  height: 42px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.9375rem;
+}
+
+.stk-sale-field input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: var(--focus-ring);
+}
+
+.stk-loss {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .stk-sale-fields {
+    grid-template-columns: 1fr;
+  }
+}

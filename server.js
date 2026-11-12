@@ -629,6 +629,7 @@ async function initializeDatabase() {
     );
   }
   await createStockCardTables();
+  await createSalesTable();
   await backfillStockLedger();
 }
 
@@ -2504,6 +2505,7 @@ async function renameItemId(connection, oldId, newId) {
     await connection.query("UPDATE inventory_audit SET item_id=? WHERE item_id=?", [newId, oldId]);
     await connection.query("UPDATE stock_ledger SET item_id=? WHERE item_id=?", [newId, oldId]);
     await connection.query("UPDATE supplier_items SET item_id=? WHERE item_id=?", [newId, oldId]);
+    await connection.query("UPDATE sales SET item_id=? WHERE item_id=?", [newId, oldId]);
   } finally {
     await connection.query("SET FOREIGN_KEY_CHECKS = 1");
   }
@@ -2566,6 +2568,344 @@ app.get(
       entry.suppliers.push({ name: row.name, code: row.supplier_item_code });
     }
     res.json(byItem);
+  }),
+);
+
+/* ----------------------- Sales and profit (stock-out with price) ----------------------- */
+
+// Each sale stores the cost and selling price as they were at the time, so later price
+// changes never alter a past sale.
+async function createSalesTable() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS sales (
+    id VARCHAR(100) PRIMARY KEY,
+    batch_id VARCHAR(64) NOT NULL,
+    movement_id VARCHAR(64) NOT NULL,
+    item_id VARCHAR(32) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    quantity INT NOT NULL,
+    unit_cost DECIMAL(12,2) NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    total_cost DECIMAL(14,2) NOT NULL,
+    total_sales DECIMAL(14,2) NOT NULL,
+    gross_profit DECIMAL(14,2) NOT NULL,
+    customer VARCHAR(150) NULL,
+    reference VARCHAR(64) NOT NULL,
+    txn_date DATE NOT NULL,
+    txn_time DATETIME NOT NULL,
+    recorded_by VARCHAR(64) NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_sales_batch (batch_id),
+    KEY idx_sales_date (txn_date),
+    KEY idx_sales_item (item_id),
+    KEY idx_sales_reference (reference),
+    KEY idx_sales_movement (movement_id)
+  ) ${tableOptions}`);
+}
+
+const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const localDateString = (date) => localDateTimeString(date).slice(0, 10);
+
+app.post(
+  "/api/sales",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) return res.status(401).json({ error: "Sign in to record a sale." });
+
+    const body = req.body || {};
+    const batchId = cleanText(body.batchId, 64);
+    const reference = cleanText(body.reference, 64);
+    const customer = cleanText(body.customer, 150) || null;
+    const rawLines = Array.isArray(body.lines) ? body.lines : [];
+    if (!batchId) return res.status(400).json({ error: "Missing sale batch ID." });
+    if (!reference) return res.status(400).json({ error: "Enter the invoice or reference number." });
+    if (rawLines.length === 0 || rawLines.length > 100) {
+      return res.status(400).json({ error: "Add between 1 and 100 items to the sale." });
+    }
+    const lines = rawLines.map((line) => ({
+      itemId: normalizeItemId(line?.itemId),
+      quantity: Number(line?.quantity),
+      unitPrice: Number(line?.unitPrice),
+    }));
+    for (const line of lines) {
+      if (!line.itemId) return res.status(400).json({ error: "Every line needs an item." });
+      if (!Number.isInteger(line.quantity) || line.quantity < 1) {
+        return res.status(400).json({ error: "Quantity must be a positive whole number." });
+      }
+      if (!Number.isFinite(line.unitPrice) || line.unitPrice <= 0) {
+        return res.status(400).json({ error: "Enter a selling price above zero for every item." });
+      }
+    }
+
+    const outcome = await withInventoryLock(async (connection) => {
+      await connection.beginTransaction();
+      try {
+        // The same sale sent twice (for example after a timeout) is recorded once.
+        const [[already]] = await connection.query("SELECT id FROM sales WHERE batch_id=? LIMIT 1", [batchId]);
+        if (already) {
+          await connection.rollback();
+          return { status: 200, duplicate: true };
+        }
+
+        const saved = [];
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index];
+          const [[item]] = await connection.query(
+            "SELECT id, name, price, discount, quantity FROM inventory WHERE id=? FOR UPDATE",
+            [line.itemId],
+          );
+          if (!item) {
+            await connection.rollback();
+            return { status: 404, error: `Item ${line.itemId} was not found.` };
+          }
+          if (line.quantity > Number(item.quantity)) {
+            await connection.rollback();
+            return { status: 400, error: `Only ${item.quantity} unit(s) of ${item.name} are on hand.` };
+          }
+
+          const when = new Date();
+          // Cost is the purchase price less the supplier discount, the same figure the stock sheet shows.
+          const unitCost = round2(Number(item.price) * (1 - Math.min(100, Math.max(0, Number(item.discount) || 0)) / 100));
+          const totalSales = round2(line.quantity * line.unitPrice);
+          const totalCost = round2(line.quantity * unitCost);
+          const grossProfit = round2(totalSales - totalCost);
+          const movementId = `MOV-${crypto.randomUUID()}`;
+
+          // Three records, one transaction: the stock deduction, the stock card line, the sale.
+          await connection.query(
+            "UPDATE inventory SET quantity = quantity - ?, version = version + 1 WHERE id=?",
+            [line.quantity, line.itemId],
+          );
+          await connection.query(
+            "INSERT INTO movements (id, item_id, type, qty, movement_date, created_by) VALUES (?, ?, 'OUT', ?, ?, ?)",
+            [movementId, line.itemId, line.quantity, localDateString(when), actor.username],
+          );
+          await recordStockLedger(connection, {
+            sourceId: movementId,
+            itemId: line.itemId,
+            type: "STOCK_OUT",
+            reference,
+            description: customer ? `Sale to ${customer}` : "Sale",
+            qtyOut: line.quantity,
+            balanceAfter: await currentItemQuantity(connection, line.itemId),
+            recordedBy: actor.username,
+            time: when,
+          });
+          await connection.query(
+            `INSERT INTO sales (id, batch_id, movement_id, item_id, item_name, quantity, unit_cost, unit_price,
+               total_cost, total_sales, gross_profit, customer, reference, txn_date, txn_time, recorded_by, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED')`,
+            [
+              `${batchId}-${index + 1}`,
+              batchId,
+              movementId,
+              line.itemId,
+              item.name,
+              line.quantity,
+              unitCost,
+              round2(line.unitPrice),
+              totalCost,
+              totalSales,
+              grossProfit,
+              customer,
+              reference,
+              localDateString(when),
+              localDateTimeString(when),
+              actor.username,
+            ],
+          );
+          saved.push({ itemId: line.itemId, quantity: line.quantity, totalSales, totalCost, grossProfit });
+        }
+        await connection.commit();
+        return { status: 201, lines: saved };
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      }
+    });
+
+    if (outcome.status === 200 && outcome.duplicate) return res.status(200).json({ duplicate: true });
+    if (outcome.status !== 201) return res.status(outcome.status).json({ error: outcome.error });
+    res.status(201).json({ lines: outcome.lines });
+  }),
+);
+
+// Admin reports. Staff can record sales but cannot read the totals.
+const SALES_DATE = (value) => (isIsoDate(value) ? value : "");
+
+function salesRangeWhere(query) {
+  const from = SALES_DATE(query.from);
+  const to = SALES_DATE(query.to);
+  const clauses = ["status = 'COMPLETED'"];
+  const params = [];
+  if (from) {
+    clauses.push("txn_date >= ?");
+    params.push(from);
+  }
+  if (to) {
+    clauses.push("txn_date <= ?");
+    params.push(to);
+  }
+  return { where: clauses.join(" AND "), params };
+}
+
+app.get(
+  "/api/sales/summary",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const now = new Date();
+    const today = localDateString(now);
+    const yesterday = localDateString(new Date(now.getTime() - 86400000));
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const yearStart = `${today.slice(0, 4)}-01-01`;
+    const floor = [yesterday, yearStart].sort()[0];
+
+    const periods = {
+      today: ["txn_date = ?", [today]],
+      yesterday: ["txn_date = ?", [yesterday]],
+      month: ["txn_date >= ?", [monthStart]],
+      year: ["txn_date >= ?", [yearStart]],
+    };
+    const columns = [];
+    const params = [];
+    for (const [key, [condition, values]] of Object.entries(periods)) {
+      columns.push(
+        `COALESCE(SUM(CASE WHEN ${condition} THEN total_sales END), 0) AS ${key}_sales`,
+        `COALESCE(SUM(CASE WHEN ${condition} THEN gross_profit END), 0) AS ${key}_profit`,
+        `COALESCE(SUM(CASE WHEN ${condition} THEN total_cost END), 0) AS ${key}_cogs`,
+        `COALESCE(SUM(CASE WHEN ${condition} THEN quantity END), 0) AS ${key}_qty`,
+      );
+      params.push(...values, ...values, ...values, ...values);
+    }
+    const [[totals]] = await pool.query(
+      `SELECT ${columns.join(", ")} FROM sales WHERE status = 'COMPLETED' AND txn_date >= ?`,
+      [...params, floor],
+    );
+    // Stock-outs recorded before sales tracking have no selling price. They are counted, not guessed.
+    const [[unrecorded]] = await pool.query(
+      `SELECT COUNT(*) AS count FROM movements m
+       WHERE m.type = 'OUT' AND NOT EXISTS (SELECT 1 FROM sales s WHERE s.movement_id = m.id)`,
+    );
+
+    const period = (key) => {
+      const sales = Number(totals[`${key}_sales`]) || 0;
+      const profit = Number(totals[`${key}_profit`]) || 0;
+      return {
+        sales: round2(sales),
+        cogs: round2(totals[`${key}_cogs`]),
+        profit: round2(profit),
+        units: Number(totals[`${key}_qty`]) || 0,
+        margin: sales > 0 ? round2((profit / sales) * 100) : 0,
+      };
+    };
+    res.json({
+      today: period("today"),
+      yesterday: period("yesterday"),
+      month: period("month"),
+      year: period("year"),
+      unrecordedStockOuts: Number(unrecorded.count) || 0,
+    });
+  }),
+);
+
+app.get(
+  "/api/sales/series",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const granularity = ["day", "month", "year"].includes(req.query.granularity) ? req.query.granularity : "day";
+    const format = { day: "%Y-%m-%d", month: "%Y-%m", year: "%Y" }[granularity];
+    const { where, params } = salesRangeWhere(req.query);
+    const [rows] = await pool.query(
+      `SELECT DATE_FORMAT(txn_date, ?) AS period, SUM(total_sales) AS sales, SUM(total_cost) AS cogs,
+              SUM(gross_profit) AS profit, SUM(quantity) AS units
+       FROM sales WHERE ${where}
+       GROUP BY period ORDER BY period LIMIT 400`,
+      [format, ...params],
+    );
+    res.json(
+      rows.map((row) => ({
+        period: row.period,
+        sales: round2(row.sales),
+        cogs: round2(row.cogs),
+        profit: round2(row.profit),
+        units: Number(row.units) || 0,
+      })),
+    );
+  }),
+);
+
+app.get(
+  "/api/sales/top-items",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const { where, params } = salesRangeWhere(req.query);
+    const [rows] = await pool.query(
+      `SELECT item_id, MAX(item_name) AS item_name, SUM(quantity) AS units, SUM(total_sales) AS sales,
+              SUM(gross_profit) AS profit
+       FROM sales WHERE ${where}
+       GROUP BY item_id ORDER BY units DESC, sales DESC LIMIT 10`,
+      params,
+    );
+    res.json(
+      rows.map((row) => ({
+        itemId: row.item_id,
+        itemName: row.item_name,
+        units: Number(row.units) || 0,
+        sales: round2(row.sales),
+        profit: round2(row.profit),
+      })),
+    );
+  }),
+);
+
+const saleRow = (row) => ({
+  id: row.id,
+  date: row.txn_date_str,
+  time: row.txn_time_str,
+  reference: row.reference,
+  customer: row.customer || "",
+  itemId: row.item_id,
+  itemName: row.item_name,
+  quantity: Number(row.quantity) || 0,
+  unitCost: round2(row.unit_cost),
+  unitPrice: round2(row.unit_price),
+  totalCost: round2(row.total_cost),
+  totalSales: round2(row.total_sales),
+  grossProfit: round2(row.gross_profit),
+  recordedBy: row.recorded_by || "",
+});
+
+app.get(
+  "/api/sales",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const { where, params } = salesRangeWhere(req.query);
+    const clauses = [where];
+    const extra = [...params];
+    const item = typeof req.query.item === "string" ? req.query.item.trim().slice(0, 64) : "";
+    const user = typeof req.query.user === "string" ? req.query.user.trim().slice(0, 64) : "";
+    const search = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
+    if (item) {
+      clauses.push("(item_id = ? OR item_name LIKE ?)");
+      extra.push(normalizeItemId(item), `%${item}%`);
+    }
+    if (user) {
+      clauses.push("recorded_by = ?");
+      extra.push(user);
+    }
+    if (search) {
+      clauses.push("(reference LIKE ? OR customer LIKE ? OR item_name LIKE ? OR item_id = ?)");
+      extra.push(`%${search}%`, `%${search}%`, `%${search}%`, search);
+    }
+    const [rows] = await pool.query(
+      `SELECT id, DATE_FORMAT(txn_date, '%Y-%m-%d') AS txn_date_str, DATE_FORMAT(txn_time, '%Y-%m-%d %H:%i:%s') AS txn_time_str,
+              reference, customer, item_id, item_name, quantity, unit_cost, unit_price, total_cost, total_sales,
+              gross_profit, recorded_by
+       FROM sales WHERE ${clauses.join(" AND ")}
+       ORDER BY txn_time DESC, id DESC LIMIT 500`,
+      extra,
+    );
+    res.json(rows.map(saleRow));
   }),
 );
 
