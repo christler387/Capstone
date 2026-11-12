@@ -6317,6 +6317,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 .dash2-list--scroll {
+  height: var(--dash-list-height);
   max-height: var(--dash-list-height);
   overflow-y: auto;
   overscroll-behavior: contain;
