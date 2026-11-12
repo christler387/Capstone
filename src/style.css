@@ -6029,6 +6029,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 /* ---- Dashboard: KPI cards, category bars, activity and attention lists ---- */
 .dash2 {
   --dash-list-height: 360px;
+  --dash-row-height: clamp(420px, 62vh, 600px);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -6134,12 +6135,13 @@ input[type='date']:focus, select:focus, textarea:focus {
   color: var(--ink-faint);
 }
 
-/* Layout: a wide left panel and a stacked right column; pairs share a row and equal height */
+/* Layout: each row has a fixed height. Panels fill it, and their lists scroll inside. */
 .dash2-main,
 .dash2-pair {
   display: grid;
   gap: 1rem;
   align-items: stretch;
+  height: var(--dash-row-height);
 }
 
 .dash2-main {
@@ -6155,6 +6157,15 @@ input[type='date']:focus, select:focus, textarea:focus {
   flex-direction: column;
   gap: 1rem;
   min-width: 0;
+  min-height: 0;
+}
+
+.dash2-stack > .dash2-panel:first-child {
+  flex: 1 1 0;
+}
+
+.dash2-stack > .dash2-panel:last-child {
+  flex: 0 0 auto;
 }
 
 /* Panels */
@@ -6162,6 +6173,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line-soft);
@@ -6213,6 +6225,8 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 .dash2-panel-body {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   padding: 0.5rem 1.25rem 0.9rem;
@@ -6251,7 +6265,8 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 /* Category bars */
 .dash2-scroll {
-  max-height: var(--dash-list-height);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -6317,8 +6332,8 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 .dash2-list--scroll {
-  height: var(--dash-list-height);
-  max-height: var(--dash-list-height);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -6519,6 +6534,17 @@ input[type='date']:focus, select:focus, textarea:focus {
   .dash2-main,
   .dash2-pair {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .dash2-stack > .dash2-panel:first-child {
+    flex: 0 0 auto;
+  }
+
+  .dash2-scroll,
+  .dash2-list--scroll {
+    flex: 0 0 auto;
+    max-height: var(--dash-list-height);
   }
 }
 
