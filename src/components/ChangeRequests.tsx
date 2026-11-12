@@ -51,7 +51,7 @@ export const ChangeRequestsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (role !== 'admin') return;
+    if (role === null) return;
     const params = new URLSearchParams();
     if (view === 'pending') params.set('status', 'PENDING');
     else if (status) params.set('status', status);
@@ -89,14 +89,6 @@ export const ChangeRequestsPage: React.FC = () => {
     return `${r.oldValue ?? '—'} removed`;
   };
 
-  if (role !== null && role !== 'admin') {
-    return (
-      <div className="content-section req">
-        <div className="sal-placeholder">Requests are for administrators.</div>
-      </div>
-    );
-  }
-
   return (
     <div className="content-section req">
       <header className="req-head">
@@ -117,8 +109,10 @@ export const ChangeRequestsPage: React.FC = () => {
         </div>
       </header>
 
-      {role === 'admin' && !isSuperAdmin && (
-        <div className="req-note" role="note">You can see the requests. Only the super administrator can approve or reject them.</div>
+      {!isSuperAdmin && (
+        <div className="req-note" role="note">
+          {role === 'admin' ? 'Only the super administrator can approve or reject requests.' : 'Your requests are listed here. The super administrator decides on them.'}
+        </div>
       )}
       {error && <div className="req-alert" role="alert">{error}</div>}
 

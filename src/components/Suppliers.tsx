@@ -47,7 +47,8 @@ const formatPeso = (value: number) =>
   `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpenStockCard, onItemRenamed }) => {
-  const isAdmin = userRole === 'admin';
+  // Staff have the same features as admins.
+  const isAdmin = true;
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');

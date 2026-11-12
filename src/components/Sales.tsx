@@ -99,7 +99,8 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = userRole === 'admin';
+  // Staff see the sales reports too.
+  const isAdmin = true;
 
   useEffect(() => {
     if (!isAdmin) return;

@@ -71,7 +71,8 @@ export const Stock: React.FC<StockProps> = ({
   const saleBatchId = useRef<string | null>(null);
   // Prices typed in the Cost column, by item, until they are saved on blur or Enter.
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
-  const isAdmin = userRole === 'admin';
+  // Staff have the same features as admins.
+  const isAdmin = true;
 
   // Saves a purchase price typed on the sheet. It is the item's price, so it is saved on the item.
   const savePrice = async (item: Item) => {
@@ -308,7 +309,7 @@ export const Stock: React.FC<StockProps> = ({
     setSheets((prev) => ({ ...prev, [tab]: [] }));
   };
 
-  const canAddNewItem = isIn && userRole === 'admin';
+  const canAddNewItem = isIn;
   const title = isIn ? 'Stock in' : 'Stock out';
   const subtitle = isIn
     ? 'Record units received. Each line adds to the item’s stock on hand.'

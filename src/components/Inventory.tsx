@@ -131,7 +131,8 @@ export const Inventory: React.FC<InventoryProps> = ({
     displayedPage * PAGE_SIZE
   );
 
-  const isAdmin = userRole === 'admin';
+  // Staff have the same features; deletes are sent for approval by the server.
+  const isAdmin = true;
 
   const renderScannerDrawer = () => (
     <div className="inv-scanner">

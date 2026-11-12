@@ -1693,7 +1693,7 @@ app.post(
 app.post(
   "/api/inventory/:id/duplicate",
   ah(async (req, res) => {
-    const actor = await requireAdmin(req, res);
+    const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const sourceId = normalizeItemId(req.params.id);
     const newId = normalizeItemId(req.body?.newId);
@@ -1832,31 +1832,160 @@ app.put(
   }),
 );
 
+
+// Deletes a stock movement and takes its stock back out. The stock card keeps the record.
+async function applyMovementDelete(connection, movementId, actorName) {
+  const [[movement]] = await connection.query("SELECT * FROM movements WHERE id=? FOR UPDATE", [movementId]);
+  if (!movement) return { status: 404, error: "Movement not found" };
+  const delta = movement.type === "IN" ? -movement.qty : movement.qty;
+  await connection.query("DELETE FROM movements WHERE id=?", [movementId]);
+  await connection.query(
+    "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
+    [delta, movement.item_id],
+  );
+  await recordStockLedger(connection, {
+    sourceId: `DEL-${movement.id}`,
+    itemId: movement.item_id,
+    type: "INVENTORY_CORRECTION",
+    reference: movement.id,
+    description: "Stock movement deleted",
+    qtyIn: movement.type === "OUT" ? movement.qty : 0,
+    qtyOut: movement.type === "IN" ? movement.qty : 0,
+    balanceAfter: await currentItemQuantity(connection, movement.item_id),
+    recordedBy: actorName,
+  });
+  return { status: 204 };
+}
+
+// Undoes part of a stock movement. The undone quantity is recorded on the stock card.
+async function applyMovementUndo(connection, movementId, requestedQty, actorName) {
+  if (!Number.isInteger(requestedQty) || requestedQty < 1) {
+    return { status: 400, error: "Undo quantity must be a positive whole number." };
+  }
+  const [[movement]] = await connection.query("SELECT * FROM movements WHERE id=? FOR UPDATE", [movementId]);
+  if (!movement) return { status: 404, error: "Movement not found" };
+  if (requestedQty > movement.qty) {
+    return { status: 400, error: "Undo quantity cannot exceed the movement quantity." };
+  }
+  const delta = movement.type === "IN" ? -requestedQty : requestedQty;
+  const remainingQty = movement.qty - requestedQty;
+  if (remainingQty === 0) {
+    await connection.query("DELETE FROM movements WHERE id=?", [movementId]);
+  } else {
+    await connection.query("UPDATE movements SET qty=? WHERE id=?", [remainingQty, movementId]);
+  }
+  await connection.query(
+    "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
+    [delta, movement.item_id],
+  );
+  await recordStockLedger(connection, {
+    sourceId: `UNDO-${crypto.randomUUID()}`,
+    itemId: movement.item_id,
+    type: "INVENTORY_CORRECTION",
+    reference: movement.id,
+    description: `Undo of ${requestedQty} unit(s)`,
+    qtyIn: movement.type === "OUT" ? requestedQty : 0,
+    qtyOut: movement.type === "IN" ? requestedQty : 0,
+    balanceAfter: await currentItemQuantity(connection, movement.item_id),
+    recordedBy: actorName,
+  });
+  return { status: 200, deleted: remainingQty === 0, remainingQty, movement: { ...movement, qty: remainingQty } };
+}
+
+// Deletes an item and writes its delete to the audit log.
+async function applyItemDelete(connection, itemId, actorName) {
+  const [[item]] = await connection.query("SELECT * FROM inventory WHERE id=? FOR UPDATE", [itemId]);
+  if (!item) return { status: 404, error: "Item not found." };
+  await connection.query("DELETE FROM inventory WHERE id=?", [itemId]);
+  await connection.query(
+    "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+    [`AUDIT-DELETE-${crypto.randomUUID()}`, itemId, item.name, "DELETE", JSON.stringify(toItem(item)), actorName],
+  );
+  return { status: 204 };
+}
+
+app.delete(
+  "/api/movements/:id",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const id = cleanText(req.params.id, 64);
+    if (!canDelete(actor)) return sendForApproval(res, actor, "MOVEMENT_DELETE", id, cleanText(req.body?.reason, 255));
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await applyMovementDelete(connection, id, actor.username);
+      if (result.status !== 204) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await connection.commit();
+      res.status(204).end();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
+app.patch(
+  "/api/movements/:id/undo",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const id = cleanText(req.params.id, 64);
+    const requestedQty = Number(req.body?.qty);
+    if (!Number.isInteger(requestedQty) || requestedQty < 1) {
+      return res.status(400).json({ error: "Undo quantity must be a positive whole number." });
+    }
+    if (!canEdit(actor)) {
+      return sendForApproval(res, actor, "MOVEMENT_UNDO", id, cleanText(req.body?.reason, 255), requestedQty);
+    }
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await applyMovementUndo(connection, id, requestedQty, actor.username);
+      if (result.status !== 200) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await connection.commit();
+      if (result.deleted) return res.json({ deleted: true });
+      res.json({ deleted: false, movement: toMovement(result.movement) });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
 app.delete(
   "/api/inventory/:id",
   ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const itemId = normalizeItemId(req.params.id);
-    const actor = await getAuthenticatedUser(req);
-    const createdBy = actor?.username || req.body?.createdBy || "Unknown";
-    const [[item]] = await pool.query("SELECT * FROM inventory WHERE id=?", [
-      itemId,
-    ]);
-    if (!item) {
-      return res.status(404).json({ error: "Item not found." });
+    if (!canDelete(actor)) return sendForApproval(res, actor, "ITEM_DELETE", itemId, cleanText(req.body?.reason, 255));
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await applyItemDelete(connection, itemId, actor.username);
+      if (result.status !== 204) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await connection.commit();
+      res.status(204).end();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-    await pool.query("DELETE FROM inventory WHERE id=?", [itemId]);
-    await pool.query(
-      "INSERT INTO inventory_audit (id, item_id, item_name, action, item_data, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        `AUDIT-DELETE-${crypto.randomUUID()}`,
-        itemId,
-        item.name,
-        "DELETE",
-        JSON.stringify(toItem(item)),
-        createdBy,
-      ],
-    );
-    res.status(204).end();
   }),
 );
 
@@ -2298,7 +2427,7 @@ app.get(
 app.post(
   "/api/suppliers",
   ah(async (req, res) => {
-    const actor = await requireAdmin(req, res);
+    const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const data = cleanSupplier(req.body || {});
     if (!data.name) return res.status(400).json({ error: "Supplier name is required." });
@@ -2328,7 +2457,7 @@ app.post(
 app.put(
   "/api/suppliers/:id",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const supplierId = toPositiveInt(req.params.id);
     if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
     const data = cleanSupplier(req.body || {});
@@ -2346,7 +2475,7 @@ app.put(
 app.patch(
   "/api/suppliers/:id/status",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const supplierId = toPositiveInt(req.params.id);
     if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
     const active = req.body?.isActive ? 1 : 0;
@@ -2387,7 +2516,7 @@ const cleanSupplierItem = (body) => ({
 app.post(
   "/api/suppliers/:id/items",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const supplierId = toPositiveInt(req.params.id);
     const itemId = normalizeItemId(req.body?.itemId);
     const data = cleanSupplierItem(req.body || {});
@@ -2545,7 +2674,7 @@ async function renameItemId(connection, oldId, newId) {
 app.post(
   "/api/items/:id/use-supplier-code",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const oldId = normalizeItemId(req.params.id);
     const newId = normalizeItemId(req.body?.newId);
     if (!newId) return res.status(400).json({ error: "Choose the supplier code to use as the Item ID." });
@@ -2767,7 +2896,7 @@ function salesRangeWhere(query) {
 app.get(
   "/api/sales/summary",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const now = new Date();
     const today = localDateString(now);
     const yesterday = localDateString(new Date(now.getTime() - 86400000));
@@ -2826,7 +2955,7 @@ app.get(
 app.get(
   "/api/sales/series",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const granularity = ["day", "month", "year"].includes(req.query.granularity) ? req.query.granularity : "day";
     const format = { day: "%Y-%m-%d", month: "%Y-%m", year: "%Y" }[granularity];
     const { where, params } = salesRangeWhere(req.query);
@@ -2852,7 +2981,7 @@ app.get(
 app.get(
   "/api/sales/top-items",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const { where, params } = salesRangeWhere(req.query);
     const [rows] = await pool.query(
       `SELECT item_id, MAX(item_name) AS item_name, SUM(quantity) AS units, SUM(total_sales) AS sales,
@@ -2893,7 +3022,7 @@ const saleRow = (row) => ({
 app.get(
   "/api/sales",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    if (!(await requireSignedIn(req, res))) return;
     const { where, params } = salesRangeWhere(req.query);
     const clauses = [where];
     const extra = [...params];
@@ -3099,14 +3228,14 @@ async function recordChangeRequest(connection, entry) {
 app.patch(
   "/api/stock-in/lines/:id",
   ah(async (req, res) => {
-    const actor = await requireAdmin(req, res);
+    const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const lineId = cleanText(req.params.id, 64);
     const newQty = Number(req.body?.qty);
     if (!Number.isInteger(newQty) || newQty < 1) {
       return res.status(400).json({ error: "Quantity must be a positive whole number." });
     }
-    if (!actor.is_super_admin) {
+    if (!canEdit(actor)) {
       const [[line]] = await pool.query(
         `SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name
          FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.id=? AND m.type='IN'`,
@@ -3154,9 +3283,10 @@ app.patch(
 app.delete(
   "/api/stock-in/lines/:id",
   ah(async (req, res) => {
-    const actor = await requireSuperAdmin(req, res);
+    const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const lineId = cleanText(req.params.id, 64);
+    if (!canDelete(actor)) return sendForApproval(res, actor, "STOCK_IN_DELETE", lineId, cleanText(req.body?.reason, 255));
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3191,9 +3321,10 @@ app.delete(
 app.delete(
   "/api/stock-in/invoice",
   ah(async (req, res) => {
-    const actor = await requireSuperAdmin(req, res);
+    const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const reference = cleanText(req.query.ref, 64);
+    if (!canDelete(actor)) return sendForApproval(res, actor, "INVOICE_DELETE", reference, cleanText(req.body?.reason, 255));
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3234,11 +3365,16 @@ app.delete(
 app.get(
   "/api/change-requests",
   ah(async (req, res) => {
-    if (!(await requireAdmin(req, res))) return;
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const status = ["PENDING", "APPROVED", "REJECTED"].includes(req.query.status) ? req.query.status : "";
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
     const clauses = ["1 = 1"];
     const params = [];
+    if (actor.role !== "admin" && !canDelete(actor)) {
+      clauses.push("requested_by = ?");
+      params.push(actor.username);
+    }
     if (status) { clauses.push("status = ?"); params.push(status); }
     if (q) {
       clauses.push("(invoice LIKE ? OR item_name LIKE ? OR item_id = ? OR requested_by LIKE ?)");
@@ -3279,12 +3415,42 @@ app.post(
         await connection.rollback();
         return res.status(409).json({ error: "This request was already decided." });
       }
-      if (request.request_type !== "STOCK_IN_EDIT") {
-        await connection.rollback();
-        return res.status(400).json({ error: "This request type cannot be approved here." });
+      let result;
+      switch (request.request_type) {
+        case "STOCK_IN_EDIT":
+          result = await setStockInLineQty(connection, request.target_id, Number(request.new_value), actor.username);
+          break;
+        case "STOCK_IN_DELETE":
+          result = await removeStockInLine(connection, request.target_id, actor.username);
+          break;
+        case "INVOICE_DELETE": {
+          const [lines] = await connection.query(
+            "SELECT m.id FROM movements m WHERE m.type='IN' AND COALESCE(m.reference, '') = ? FOR UPDATE",
+            [request.target_id],
+          );
+          result = { status: 200 };
+          for (const line of lines) {
+            const removed = await removeStockInLine(connection, line.id, actor.username);
+            if (removed.status !== 200) {
+              result = removed;
+              break;
+            }
+          }
+          break;
+        }
+        case "MOVEMENT_DELETE":
+          result = await applyMovementDelete(connection, request.target_id, actor.username);
+          break;
+        case "MOVEMENT_UNDO":
+          result = await applyMovementUndo(connection, request.target_id, Number(request.new_value), actor.username);
+          break;
+        case "ITEM_DELETE":
+          result = await applyItemDelete(connection, request.target_id, actor.username);
+          break;
+        default:
+          result = { status: 400, error: "This request type cannot be approved here." };
       }
-      const result = await setStockInLineQty(connection, request.target_id, Number(request.new_value), actor.username);
-      if (result.status !== 200) {
+      if (![200, 204].includes(result.status)) {
         await connection.rollback();
         return res.status(result.status).json({ error: result.error });
       }
@@ -3326,7 +3492,7 @@ app.get(
   ah(async (req, res) => {
     const actor = await getAuthenticatedUser(req);
     if (!actor) return res.status(401).json({ error: "Sign in." });
-    res.json({ username: actor.username, role: actor.role, isSuperAdmin: Number(actor.is_super_admin) === 1 });
+    res.json({ username: actor.username, role: actor.role, isSuperAdmin: canDelete(actor), canEdit: canEdit(actor) });
   }),
 );
 
@@ -3436,128 +3602,7 @@ app.post(
   }),
 );
 
-app.delete(
-  "/api/movements/:id",
-  ah(async (req, res) => {
-    const actor = await requireAdmin(req, res);
-    if (!actor) return;
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [[movement]] = await connection.query(
-        "SELECT * FROM movements WHERE id=? FOR UPDATE",
-        [req.params.id],
-      );
-      if (!movement) {
-        await connection.rollback(); // was missing: left the transaction open
-        return res.status(404).json({ error: "Movement not found" });
-      }
-      const delta = movement.type === "IN" ? -movement.qty : movement.qty;
-      await connection.query("DELETE FROM movements WHERE id=?", [
-        req.params.id,
-      ]);
-      await connection.query(
-        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
-        [delta, movement.item_id],
-      );
-      await recordStockLedger(connection, {
-        sourceId: `DEL-${movement.id}`,
-        itemId: movement.item_id,
-        type: "INVENTORY_CORRECTION",
-        reference: movement.id,
-        description: "Stock movement deleted",
-        qtyIn: movement.type === "OUT" ? movement.qty : 0,
-        qtyOut: movement.type === "IN" ? movement.qty : 0,
-        balanceAfter: await currentItemQuantity(connection, movement.item_id),
-        recordedBy: actor.username,
-      });
-      await connection.commit();
-      res.status(204).end();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }),
-);
 
-app.patch(
-  "/api/movements/:id/undo",
-  ah(async (req, res) => {
-    const actor = await requireAdmin(req, res);
-    if (!actor) return;
-    const requestedQty = Number(req.body?.qty);
-    if (!Number.isInteger(requestedQty) || requestedQty < 1) {
-      return res
-        .status(400)
-        .json({ error: "Undo quantity must be a positive whole number." });
-    }
-
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [[movement]] = await connection.query(
-        "SELECT * FROM movements WHERE id=? FOR UPDATE",
-        [req.params.id],
-      );
-      if (!movement) {
-        await connection.rollback();
-        return res.status(404).json({ error: "Movement not found" });
-      }
-      if (requestedQty > movement.qty) {
-        await connection.rollback();
-        return res
-          .status(400)
-          .json({
-            error: "Undo quantity cannot exceed the movement quantity.",
-          });
-      }
-
-      const delta = movement.type === "IN" ? -requestedQty : requestedQty;
-      const remainingQty = movement.qty - requestedQty;
-      if (remainingQty === 0) {
-        await connection.query("DELETE FROM movements WHERE id=?", [
-          req.params.id,
-        ]);
-      } else {
-        await connection.query("UPDATE movements SET qty=? WHERE id=?", [
-          remainingQty,
-          req.params.id,
-        ]);
-      }
-      await connection.query(
-        "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
-        [delta, movement.item_id],
-      );
-      await recordStockLedger(connection, {
-        sourceId: `UNDO-${crypto.randomUUID()}`,
-        itemId: movement.item_id,
-        type: "INVENTORY_CORRECTION",
-        reference: movement.id,
-        description: `Undo of ${requestedQty} unit(s)`,
-        qtyIn: movement.type === "OUT" ? requestedQty : 0,
-        qtyOut: movement.type === "IN" ? requestedQty : 0,
-        balanceAfter: await currentItemQuantity(connection, movement.item_id),
-        recordedBy: actor.username,
-      });
-      await connection.commit();
-
-      if (remainingQty === 0) {
-        return res.json({ deleted: true });
-      }
-      res.json({
-        deleted: false,
-        movement: toMovement({ ...movement, qty: remainingQty }),
-      });
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }),
-);
 
 /* ------------------------- Warehouse layout ------------------------- */
 
@@ -3680,6 +3725,85 @@ async function requireAdmin(req, res) {
     return null;
   }
   return actor;
+}
+
+// Staff and admins both use the everyday features. Edits and undos by staff go to the super admin;
+// deletes go to the super admin, whoever asks.
+const canEdit = (actor) => Boolean(actor) && (actor.role === "admin" || Number(actor.is_super_admin) === 1);
+const canDelete = (actor) => Boolean(actor) && Number(actor.is_super_admin) === 1;
+
+async function requireSignedIn(req, res) {
+  const actor = await getAuthenticatedUser(req);
+  if (!actor) {
+    res.status(401).json({ error: "Sign in first." });
+    return null;
+  }
+  return actor;
+}
+
+// Creates a pending request for a change a staff member (or an admin, for deletes) cannot make directly.
+// The details shown on the request are read from the record it is about.
+async function sendForApproval(res, actor, type, targetId, reason, newValue = null) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    let info = { itemId: "", itemName: "", invoice: "", oldValue: null, newValue: null };
+    if (type.startsWith("MOVEMENT_")) {
+      const [[m]] = await connection.query(
+        "SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.id=?",
+        [targetId],
+      );
+      if (!m) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Movement not found." });
+      }
+      info = { itemId: m.item_id, itemName: m.item_name, invoice: m.reference || "", oldValue: Number(m.qty), newValue };
+    } else if (type === "ITEM_DELETE") {
+      const [[item]] = await connection.query("SELECT id, name, quantity FROM inventory WHERE id=?", [targetId]);
+      if (!item) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Item not found." });
+      }
+      info = { itemId: item.id, itemName: item.name, invoice: "", oldValue: Number(item.quantity), newValue: 0 };
+    } else if (type === "INVOICE_DELETE") {
+      const [lines] = await connection.query(
+        "SELECT m.item_id, m.qty, i.name AS item_name FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.type='IN' AND COALESCE(m.reference,'') = ?",
+        [targetId],
+      );
+      if (lines.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "No stock-in lines on this invoice." });
+      }
+      info = {
+        itemId: lines.length === 1 ? lines[0].item_id : `${lines.length} items`,
+        itemName: lines.length === 1 ? lines[0].item_name : `Invoice ${targetId || "(no invoice)"}`,
+        invoice: targetId,
+        oldValue: lines.reduce((sum, l) => sum + Number(l.qty), 0),
+        newValue: 0,
+      };
+    } else {
+      const [[m]] = await connection.query(
+        "SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.id=? AND m.type='IN'",
+        [targetId],
+      );
+      if (!m) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Stock-in line not found." });
+      }
+      info = { itemId: m.item_id, itemName: m.item_name, invoice: m.reference || "", oldValue: Number(m.qty), newValue: 0 };
+    }
+    await recordChangeRequest(connection, {
+      type, targetId, invoice: info.invoice, itemId: info.itemId, itemName: info.itemName,
+      oldValue: info.oldValue, newValue: info.newValue, reason, requestedBy: actor.username, status: "PENDING",
+    });
+    await connection.commit();
+    res.status(202).json({ requested: true });
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function requireSuperAdmin(req, res) {

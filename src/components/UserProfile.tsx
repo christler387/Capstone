@@ -491,6 +491,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       detail="Used for password reset codes"
                       onClick={() => setIsRecoveryModalOpen(true)}
                     />
+                    <ProfileAction
+                      icon="bx-git-compare"
+                      label="Requests"
+                      detail="Edit and delete approvals, with the audit trail"
+                      onClick={() => window.open(`${window.location.pathname}?section=requests`, "_blank", "noopener")}
+                    />
                   </div>
 
                   <div className="profile-action-group">
@@ -512,12 +518,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                         await loadManagedUsers();
                         setIsManageUsersModalOpen(true);
                       }}
-                    />
-                    <ProfileAction
-                      icon="bx-git-compare"
-                      label="Requests"
-                      detail="Edit and delete approvals, with the audit trail"
-                      onClick={() => window.open(`${window.location.pathname}?section=requests`, "_blank", "noopener")}
                     />
                   </div>
                 </div>

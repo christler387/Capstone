@@ -752,10 +752,14 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   const deleteItem = async (id: string) => {
     const deletedItem = inventory.find(item => item.id === id);
     const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
-    await requestJson<void>(`/inventory/${encodeURIComponent(id)}`, {
+    const result = await requestJson<{ requested?: boolean } | undefined>(`/inventory/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       body: JSON.stringify({ createdBy: currentUser }),
     });
+    if (result?.requested) {
+      window.alert('Sent for approval. Nothing changes until the super administrator approves it.');
+      return;
+    }
     setInventory(prev => prev.filter(i => i.id !== id));
     if (deletedItem) setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
@@ -785,15 +789,17 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   };
 
   const undoMovement = async (movementId: string, undoQuantity: number) => {
-    if (userRole !== 'admin') return;
-
     const movementToUndo = movements.find(m => m.id === movementId);
     if (!movementToUndo) return;
 
-    const result = await requestJson<{ deleted: boolean; movement?: Movement }>(`/movements/${encodeURIComponent(movementId)}/undo`, {
+    const result = await requestJson<{ deleted: boolean; movement?: Movement; requested?: boolean }>(`/movements/${encodeURIComponent(movementId)}/undo`, {
       method: 'PATCH',
       body: JSON.stringify({ qty: undoQuantity }),
     });
+    if (result.requested) {
+      window.alert('Sent for approval. Nothing changes until the super administrator approves it.');
+      return;
+    }
     setMovements(prev => result.deleted
       ? prev.filter(m => m.id !== movementId)
       : prev.map(m => m.id === movementId && result.movement ? result.movement : m));

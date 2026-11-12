@@ -70,7 +70,8 @@ const formatPeso = (value: number) =>
 const formatDateTime = (value: string) => value.slice(0, 16).replace(' ', ' · ');
 
 export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, selectedItemId, onSelectItem, onItemRenamed, userRole }) => {
-  const isAdmin = userRole === 'admin';
+  // Staff have the same features as admins.
+  const isAdmin = true;
   const [itemSearch, setItemSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');

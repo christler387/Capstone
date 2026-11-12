@@ -69,7 +69,8 @@ function rangeFor(preset: string): { from: string; to: string } {
 const invoiceLabel = (reference: string) => reference || 'No invoice';
 
 export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole, onAddItemsToInvoice }) => {
-  const isAdmin = userRole === 'admin';
+  // Staff have the same features as admins; edits and deletes are sent for approval.
+  const isAdmin = true;
   const [preset, setPreset] = useState('month');
   const [range, setRange] = useState(rangeFor('month'));
   const [search, setSearch] = useState('');
@@ -305,7 +306,11 @@ export const InvoiceModal: React.FC<{
     if (!window.confirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`)) return;
     setError(null);
     try {
-      await apiRequest(`/stock-in/lines/${encodeURIComponent(line.id)}`, { method: 'DELETE' });
+      const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/lines/${encodeURIComponent(line.id)}`, { method: 'DELETE' });
+      if (result?.requested) {
+        setInfo('Sent for approval. Nothing changes until the super administrator approves it.');
+        return;
+      }
       window.dispatchEvent(new CustomEvent('inventory-changed'));
       onChanged();
       load();
@@ -319,7 +324,11 @@ export const InvoiceModal: React.FC<{
     if (!window.confirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`)) return;
     setError(null);
     try {
-      await apiRequest(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`, { method: 'DELETE' });
+      const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`, { method: 'DELETE' });
+      if (result?.requested) {
+        setInfo('Sent for approval. Nothing changes until the super administrator approves it.');
+        return;
+      }
       window.dispatchEvent(new CustomEvent('inventory-changed'));
       onChanged();
       onClose();
@@ -388,8 +397,10 @@ export const InvoiceModal: React.FC<{
                         {isSuperAdmin ? 'Edit' : 'Request edit'}
                       </button>
                     )}
-                    {isSuperAdmin && editingId !== line.id && (
-                      <button type="button" className="sin-btn is-danger" onClick={() => deleteLine(line)}>Delete</button>
+                    {editingId !== line.id && (
+                      <button type="button" className="sin-btn is-danger" onClick={() => deleteLine(line)}>
+                        {isSuperAdmin ? 'Delete' : 'Request delete'}
+                      </button>
                     )}
                     {isAdmin && editingId === line.id && (
                       <>
@@ -410,8 +421,10 @@ export const InvoiceModal: React.FC<{
         <div className="sin-dialog-foot">
           <span className="sin-muted">{detail?.lines.length ?? 0} item(s) · {units.toLocaleString()} unit(s)</span>
           <div className="sin-foot-actions">
-            {isSuperAdmin && detail && detail.lines.length > 0 && (
-              <button type="button" className="sin-btn is-danger" onClick={deleteInvoice}>Delete invoice</button>
+            {detail && detail.lines.length > 0 && (
+              <button type="button" className="sin-btn is-danger" onClick={deleteInvoice}>
+                {isSuperAdmin ? 'Delete invoice' : 'Request invoice delete'}
+              </button>
             )}
             {detail && reference && (
               <button type="button" className="sin-btn is-primary" onClick={() => onAddItems(detail)}>
