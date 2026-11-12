@@ -5,6 +5,7 @@ import { StockCard } from './components/StockCard';
 import { Suppliers } from './components/Suppliers';
 import { Sales } from './components/Sales';
 import { StockInHistoryPage } from './components/StockInHistory';
+import { ChangeRequestsPage } from './components/ChangeRequests';
 
 const API_BASE = '/api';
 
@@ -58,7 +59,10 @@ const App: React.FC = () => {
   const [inventory, setInventory] = useState<Item[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
-  const [currentSection, setCurrentSection] = useState('dashboard');
+  // The Requests page opens in its own tab with ?section=requests.
+  const [currentSection, setCurrentSection] = useState(() =>
+    new URLSearchParams(window.location.search).get('section') === 'requests' ? 'requests' : 'dashboard',
+  );
   const [stockCardItemId, setStockCardItemId] = useState('');
   // Set when "Add items to this invoice" is used on the stock-in history page.
   const [stockInPrefill, setStockInPrefill] = useState<{ invoice: string; supplierId: string } | null>(null);
@@ -935,6 +939,8 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         );
       case 'sales':
         return <Sales userRole={userRole} />;
+      case 'requests':
+        return <ChangeRequestsPage />;
       case 'stock-in-history':
         return (
           <StockInHistoryPage
@@ -1116,7 +1122,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
             <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
             <h1 className="sr-only">
-              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection === 'stock-in-history' ? 'Stock in history' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection === 'stock-in-history' ? 'Stock in history' : currentSection === 'requests' ? 'Requests' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation

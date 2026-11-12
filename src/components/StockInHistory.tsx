@@ -255,6 +255,14 @@ export const InvoiceModal: React.FC<{
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    apiRequest<{ isSuperAdmin: boolean }>('/me')
+      .then((me) => setIsSuperAdmin(me.isSuperAdmin))
+      .catch(() => setIsSuperAdmin(false));
+  }, []);
 
   const load = () =>
     apiRequest<InvoiceDetail>(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`)
@@ -267,22 +275,56 @@ export const InvoiceModal: React.FC<{
 
   const saveLine = async (line: InvoiceLine) => {
     setError(null);
+    setInfo(null);
     const qty = Number(editQty);
     if (!Number.isInteger(qty) || qty < 1) {
       setError('Quantity must be a whole number of at least 1.');
       return;
     }
     try {
-      await apiRequest(`/stock-in/lines/${encodeURIComponent(line.id)}`, {
+      const result = await apiRequest<{ requested?: boolean }>(`/stock-in/lines/${encodeURIComponent(line.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({ qty }),
       });
       setEditingId(null);
+      if (result.requested) {
+        setInfo(`Sent for approval: ${line.itemName} from ${line.qty} to ${qty}. Nothing changes until the super administrator approves it.`);
+        onChanged();
+        return;
+      }
       window.dispatchEvent(new CustomEvent('inventory-changed'));
       onChanged();
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not change the quantity.');
+    }
+  };
+
+  // Super administrator only: removes the line and takes its stock back out.
+  const deleteLine = async (line: InvoiceLine) => {
+    if (!window.confirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`)) return;
+    setError(null);
+    try {
+      await apiRequest(`/stock-in/lines/${encodeURIComponent(line.id)}`, { method: 'DELETE' });
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+      onChanged();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the line.');
+    }
+  };
+
+  // Super administrator only: removes every line on the invoice.
+  const deleteInvoice = async () => {
+    if (!window.confirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`)) return;
+    setError(null);
+    try {
+      await apiRequest(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`, { method: 'DELETE' });
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+      onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the invoice.');
     }
   };
 
@@ -303,6 +345,7 @@ export const InvoiceModal: React.FC<{
         </div>
 
         {error && <div className="sin-alert" role="alert">{error}</div>}
+        {info && <div className="sin-info" role="status">{info}</div>}
 
         <div className="stk-table-wrap">
           <table className="stk-table">
@@ -341,7 +384,12 @@ export const InvoiceModal: React.FC<{
                   <td>{line.recordedBy || '—'}</td>
                   <td className="sin-actions">
                     {isAdmin && editingId !== line.id && (
-                      <button type="button" className="sin-btn is-ghost" onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}>Edit</button>
+                      <button type="button" className="sin-btn is-ghost" onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}>
+                        {isSuperAdmin ? 'Edit' : 'Request edit'}
+                      </button>
+                    )}
+                    {isSuperAdmin && editingId !== line.id && (
+                      <button type="button" className="sin-btn is-danger" onClick={() => deleteLine(line)}>Delete</button>
                     )}
                     {isAdmin && editingId === line.id && (
                       <>
@@ -362,6 +410,9 @@ export const InvoiceModal: React.FC<{
         <div className="sin-dialog-foot">
           <span className="sin-muted">{detail?.lines.length ?? 0} item(s) · {units.toLocaleString()} unit(s)</span>
           <div className="sin-foot-actions">
+            {isSuperAdmin && detail && detail.lines.length > 0 && (
+              <button type="button" className="sin-btn is-danger" onClick={deleteInvoice}>Delete invoice</button>
+            )}
             {detail && reference && (
               <button type="button" className="sin-btn is-primary" onClick={() => onAddItems(detail)}>
                 Add items to this invoice

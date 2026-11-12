@@ -513,6 +513,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                         setIsManageUsersModalOpen(true);
                       }}
                     />
+                    <ProfileAction
+                      icon="bx-git-compare"
+                      label="Requests"
+                      detail="Edit and delete approvals, with the audit trail"
+                      onClick={() => window.open(`${window.location.pathname}?section=requests`, "_blank", "noopener")}
+                    />
                   </div>
                 </div>
               )}

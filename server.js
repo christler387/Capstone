@@ -110,7 +110,7 @@ async function getAuthenticatedUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
   const [[user]] = await pool.query(
-    `SELECT u.id, u.username, u.role
+    `SELECT u.id, u.username, u.role, u.is_super_admin
      FROM user_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
@@ -630,6 +630,33 @@ async function initializeDatabase() {
   }
   await createStockCardTables();
   await createSalesTable();
+  await addColumnIfMissing("users", "is_super_admin", "TINYINT(1) NOT NULL DEFAULT 0");
+  await pool.query(`CREATE TABLE IF NOT EXISTS change_requests (
+    id VARCHAR(64) PRIMARY KEY,
+    request_type VARCHAR(32) NOT NULL,
+    target_id VARCHAR(64) NOT NULL,
+    invoice VARCHAR(64) NOT NULL DEFAULT '',
+    item_id VARCHAR(32) NOT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    old_value INT NULL,
+    new_value INT NULL,
+    reason VARCHAR(255) NULL,
+    requested_by VARCHAR(64) NOT NULL,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(16) NOT NULL,
+    decided_by VARCHAR(64) NULL,
+    decided_at TIMESTAMP NULL,
+    decision_note VARCHAR(255) NULL,
+    KEY idx_change_requests_status (status),
+    KEY idx_change_requests_invoice (invoice)
+  ) ${tableOptions}`);
+  // The super administrator is the account named in SUPER_ADMIN_USERNAME (set it in the server environment).
+  // It is applied only while no super administrator exists, so it does not undo a later change.
+  const superAdminName = cleanText(process.env.SUPER_ADMIN_USERNAME, 64);
+  const [[superCount]] = await pool.query("SELECT COUNT(*) AS n FROM users WHERE is_super_admin = 1");
+  if (superAdminName && Number(superCount.n) === 0) {
+    await pool.query("UPDATE users SET is_super_admin = 1 WHERE username = ? AND role = 'admin'", [superAdminName]);
+  }
   await addColumnIfMissing("movements", "reference", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "supplier_id", "INT NULL");
   await backfillStockLedger();
@@ -2995,64 +3022,311 @@ app.get(
   }),
 );
 
-// Changes the quantity of one stock-in line (admin). Stock moves by the difference, and the change is
-// recorded on the item's stock card with the person who made it.
+// Changes the stock-in line quantity by the difference. Shared by a direct super-admin edit and an approved request.
+async function setStockInLineQty(connection, lineId, newQty, actorName) {
+  const [[line]] = await connection.query(
+    "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN' FOR UPDATE",
+    [lineId],
+  );
+  if (!line) return { status: 404, error: "Stock-in line not found." };
+  const oldQty = Number(line.qty);
+  const diff = newQty - oldQty;
+  if (diff === 0) return { status: 200, qty: oldQty };
+  const [[inv]] = await connection.query("SELECT quantity FROM inventory WHERE id=? FOR UPDATE", [line.item_id]);
+  if (!inv) return { status: 404, error: "Item not found." };
+  if (Number(inv.quantity) + diff < 0) {
+    return { status: 400, error: "This change would make the stock on hand negative." };
+  }
+  await connection.query("UPDATE inventory SET quantity = quantity + ?, version = version + 1 WHERE id=?", [diff, line.item_id]);
+  await connection.query("UPDATE movements SET qty=? WHERE id=?", [newQty, line.id]);
+  await recordStockLedger(connection, {
+    sourceId: `EDIT-${line.id}-${crypto.randomUUID()}`,
+    itemId: line.item_id,
+    type: "INVENTORY_CORRECTION",
+    reference: line.reference || line.id,
+    description: `Stock-in line changed from ${oldQty} to ${newQty}`,
+    qtyIn: diff > 0 ? diff : 0,
+    qtyOut: diff < 0 ? -diff : 0,
+    balanceAfter: Number(inv.quantity) + diff,
+    recordedBy: actorName,
+  });
+  return { status: 200, qty: newQty };
+}
+
+// Removes a stock-in line and takes its stock back out. The stock card keeps the removal.
+async function removeStockInLine(connection, lineId, actorName) {
+  const [[line]] = await connection.query(
+    "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN' FOR UPDATE",
+    [lineId],
+  );
+  if (!line) return { status: 404, error: "Stock-in line not found." };
+  const qty = Number(line.qty);
+  const [[inv]] = await connection.query("SELECT quantity FROM inventory WHERE id=? FOR UPDATE", [line.item_id]);
+  if (!inv) return { status: 404, error: "Item not found." };
+  if (Number(inv.quantity) - qty < 0) {
+    return { status: 400, error: "Removing this line would make the stock on hand negative." };
+  }
+  await connection.query("UPDATE inventory SET quantity = quantity - ?, version = version + 1 WHERE id=?", [qty, line.item_id]);
+  await connection.query("DELETE FROM movements WHERE id=?", [line.id]);
+  await recordStockLedger(connection, {
+    sourceId: `DELSI-${line.id}`,
+    itemId: line.item_id,
+    type: "INVENTORY_CORRECTION",
+    reference: line.reference || line.id,
+    description: `Stock-in line of ${qty} removed`,
+    qtyOut: qty,
+    balanceAfter: Number(inv.quantity) - qty,
+    recordedBy: actorName,
+  });
+  return { status: 200, qty };
+}
+
+async function recordChangeRequest(connection, entry) {
+  await connection.query(
+    `INSERT INTO change_requests (id, request_type, target_id, invoice, item_id, item_name, old_value, new_value, reason,
+       requested_by, status, decided_by, decided_at, decision_note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      `CR-${crypto.randomUUID()}`, entry.type, entry.targetId, entry.invoice || "", entry.itemId, entry.itemName,
+      entry.oldValue ?? null, entry.newValue ?? null, entry.reason || null, entry.requestedBy, entry.status,
+      entry.decidedBy || null, entry.status === "PENDING" ? null : localDateTimeString(new Date()),
+      entry.note || null,
+    ],
+  );
+}
+
+// An admin's quantity change waits for the super admin. A super admin's change is made straight away.
 app.patch(
   "/api/stock-in/lines/:id",
   ah(async (req, res) => {
     const actor = await requireAdmin(req, res);
     if (!actor) return;
+    const lineId = cleanText(req.params.id, 64);
     const newQty = Number(req.body?.qty);
     if (!Number.isInteger(newQty) || newQty < 1) {
       return res.status(400).json({ error: "Quantity must be a positive whole number." });
     }
+    if (!actor.is_super_admin) {
+      const [[line]] = await pool.query(
+        `SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name
+         FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.id=? AND m.type='IN'`,
+        [lineId],
+      );
+      if (!line) return res.status(404).json({ error: "Stock-in line not found." });
+      if (Number(line.qty) === newQty) return res.json({ id: lineId, qty: newQty, requested: false });
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        await recordChangeRequest(connection, {
+          type: "STOCK_IN_EDIT", targetId: line.id, invoice: line.reference || "", itemId: line.item_id,
+          itemName: line.item_name, oldValue: Number(line.qty), newValue: newQty, requestedBy: actor.username,
+          status: "PENDING",
+        });
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+      return res.status(202).json({ id: lineId, requested: true });
+    }
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      const [[line]] = await connection.query(
-        "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN' FOR UPDATE",
-        [cleanText(req.params.id, 64)],
-      );
-      if (!line) {
+      const result = await setStockInLineQty(connection, lineId, newQty, actor.username);
+      if (result.status !== 200) {
         await connection.rollback();
-        return res.status(404).json({ error: "Stock-in line not found." });
+        return res.status(result.status).json({ error: result.error });
       }
-      const oldQty = Number(line.qty);
-      const diff = newQty - oldQty;
-      if (diff === 0) {
-        await connection.rollback();
-        return res.json({ id: line.id, qty: oldQty });
-      }
-      const [[inv]] = await connection.query("SELECT quantity FROM inventory WHERE id=? FOR UPDATE", [line.item_id]);
-      if (!inv) {
-        await connection.rollback();
-        return res.status(404).json({ error: "Item not found." });
-      }
-      if (Number(inv.quantity) + diff < 0) {
-        await connection.rollback();
-        return res.status(400).json({ error: "This change would make the stock on hand negative." });
-      }
-      await connection.query("UPDATE inventory SET quantity = quantity + ?, version = version + 1 WHERE id=?", [diff, line.item_id]);
-      await connection.query("UPDATE movements SET qty=? WHERE id=?", [newQty, line.id]);
-      await recordStockLedger(connection, {
-        sourceId: `EDIT-${line.id}-${crypto.randomUUID()}`,
-        itemId: line.item_id,
-        type: "INVENTORY_CORRECTION",
-        reference: line.reference || line.id,
-        description: `Stock-in line changed from ${oldQty} to ${newQty}`,
-        qtyIn: diff > 0 ? diff : 0,
-        qtyOut: diff < 0 ? -diff : 0,
-        balanceAfter: Number(inv.quantity) + diff,
-        recordedBy: actor.username,
-      });
       await connection.commit();
-      res.json({ id: line.id, qty: newQty });
+      res.json({ id: lineId, qty: result.qty, requested: false });
     } catch (error) {
       await connection.rollback();
       throw error;
     } finally {
       connection.release();
     }
+  }),
+);
+
+// Deleting a stock-in line is for the super admin only.
+app.delete(
+  "/api/stock-in/lines/:id",
+  ah(async (req, res) => {
+    const actor = await requireSuperAdmin(req, res);
+    if (!actor) return;
+    const lineId = cleanText(req.params.id, 64);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [[line]] = await connection.query(
+        "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN'", [lineId],
+      );
+      const [[item]] = line
+        ? await connection.query("SELECT name FROM inventory WHERE id=?", [line.item_id])
+        : [[null]];
+      const result = await removeStockInLine(connection, lineId, actor.username);
+      if (result.status !== 200) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await recordChangeRequest(connection, {
+        type: "STOCK_IN_DELETE", targetId: line.id, invoice: line.reference || "", itemId: line.item_id,
+        itemName: item?.name || line.item_id, oldValue: Number(line.qty), newValue: 0,
+        requestedBy: actor.username, decidedBy: actor.username, status: "APPROVED",
+      });
+      await connection.commit();
+      res.status(204).end();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
+// Deletes a whole invoice (all its stock-in lines). Super admin only.
+app.delete(
+  "/api/stock-in/invoice",
+  ah(async (req, res) => {
+    const actor = await requireSuperAdmin(req, res);
+    if (!actor) return;
+    const reference = cleanText(req.query.ref, 64);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [lines] = await connection.query(
+        `SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name
+         FROM movements m JOIN inventory i ON i.id = m.item_id
+         WHERE m.type='IN' AND COALESCE(m.reference, '') = ? FOR UPDATE`,
+        [reference],
+      );
+      if (lines.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "No stock-in lines on this invoice." });
+      }
+      for (const line of lines) {
+        const result = await removeStockInLine(connection, line.id, actor.username);
+        if (result.status !== 200) {
+          await connection.rollback();
+          return res.status(result.status).json({ error: result.error });
+        }
+        await recordChangeRequest(connection, {
+          type: "INVOICE_DELETE", targetId: line.id, invoice: reference, itemId: line.item_id,
+          itemName: line.item_name, oldValue: Number(line.qty), newValue: 0,
+          requestedBy: actor.username, decidedBy: actor.username, status: "APPROVED",
+        });
+      }
+      await connection.commit();
+      res.status(204).end();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
+// Requests: the list is for every admin (the audit), approving and rejecting is for the super admin.
+app.get(
+  "/api/change-requests",
+  ah(async (req, res) => {
+    if (!(await requireAdmin(req, res))) return;
+    const status = ["PENDING", "APPROVED", "REJECTED"].includes(req.query.status) ? req.query.status : "";
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
+    const clauses = ["1 = 1"];
+    const params = [];
+    if (status) { clauses.push("status = ?"); params.push(status); }
+    if (q) {
+      clauses.push("(invoice LIKE ? OR item_name LIKE ? OR item_id = ? OR requested_by LIKE ?)");
+      params.push(`%${q}%`, `%${q}%`, normalizeItemId(q), `%${q}%`);
+    }
+    const [rows] = await pool.query(
+      `SELECT id, request_type, invoice, item_id, item_name, old_value, new_value, reason, requested_by,
+              DATE_FORMAT(requested_at, '%Y-%m-%d %H:%i') AS requested_str, status, decided_by,
+              DATE_FORMAT(decided_at, '%Y-%m-%d %H:%i') AS decided_str, decision_note
+       FROM change_requests WHERE ${clauses.join(" AND ")}
+       ORDER BY requested_at DESC LIMIT 300`,
+      params,
+    );
+    res.json(rows.map((r) => ({
+      id: r.id, type: r.request_type, invoice: r.invoice, itemId: r.item_id, itemName: r.item_name,
+      oldValue: r.old_value, newValue: r.new_value, reason: r.reason || "", requestedBy: r.requested_by,
+      requestedAt: r.requested_str, status: r.status, decidedBy: r.decided_by || "", decidedAt: r.decided_str || "",
+      note: r.decision_note || "",
+    })));
+  }),
+);
+
+app.post(
+  "/api/change-requests/:id/approve",
+  ah(async (req, res) => {
+    const actor = await requireSuperAdmin(req, res);
+    if (!actor) return;
+    const id = cleanText(req.params.id, 64);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [[request]] = await connection.query("SELECT * FROM change_requests WHERE id=? FOR UPDATE", [id]);
+      if (!request) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Request not found." });
+      }
+      if (request.status !== "PENDING") {
+        await connection.rollback();
+        return res.status(409).json({ error: "This request was already decided." });
+      }
+      if (request.request_type !== "STOCK_IN_EDIT") {
+        await connection.rollback();
+        return res.status(400).json({ error: "This request type cannot be approved here." });
+      }
+      const result = await setStockInLineQty(connection, request.target_id, Number(request.new_value), actor.username);
+      if (result.status !== 200) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await connection.query(
+        "UPDATE change_requests SET status='APPROVED', decided_by=?, decided_at=NOW() WHERE id=?",
+        [actor.username, id],
+      );
+      await connection.commit();
+      res.json({ id, status: "APPROVED" });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
+app.post(
+  "/api/change-requests/:id/reject",
+  ah(async (req, res) => {
+    const actor = await requireSuperAdmin(req, res);
+    if (!actor) return;
+    const id = cleanText(req.params.id, 64);
+    const note = cleanText(req.body?.note, 255);
+    if (!note) return res.status(400).json({ error: "Enter the reason for rejecting this request." });
+    const [result] = await pool.query(
+      "UPDATE change_requests SET status='REJECTED', decided_by=?, decided_at=NOW(), decision_note=? WHERE id=? AND status='PENDING'",
+      [actor.username, note, id],
+    );
+    if (result.affectedRows === 0) return res.status(409).json({ error: "This request is not pending." });
+    res.json({ id, status: "REJECTED" });
+  }),
+);
+
+// The signed-in user's role, used by the screens to show or hide actions.
+app.get(
+  "/api/me",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) return res.status(401).json({ error: "Sign in." });
+    res.json({ username: actor.username, role: actor.role, isSuperAdmin: Number(actor.is_super_admin) === 1 });
   }),
 );
 
@@ -3403,6 +3677,16 @@ async function requireAdmin(req, res) {
     res
       .status(actor ? 403 : 401)
       .json({ error: "Administrator access is required." });
+    return null;
+  }
+  return actor;
+}
+
+async function requireSuperAdmin(req, res) {
+  const actor = await requireAdmin(req, res);
+  if (!actor) return null;
+  if (!actor.is_super_admin) {
+    res.status(403).json({ error: "Super administrator access is required." });
     return null;
   }
   return actor;
