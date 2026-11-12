@@ -63,7 +63,37 @@ export const pool = mysql.createPool({
 
 // Behind Hostinger's proxy, use the visitor's real address for rate limits (not the proxy's).
 app.set("trust proxy", 1);
-app.use(cors());
+
+// Security headers for every response. Pictures, fonts and icons are the only things loaded from other sites.
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), payment=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
+      "font-src 'self' data: https://fonts.gstatic.com https://unpkg.com",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join("; "),
+  );
+  next();
+});
+// Browsers may call the API only from the sites listed in ALLOWED_ORIGINS (comma separated).
+// The web app is served from this same server, so it normally needs no entry.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)) }));
 app.use(express.json({ limit: "10mb" }));
 
 // Express 4 does not catch rejected promises in async handlers; this forwards them to the error handler.
@@ -1586,7 +1616,9 @@ function inventoryValues(id, item) {
 
 app.get(
   "/api/inventory",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const [rows] = await pool.query("SELECT * FROM inventory ORDER BY id");
     res.json(rows.map(toItem));
   }),
@@ -2039,9 +2071,11 @@ app.delete(
 
 app.get(
   "/api/inventory-audit",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const [rows] = await pool.query(
-      "SELECT * FROM inventory_audit ORDER BY created_at DESC",
+      "SELECT * FROM inventory_audit ORDER BY created_at DESC LIMIT 1000",
     );
     res.json(rows.map(toInventoryAudit));
   }),
@@ -2050,6 +2084,8 @@ app.get(
 app.patch(
   "/api/inventory-audit/:id/undo",
   ah(async (req, res) => {
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -2335,6 +2371,8 @@ const isIsoDate = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.
 app.get(
   "/api/items/:id/stock-card",
   ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const itemId = normalizeItemId(req.params.id);
     const [[item]] = await pool.query("SELECT * FROM inventory WHERE id=?", [itemId]);
     if (!item) return res.status(404).json({ error: "Item not found." });
@@ -2441,7 +2479,9 @@ function toSupplierItem(row) {
 
 app.get(
   "/api/suppliers",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const [rows] = await pool.query(
       `SELECT s.*, (SELECT COUNT(*) FROM supplier_items si WHERE si.supplier_id = s.id) AS item_count
        FROM suppliers s ORDER BY s.name`,
@@ -2453,6 +2493,8 @@ app.get(
 app.get(
   "/api/suppliers/:id",
   ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const supplierId = toPositiveInt(req.params.id);
     if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
     const [[row]] = await pool.query(
@@ -2537,6 +2579,8 @@ app.patch(
 app.get(
   "/api/items/:id/suppliers",
   ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const itemId = normalizeItemId(req.params.id);
     const [rows] = await pool.query(
       `SELECT si.*, s.name AS supplier_name, s.supplier_code, s.is_active,
@@ -2675,6 +2719,8 @@ function supplierCodePrefix(name) {
 app.get(
   "/api/suppliers/:id/next-code",
   ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const supplierId = toPositiveInt(req.params.id);
     if (!supplierId) return res.status(400).json({ error: "Invalid supplier." });
     const [[supplier]] = await pool.query("SELECT name FROM suppliers WHERE id=?", [supplierId]);
@@ -2761,7 +2807,9 @@ app.post(
 // The suppliers linked to each inventory item, for the Inventory list.
 app.get(
   "/api/supplier-links/counts",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const [rows] = await pool.query(
       `SELECT si.item_id, s.name, si.supplier_item_code
        FROM supplier_items si JOIN suppliers s ON s.id = si.supplier_id
@@ -3552,7 +3600,9 @@ app.get(
 
 app.get(
   "/api/movements",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     const [rows] = await pool.query(
       "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC",
     );
@@ -3935,7 +3985,9 @@ async function isFootprintBlocked(db, floorId, gridCol, gridRow, orientation, ra
 
 app.get(
   "/api/layout",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
     res.json(await readWarehouseLayout());
   }),
 );
