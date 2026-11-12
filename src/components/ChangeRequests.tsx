@@ -3,7 +3,7 @@ import { apiRequest } from '../apiClient';
 
 export interface ChangeRequest {
   id: string;
-  type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE';
+  type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE' | 'PRICE_CHANGE';
   invoice: string;
   itemId: string;
   itemName: string;
@@ -22,6 +22,7 @@ const TYPE_LABELS: Record<ChangeRequest['type'], string> = {
   STOCK_IN_EDIT: 'Edit quantity',
   STOCK_IN_DELETE: 'Delete line',
   INVOICE_DELETE: 'Delete invoice',
+  PRICE_CHANGE: 'Price change',
 };
 
 const STATUS_LABELS: Record<ChangeRequest['status'], string> = {
@@ -83,6 +84,7 @@ export const ChangeRequestsPage: React.FC = () => {
 
   const change = (r: ChangeRequest) => {
     if (r.type === 'STOCK_IN_EDIT') return `${r.oldValue ?? '—'} → ${r.newValue ?? '—'}`;
+    if (r.type === 'PRICE_CHANGE') return `${r.oldValue?.toFixed(2) ?? '—'} → ${r.newValue?.toFixed(2) ?? '—'}`;
     return `${r.oldValue ?? '—'} removed`;
   };
 

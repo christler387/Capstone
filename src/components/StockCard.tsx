@@ -62,6 +62,7 @@ export const TXN_LABELS: Record<string, string> = {
   STOCK_ADJUSTMENT: 'Stock Adjustment',
   DAMAGED_ITEMS: 'Damaged Items',
   INVENTORY_CORRECTION: 'Inventory Correction',
+  PRICE_CHANGE: 'Price Change',
 };
 
 const formatPeso = (value: number) =>

@@ -649,6 +649,7 @@ async function initializeDatabase() {
     KEY idx_change_requests_status (status),
     KEY idx_change_requests_invoice (invoice)
   ) ${tableOptions}`);
+  await pool.query("ALTER TABLE change_requests MODIFY old_value DECIMAL(12,2) NULL, MODIFY new_value DECIMAL(12,2) NULL");
   await addColumnIfMissing("movements", "reference", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "supplier_id", "INT NULL");
   await backfillStockLedger();
@@ -1757,15 +1758,16 @@ app.put(
     // someone else's change, so it is refused.
     const expectedVersion =
       item.version === undefined || item.version === null ? null : Number(item.version);
-    const actor = await getAuthenticatedUser(req);
-    const actorName = actor?.username || item.updatedBy || "Unknown";
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const actorName = actor.username;
     const values = inventoryValues(itemId, item).slice(1); // drop id; it goes in WHERE
 
     const outcome = await withInventoryLock(async (connection) => {
       await connection.beginTransaction();
       try {
         const [[current]] = await connection.query(
-          "SELECT version, quantity FROM inventory WHERE id=? FOR UPDATE",
+          "SELECT version, quantity, price, discount FROM inventory WHERE id=? FOR UPDATE",
           [itemId],
         );
         if (!current) {
@@ -1808,6 +1810,35 @@ app.put(
               actorName,
             ],
           );
+        }
+        const oldPrice = round2(Number(current.price));
+        const newPrice = round2(Number(item.price) || 0);
+        const oldDiscount = Number(current.discount) || 0;
+        const newDiscount = Number(item.discount) || 0;
+        if (oldPrice !== newPrice || oldDiscount !== newDiscount) {
+          const parts = [];
+          if (oldPrice !== newPrice) parts.push(`Price changed from ${oldPrice.toFixed(2)} to ${newPrice.toFixed(2)}`);
+          if (oldDiscount !== newDiscount) parts.push(`Discount changed from ${oldDiscount}% to ${newDiscount}%`);
+          const description = parts.join("; ");
+          await recordStockLedger(connection, {
+            sourceId: `PRICE-${crypto.randomUUID()}`,
+            itemId,
+            type: "PRICE_CHANGE",
+            reference: `PRICE-${Date.now().toString().slice(-8)}`,
+            description,
+            qtyIn: 0,
+            qtyOut: 0,
+            balanceAfter: await currentItemQuantity(connection, itemId),
+            recordedBy: actorName,
+          });
+          // A staff member's price change is recorded as a request that is approved at once, so the audit trail shows it.
+          if (!isAdmin(actor)) {
+            await recordChangeRequest(connection, {
+              type: "PRICE_CHANGE", targetId: itemId, invoice: "", itemId, itemName: String(item.name || itemId),
+              oldValue: oldPrice, newValue: newPrice, reason: description, requestedBy: actorName,
+              status: "APPROVED", decidedBy: "Automatic", note: "Approved automatically; the change is audited.",
+            });
+          }
         }
         await connection.commit();
         return { status: 200, version: Number(current.version) + 1 };
@@ -3382,7 +3413,9 @@ app.get(
     );
     res.json(rows.map((r) => ({
       id: r.id, type: r.request_type, invoice: r.invoice, itemId: r.item_id, itemName: r.item_name,
-      oldValue: r.old_value, newValue: r.new_value, reason: r.reason || "", requestedBy: r.requested_by,
+      oldValue: r.old_value === null ? null : Number(r.old_value),
+      newValue: r.new_value === null ? null : Number(r.new_value),
+      reason: r.reason || "", requestedBy: r.requested_by,
       requestedAt: r.requested_str, status: r.status, decidedBy: r.decided_by || "", decidedAt: r.decided_str || "",
       note: r.decision_note || "",
     })));

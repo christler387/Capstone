@@ -1000,14 +1000,13 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         isOpen={isItemModalOpen} 
         onClose={() => setIsItemModalOpen(false)} 
         type="landscape"
-        title={userRole === 'staff' ? `Item Details: ${editingItem?.id || ''}` : (editingItem?.name ? `Edit Item: ${editingItem.id}` : 'Add New Item')}
+        title={editingItem?.name ? `Edit Item: ${editingItem.id}` : 'Add New Item'}
       >
         <ItemForm 
           item={editingItem} 
           existingItems={inventory}
           onSave={handleSaveItem} 
           onCancel={() => setIsItemModalOpen(false)} 
-          readOnly={userRole === 'staff'}
           rackLocations={rackLocations}
           rackFloors={rackFloors}
           floors={layout.map(floor => ({ id: floor.id, name: floor.name }))}
