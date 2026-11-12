@@ -3,6 +3,7 @@ import { InventoryAuditEntry, Item, Movement, UserRole, WarehouseLayout } from '
 import { Modal } from './components/Modal';
 import { StockCard } from './components/StockCard';
 import { Suppliers } from './components/Suppliers';
+import { Sales } from './components/Sales';
 
 const API_BASE = '/api';
 
@@ -927,6 +928,8 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             onItemRenamed={handleItemRenamed}
           />
         );
+      case 'sales':
+        return <Sales userRole={userRole} />;
       case 'warehouse': 
         return (
           <WarehouseMap
@@ -1098,7 +1101,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
             <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
             <h1 className="sr-only">
-              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation
