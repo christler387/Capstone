@@ -15,7 +15,6 @@
     "icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
-    "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/montserrat": "^5.3.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
@@ -24,11 +23,8 @@
     "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "emailjs": "^5.0.4",
     "express": "^5.3.0",
-    "google-auth-library": "^11.0.2",
     "html5-qrcode": "^2.3.8",
-    "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.14.1",
     "nodemailer": "^10.3.1",
     "react": "latest",
@@ -36,9 +32,6 @@
     "sharp": "^0.35.5",
     "typescript": "latest",
     "vite": "latest"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
   },
   "overrides": {
     "qs": "6.17.1"

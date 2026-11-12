@@ -53,7 +53,7 @@ interface SupplierOption {
   isActive: boolean;
 }
 
-export const TXN_LABELS: Record<string, string> = {
+const TXN_LABELS: Record<string, string> = {
   BEGINNING_BALANCE: 'Beginning Balance',
   STOCK_IN: 'Stock In',
   STOCK_OUT: 'Stock Out',

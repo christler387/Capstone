@@ -257,7 +257,7 @@ const IconAction: React.FC<{
   </button>
 );
 
-export const InvoiceModal: React.FC<{
+const InvoiceModal: React.FC<{
   reference: string;
   isAdmin: boolean;
   onClose: () => void;

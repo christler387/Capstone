@@ -15,7 +15,7 @@ export function getStockTotal(item: { price?: number; discount?: number; quantit
   return getLocalCost(item) * (Number(item.quantity) || 0);
 }
 
-export function getAnnualDemand(item: Item, movements: Movement[]): number {
+function getAnnualDemand(item: Item, movements: Movement[]): number {
   const itemMovements = movements.filter(m => m.itemId === item.id && m.type === 'OUT');
   if (itemMovements.length === 0) return 0;
   const dates = itemMovements.map(m => new Date(m.date).getTime()).filter(Number.isFinite);
@@ -36,7 +36,7 @@ export function getEoq(item: Item, movements: Movement[]): number {
   return Math.sqrt((2 * annualDemand * orderingCost) / holdingCost);
 }
 
-export function getAverageMonthlyDemand(item: Item, movements: Movement[]): number {
+function getAverageMonthlyDemand(item: Item, movements: Movement[]): number {
   return getAnnualDemand(item, movements) / 12;
 }
 

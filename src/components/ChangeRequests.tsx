@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../apiClient';
 
-export interface ChangeRequest {
+interface ChangeRequest {
   id: string;
   type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE' | 'PRICE_CHANGE' | 'MOVEMENT_UNDO' | 'MOVEMENT_DELETE' | 'ITEM_DELETE' | 'SALE_UNDO';
   invoice: string;

@@ -53,8 +53,6 @@ export interface Movement {
   supplierId?: number | null;
 }
 
-export type InventoryAuditAction = 'ADD' | 'DELETE' | 'QTY';
-
 export type AisleOrientation = 'portrait' | 'landscape';
 
 export interface WarehouseRack {
@@ -84,28 +82,3 @@ export interface WarehouseFloor {
 }
 
 export type WarehouseLayout = WarehouseFloor[];
-
-export interface InventoryAuditEntry {
-  id: string;
-  itemId: string;
-  itemName: string;
-  action: InventoryAuditAction;
-  date: string;
-  timestamp: number;
-  createdBy?: string;
-  // For QTY entries: the quantity before and after the change.
-  quantityChange?: { from: number; to: number };
-}
-
-
-export const CONFIG = {
-  LOW_STOCK_THRESHOLD: 5,
-  SECTIONS: {
-    dashboard: 'System Overview & Analytics',
-    inventory: 'Inventory Ledger',
-    stock: 'Manage Stock Movements',
-    warehouse: 'Visual Layout & Zoning',
-    user: 'User Profile & Session'
-  } as Record<string, string>
-};
-
