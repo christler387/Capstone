@@ -11,3 +11,5 @@ pnpm-debug.log*
 Thumbs.db
 desktop-release-new/
 release/
+# Uploaded product pictures (live data is kept on the server, not in the code)
+uploads/

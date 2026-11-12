@@ -5,6 +5,7 @@ import { Suspense, lazy } from 'react';
 // The camera scanner loads only when it is opened.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })));
 import { apiRequest } from '../apiClient';
+import { ProductImage } from './ProductImage';
 import { getLocalCost, getReorderQuantity, getStockTotal, isAtReorderPoint } from '../inventoryMetrics';
 
 interface InventoryProps {
@@ -299,13 +300,14 @@ export const Inventory: React.FC<InventoryProps> = ({
               >
                 <span className="inv-picture" role="cell">
                   {i.image ? (
-                    <img
+                    <ProductImage
                       src={i.image}
                       className="inv-thumb"
-                      onClick={(e) => { e.stopPropagation(); onZoomImage(i.image!, i.name); }}
-                      referrerPolicy="no-referrer"
+                      width={48}
+                      height={48}
                       alt={i.name}
                       title="View picture"
+                      onClick={(e) => { e.stopPropagation(); onZoomImage(i.image!, i.name); }}
                     />
                   ) : (
                     <span className="inv-thumb is-empty" aria-label="No picture">

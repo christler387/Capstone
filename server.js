@@ -7,6 +7,13 @@ import nodemailer from "nodemailer";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  storeProductImage,
+  importPictureFromAddress,
+  deleteLocalPicture,
+  isLocalPicture,
+  UPLOAD_MAX_BYTES,
+} from "./image-pipeline.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -150,53 +157,36 @@ async function clearUserSession(req, res) {
   );
 }
 
-// Saves a base64 image sent by the item form to the uploads folder and returns its URL.
-async function storeItemImage(image, imageFileName) {
-  if (typeof image !== "string" || !image.startsWith("data:")) {
-    // A pasted address must be a web link or an uploaded picture path, so it cannot run as a script.
-    if (image && !/^(https?:\/\/|\/api\/uploads\/)/i.test(image.trim())) {
-      throw Object.assign(new Error("The picture address must start with https:// or http://."), { status: 400 });
+// Turns a picture from the item form into a stored path on this server.
+// Uploads and web addresses are converted to WebP; a path already on this server is kept as it is.
+async function storeItemImage(image) {
+  if (typeof image !== "string" || image.trim() === "") return image || null;
+  const value = image.trim();
+  if (value.startsWith("data:")) {
+    const match = value.match(/^data:(image\/(?:png|jpeg|webp|gif|avif));base64,([A-Za-z0-9+/]+={0,2})$/);
+    if (!match) throw Object.assign(new Error("The uploaded image format is not supported."), { httpStatus: 400 });
+    const buffer = Buffer.from(match[2], "base64");
+    if (buffer.length > UPLOAD_MAX_BYTES) {
+      throw Object.assign(new Error("Please select an image smaller than 5 MB."), { httpStatus: 400 });
     }
-    return image || null;
+    return storeProductImage(uploadsDirectory, buffer);
   }
+  if (/^https?:\/\//i.test(value)) return importPictureFromAddress(uploadsDirectory, value);
+  if (value.startsWith("/api/uploads/")) return value;
+  throw Object.assign(new Error("The picture address must start with https:// or http://."), { httpStatus: 400 });
+}
 
-  const match = image.match(
-    /^data:(image\/(?:png|jpeg|webp|gif|bmp|avif));base64,([A-Za-z0-9+/]+={0,2})$/,
-  );
-  if (!match) {
-    throw new Error("The uploaded image format is not supported.");
+// The picture to save. An address that did not change keeps its stored value, so it is not downloaded again.
+async function pictureToSave(value, previous) {
+  if (typeof value === "string" && typeof previous === "string" && value.trim() === previous.trim()) {
+    return previous.trim() || null;
   }
+  return (await storeItemImage(value)) || null;
+}
 
-  const extensions = {
-    "image/png": "png",
-    "image/jpeg": "jpg",
-    "image/webp": "webp",
-    "image/gif": "gif",
-    "image/bmp": "bmp",
-    "image/avif": "avif",
-  };
-  const imageBuffer = Buffer.from(match[2], "base64");
-  if (imageBuffer.length > 5 * 1024 * 1024) {
-    throw new Error("Please select an image smaller than 5 MB.");
-  }
-
-  const safeOriginalFilename =
-    typeof imageFileName === "string"
-      ? imageFileName
-          .split(/[\\/]/)
-          .pop()
-          .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-          .trim()
-          .slice(0, 120)
-      : "";
-  const filename = safeOriginalFilename
-    ? `${crypto.randomUUID()}-${safeOriginalFilename}`
-    : `${crypto.randomUUID()}.${extensions[match[1]]}`;
-  await fs.mkdir(uploadsDirectory, { recursive: true });
-  await fs.writeFile(path.join(uploadsDirectory, filename), imageBuffer, {
-    flag: "wx",
-  });
-  return `/api/uploads/${encodeURIComponent(filename)}`;
+// Removes a picture this request just created, when the item could not be saved.
+async function discardNewPicture(isNew, picture) {
+  if (isNew && isLocalPicture(picture)) await deleteLocalPicture(uploadsDirectory, picture);
 }
 
 const inventorySeed = [
@@ -1745,11 +1735,19 @@ app.put(
   "/api/inventory/:id",
   ah(async (req, res) => {
     const { imageFileName, ...itemData } = req.body || {};
+    const itemId = normalizeItemId(req.params.id);
+    const [[previousRow]] = await pool.query("SELECT image FROM inventory WHERE id=?", [itemId]);
+    const previousPicture = previousRow?.image || null;
     const item = {
       ...itemData,
-      image: (await storeItemImage(itemData.image, imageFileName)) || undefined,
+      image: (await pictureToSave(itemData.image, previousPicture)) || undefined,
     };
-    const itemId = normalizeItemId(req.params.id);
+    // Only a picture uploaded or downloaded by this request is discarded on failure; a path chosen from
+    // another item is never deleted.
+    const pictureUploadedNow =
+      typeof itemData.image === "string" && /^(data:|https?:\/\/)/i.test(itemData.image.trim());
+    const pictureChanged = (item.image || null) !== previousPicture;
+    const pictureIsNew = pictureUploadedNow && pictureChanged;
     const submittedItemId = normalizeItemId(item.id || itemId);
     if (submittedItemId !== itemId) {
       return res.status(400).json({ error: "The Item ID cannot be changed. Duplicate the item to make one with a new ID." });
@@ -1762,7 +1760,9 @@ app.put(
     if (!actor) return;
     const actorName = actor.username;
 
-    const outcome = await withInventoryLock(async (connection) => {
+    let outcome;
+    try {
+    outcome = await withInventoryLock(async (connection) => {
       await connection.beginTransaction();
       try {
         const [[current]] = await connection.query(
@@ -1823,9 +1823,19 @@ app.put(
         throw error;
       }
     });
+    } catch (error) {
+      await discardNewPicture(pictureIsNew, item.image);
+      throw error;
+    }
 
     if (outcome.status !== 200) {
+      await discardNewPicture(pictureIsNew, item.image);
       return res.status(outcome.status).json({ error: outcome.error });
+    }
+    // The item now uses the new picture, so the old local file is removed, unless another item still uses it.
+    if (pictureChanged && isLocalPicture(previousPicture)) {
+      const [[stillUsed]] = await pool.query("SELECT COUNT(*) AS n FROM inventory WHERE image = ?", [previousPicture]);
+      if (Number(stillUsed.n) === 0) await deleteLocalPicture(uploadsDirectory, previousPicture);
     }
     res.json({ ...item, id: submittedItemId, version: outcome.version });
   }),
@@ -4444,7 +4454,7 @@ app.post(
   }),
 );
 
-app.use("/api/uploads", express.static(uploadsDirectory));
+app.use("/api/uploads", express.static(uploadsDirectory, { maxAge: "30d", immutable: true }));
 app.use(express.static(path.join(__dirname, "dist")));
 // Regex works on Express 4 and 5, and unknown /api routes get a JSON 404 instead of index.html.
 app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));

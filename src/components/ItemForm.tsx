@@ -4,6 +4,7 @@ import { ScannerDialog } from "./ScannerDialog";
 import { Combobox, normalizeDescriptor } from "./Combobox";
 import { getLocalCost } from "../inventoryMetrics";
 import { apiRequest } from "../apiClient";
+import { ProductImage } from "./ProductImage";
 
 // Typed fields that suggest values already saved on other items.
 const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", "color", "unitOfMeasure"];
@@ -596,7 +597,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         <div className="picture-field-body">
           <div className={`picture-preview ${previewUrl ? "" : "is-empty"}`}>
             {previewUrl ? (
-              <img src={previewUrl} alt="Item picture preview" referrerPolicy="no-referrer" />
+              <ProductImage src={previewUrl} full alt="Item picture preview" width={96} height={96} />
             ) : (
               <i className="bx bx-image-add" aria-hidden="true"></i>
             )}

@@ -10751,3 +10751,12 @@ input[type='date']:focus, select:focus, textarea:focus {
     display: inline;
   }
 }
+
+/* ---- Product pictures that cannot be loaded: a neutral icon in the same space ---- */
+.is-broken {
+  display: grid;
+  place-items: center;
+  background: #f4f6f9;
+  color: rgba(32, 48, 71, 0.35);
+  font-size: 20px;
+}
