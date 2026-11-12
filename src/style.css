@@ -6267,11 +6267,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .dash2-scroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: scroll;
+  overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
 }
 
 .dash2-bars {
@@ -6336,11 +6334,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .dash2-list--scroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: scroll;
+  overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
 }
 
 .dash2-row-button,
