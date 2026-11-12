@@ -26,6 +26,7 @@ interface UserProfileProps {
     password: string,
     role: UserRole,
   ) => Promise<void>;
+  onOpenRequests?: () => void;
 }
 
 interface ManagedUser {
@@ -87,6 +88,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   onChangePassword,
   onChangeUsername,
   onCreateUser,
+  onOpenRequests,
 }) => {
   const [filterType, setFilterType] = useState<"ALL" | "IN" | "OUT">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -495,7 +497,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                       icon="bx-git-compare"
                       label="Requests"
                       detail="Edit and delete approvals, with the audit trail"
-                      onClick={() => window.open(`${window.location.pathname}?section=requests`, "_blank", "noopener")}
+                      onClick={() => onOpenRequests?.()}
                     />
                   </div>
 

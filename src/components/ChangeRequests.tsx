@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<ChangeRequest['status'], string> = {
   REJECTED: 'Rejected',
 };
 
-// Edit and delete requests for stock-in invoices. Opened in its own tab from the profile.
+// Edit and delete requests for stock-in invoices. Opened as a pop-out from the profile.
 export const ChangeRequestsPage: React.FC = () => {
   const [role, setRole] = useState<'admin' | 'staff' | null>(null);
   const isAdmin = role === 'admin';

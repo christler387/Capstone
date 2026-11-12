@@ -59,10 +59,9 @@ const App: React.FC = () => {
   const [inventory, setInventory] = useState<Item[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
-  // The Requests page opens in its own tab with ?section=requests.
-  const [currentSection, setCurrentSection] = useState(() =>
-    new URLSearchParams(window.location.search).get('section') === 'requests' ? 'requests' : 'dashboard',
-  );
+  // Requests open as a pop-out over the current page, so no second sign-in is needed.
+  const [isRequestsOpen, setIsRequestsOpen] = useState(false);
+  const [currentSection, setCurrentSection] = useState('dashboard');
   const [stockCardItemId, setStockCardItemId] = useState('');
   // Set when "Add items to this invoice" is used on the stock-in history page.
   const [stockInPrefill, setStockInPrefill] = useState<{ invoice: string; supplierId: string } | null>(null);
@@ -945,8 +944,6 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         );
       case 'sales':
         return <Sales userRole={userRole} />;
-      case 'requests':
-        return <ChangeRequestsPage />;
       case 'stock-in-history':
         return (
           <StockInHistoryPage
@@ -988,6 +985,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             onChangePassword={handleChangePassword}
             onChangeUsername={handleChangeUsername}
             onCreateUser={handleCreateUser}
+            onOpenRequests={() => setIsRequestsOpen(true)}
           />
         );
       default: 
@@ -1047,6 +1045,15 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
                 alt="Zoomed"
             />
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={isRequestsOpen}
+        onClose={() => setIsRequestsOpen(false)}
+        title="Requests"
+        type="wide"
+      >
+        <ChangeRequestsPage />
       </Modal>
 
       <Modal
@@ -1128,7 +1135,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
             <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
             <h1 className="sr-only">
-              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection === 'stock-in-history' ? 'Stock in history' : currentSection === 'requests' ? 'Requests' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection === 'stock-in-history' ? 'Stock in history' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation
