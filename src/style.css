@@ -1,4 +1,4 @@
-/* ---- Global styles ---- */
+
 :root {
   font-size: 110%;
   --bg: #f7f3eb;
@@ -57,7 +57,9 @@ body {
 #root {
   min-height: 100vh;
 }
-/* ---- Login.tsx ---- */
+
+
+
 .login-shell {
   min-height: 100vh;
   display: flex;
@@ -241,7 +243,9 @@ body {
     padding: 1.5rem;
   }
 }
-/* ---- Shared application layout and typography ---- */
+
+
+
 .font-mono { font-family: var(--f-mono); }
 
 .alert-text { color: var(--accent) !important; opacity: 1 !important; }
@@ -283,7 +287,9 @@ main { padding: var(--gap); flex: 1; }
 
 
 .content-section { display: flex; flex: 1; flex-direction: column; min-height: 0; }
-/* ---- Dashboard.tsx ---- */
+
+
+
 .dashboard-grid { 
   display: grid; 
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -298,14 +304,18 @@ main { padding: var(--gap); flex: 1; }
 @media (max-width: 767px) {
   .dashboard-grid{ grid-template-columns: 1fr; }
 }
-/* ---- Navigation.tsx ---- */
+
+
+
 .top-nav {
   display: flex;
   gap: 0.5rem;
   margin-top: 1rem;
   flex-wrap: wrap;
 }
-/* ---- Shared buttons and controls ---- */
+
+
+
 .olive-button {
   background: var(--ink); 
   color: var(--bg); 
@@ -333,7 +343,9 @@ main { padding: var(--gap); flex: 1; }
   border-color: var(--ink);
   opacity: 1;
 }
-/* ---- Dashboard.tsx ---- */
+
+
+
 .dash-card { 
   background: rgba(255, 255, 255, 0.38); border: 1px solid var(--line); padding: var(--gap); 
   display: flex; flex-direction: column; gap: 1rem; 
@@ -341,7 +353,9 @@ main { padding: var(--gap); flex: 1; }
   height: 100%;
   min-height: 380px;
 }
-/* ---- Modal.tsx ---- */
+
+
+
 .modal-overlay { 
   position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(4px); 
   display: none; align-items: center; justify-content: center; z-index: 2000; padding: 2rem; 
@@ -493,7 +507,9 @@ main { padding: var(--gap); flex: 1; }
 .close-modal i{
   font-size: 1.5rem;
 }
-/* ---- Inventory.tsx and shared table styles ---- */
+
+
+
 .table-grid { display: grid; align-items: center; gap: 1rem; }
 
 
@@ -502,7 +518,9 @@ main { padding: var(--gap); flex: 1; }
 .table-row { padding: 1rem; border-bottom: 1px solid var(--line-soft); transition: 0.2s; }
 
 .table-row:hover { background: var(--ink); color: var(--bg); }
-/* ---- ItemForm.tsx ---- */
+
+
+
 .form-group { margin-bottom: 1.5rem; }
 
 .form-group label { display: block; margin-bottom: 0.5rem; }
@@ -559,7 +577,10 @@ select.form-input {
 .item-barcode-scan-button.active {
   color: var(--accent);
 }
-/* ---- BarcodeScanner.tsx ---- */
+
+
+
+
 #reader video { 
   border-radius: 8px; 
   object-fit: cover !important; 
@@ -603,7 +624,10 @@ select.form-input {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-/* ---- WarehouseMap.tsx ---- */
+
+
+
+
 .warehouse-layout-container {
   display: flex;
   flex-direction: column;
@@ -1135,9 +1159,10 @@ select.form-input {
 
 
 .slot.empty i { font-size: 14px; }
-/* ==========================================================================
-                                9. App.tsx
-   ========================================================================== */
+
+
+
+
 footer {
   padding: 2rem var(--gap);
   border-top: 1px solid var(--line-soft);
@@ -1198,15 +1223,17 @@ footer p {
   flex-direction: column;
   gap: 0.75rem;
 }
-/* ==========================================================================
-                              10. UserProfile.tsx
-   ========================================================================== */
+
+
+
 .account-management-list {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
-/* User page: profile card, action list and audit header */
+
+
+
 .profile-card {
   display: flex;
   flex-direction: column;
@@ -1403,17 +1430,6 @@ footer p {
 .profile-logout:hover {
   background: rgba(175, 4, 4, 0.06);
 }
-/* Audit row undo: button and confirm panel */
-/* Right side of each activity row: value, date and Undo stacked on one right edge. */
-/* Fixed width, so every row's right column ends at the same x{
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 7.25rem;
-  width: 7.25rem;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 0.4rem !important;
-}
 
 
 .audit-undo-confirm-btn:hover:not(:disabled) {
@@ -1428,7 +1444,9 @@ footer p {
   font-size: 11px;
   color: rgba(32, 48, 71, 0.6);
 }
-/* ---------------- Inventory page ---------------- */
+
+
+
 .inv-page {
   display: flex;
   flex-direction: column;
@@ -1683,8 +1701,9 @@ footer p {
 .inv-table {
   min-width: 1616px;
 }
-/* Picture and part name stay in view while the wide table scrolls sideways.
-   Pinned cells take the same background as their row, so hover and the normal state match. */
+
+
+
 .inv-head > :nth-child(1),
 .inv-head > :nth-child(2),
 .inv-item > :nth-child(1),
@@ -1868,21 +1887,6 @@ img.inv-thumb:hover {
   font-size: 11px;
   color: rgba(32, 48, 71, 0.55);
 }
-/* Part numbers are codes: tabular figures, one line, full value on hover. */
-
-
-/* Part numbers are codes: tabular figures, one line{
-  font-family: var(--f-sans);
-  font-size: 13px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
 
 
 .inv-location {
@@ -2001,7 +2005,9 @@ img.inv-thumb:hover {
   font-size: 12px;
   text-align: center;
 }
-/* Item form: picture field with preview, link box and actions */
+
+
+
 .picture-field-head {
   display: flex;
   align-items: baseline;
@@ -2157,7 +2163,9 @@ img.inv-thumb:hover {
     height: 160px;
   }
 }
-/* Item form: required and optional field markers */
+
+
+
 .form-input.is-missing {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(175, 4, 4, 0.12);
@@ -2193,7 +2201,9 @@ img.inv-thumb:hover {
   text-transform: none;
   color: rgba(32, 48, 71, 0.5);
 }
-/* Barcode scanner status line */
+
+
+
 .barcode-scanner {
   display: flex;
   flex-direction: column;
@@ -2465,9 +2475,9 @@ img.inv-thumb:hover {
     flex: 1;
   }
 }
-/* ==========================================================================
-                11. Responsive layout and shared utility classes
-   ========================================================================== */
+
+
+
 @keyframes fadeIn { 
   from { opacity: 0; transform: translateY(8px); } 
   to { opacity: 1; transform: translateY(0); } 
@@ -2560,7 +2570,9 @@ img.inv-thumb:hover {
   padding: 0;
   text-transform: uppercase;
 }
-/* ---------------- Session timeout notice (login page) ---------------- */
+
+
+
 .session-dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -2689,7 +2701,9 @@ img.inv-thumb:hover {
     animation: none;
   }
 }
-/* ---------------- Barcode scanner dialog (Add Item form) ---------------- */
+
+
+
 .scanner-dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -2791,7 +2805,9 @@ img.inv-thumb:hover {
   flex-shrink: 0;
   font-size: 1.1rem;
 }
-/* html5-qrcode draws its own controls inside #reader; restyle them to match the app. */
+
+
+
 .scanner-dialog #reader {
   max-width: 100% !important;
   margin: 0 !important;
@@ -2882,7 +2898,9 @@ img.inv-thumb:hover {
     animation: none;
   }
 }
-/* ---------------- Warehouse floor tabs ---------------- */
+
+
+
 .floor-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -3048,7 +3066,9 @@ img.inv-thumb:hover {
 .analytics-scope-toggle:hover {
   background: var(--line-soft);
 }
-/* ---------------- Add aisle dialog: orientation and rack count ---------------- */
+
+
+
 .aisle-color-input {
   width: 46px;
   height: 38px;
@@ -3153,7 +3173,9 @@ img.inv-thumb:hover {
   font-size: 1.1rem;
   font-weight: 700;
 }
-/* ---------------- Edit Layout mode ---------------- */
+
+
+
 .layout-edit-bar {
   display: inline-flex;
   align-items: center;
@@ -3193,11 +3215,9 @@ img.inv-thumb:hover {
 .aisle-edit-btn:hover:not(:disabled) {
   background: var(--line-soft);
 }
-/* ---------------- Shared floor grid: one column per portrait aisle, rack-sized rows ----------------
-   Every aisle sits on the same grid. Rows are one rack tall, and the gap between rows equals the
-   gap between racks, so racks line up across aisles. A card's height is exactly its footprint:
-   portrait = header row + one row per rack; landscape = header row + one rack row.
-   Racks are the same size in both orientations: full column width and one row tall. */
+
+
+
 .warehouse-map-scroll {
   width: 100%;
   overflow-x: auto;
@@ -3238,7 +3258,9 @@ img.inv-thumb:hover {
   border: 1px dashed rgba(32, 48, 71, 0.16);
   border-radius: 12px;
 }
-/* Edit Layout: drag handle, ghost preview, selected-aisle panel */
+
+
+
 .warehouse-map-grid .aisle-drag-handle {
   margin-left: auto;
   display: grid;
@@ -3274,7 +3296,9 @@ img.inv-thumb:hover {
   border-color: var(--accent);
   background: rgba(175, 4, 4, 0.12);
 }
-/* ---------------- Warehouse map: UI polish (cards, headers, racks) ---------------- */
+
+
+
 .warehouse-map-grid {
   --rack-h: 84px;
   --map-gap: 16px;
@@ -3313,10 +3337,10 @@ img.inv-thumb:hover {
 .warehouse-map-grid .rack.low-stock-alert {
   border-color: rgba(175, 4, 4, 0.45);
 }
-/* ---------------- Racks define the grid; aisle labels sit in the gap above them ----------------
-   Only racks occupy grid rows/columns: a portrait aisle is one column wide and N rows tall, a
-   landscape aisle is N columns wide and one row tall. The row gap is the label band, so the
-   label never takes a row, and every rack lines up with the racks beside it. */
+
+
+
+
 .warehouse-map-grid {
   --header-gap: 36px;
   --rack-h: 84px;
@@ -3444,7 +3468,9 @@ img.inv-thumb:hover {
 .aisle-group.is-editing .rack {
   cursor: default;
 }
-/* ---------------- Aisle editor (Edit Layout) ---------------- */
+
+
+
 .aisle-editor {
   --editor-border: rgba(32, 48, 71, 0.12);
   --editor-muted: rgba(32, 48, 71, 0.62);
@@ -3735,7 +3761,9 @@ select.aisle-editor-input {
     grid-column: auto;
   }
 }
-/* Calmer selection on the map: blue instead of the alarm red */
+
+
+
 .warehouse-map-grid .aisle-group.is-selected .rack {
   border-color: var(--button);
   box-shadow: 0 0 0 2px rgba(56, 103, 168, 0.25);
@@ -3745,11 +3773,15 @@ select.aisle-editor-input {
 .warehouse-map-grid .aisle-group.is-selected .aisle-label-code {
   color: var(--button);
 }
-/* Empty grid spots: a quieter outline */
+
+
+
 .warehouse-map-grid .grid-empty-cell {
   border: 1px dashed rgba(32, 48, 71, 0.10);
 }
-/* Breathing room between the top navigation and the floor tabs */
+
+
+
 .warehouse-map-grid,
 .content-section > .floor-tabs {
   margin-top: 0;
@@ -3759,12 +3791,16 @@ select.aisle-editor-input {
 .content-section > .floor-tabs {
   padding-top: 1.1rem;
 }
-/* Warehouse section lines up with the header: same side padding as the logo and user button */
+
+
+
 .content-section:has(> .floor-tabs) {
   padding-left: var(--gap);
   padding-right: var(--gap);
 }
-/* ---------------- Move items before deleting an aisle or floor ---------------- */
+
+
+
 .move-items-list {
   display: flex;
   flex-direction: column;
@@ -3798,9 +3834,9 @@ select.aisle-editor-input {
   font-size: 12px;
   color: rgba(32, 48, 71, 0.62);
 }
-/* ---------------- Aisle frame: each aisle reads as one block in its category color ----------------
-   The frame is drawn behind the racks with a pseudo-element, so it does not change the grid
-   footprint or the rack sizes. Frames of neighbouring aisles keep a small visible gap. */
+
+
+
 .warehouse-map-grid {
   --header-gap: 40px;
 }
@@ -3860,7 +3896,9 @@ select.aisle-editor-input {
 .aisle-group .rack:not(.low-stock-alert) {
   border-color: color-mix(in srgb, var(--aisle-color, #64748b) 22%, #e6e2d9);
 }
-/* Racks sit inside the aisle frame with even breathing room, top label band included */
+
+
+
 .warehouse-map-grid {
   --header-gap: 44px;
 }
@@ -3878,25 +3916,33 @@ select.aisle-editor-input {
   top: calc(-1 * var(--header-gap) + 24px);
   height: 16px;
 }
-/* Racks inside one aisle sit closer together; the gap between aisles stays as it was */
+
+
+
 .aisle-group {
   row-gap: 12px;
 }
-/* Room for the aisle label above the racks; the frame keeps a clear gap to the aisle below */
+
+
+
 .warehouse-map-grid {
   --header-gap: 56px;
 }
-/* Option 2: racks share one grid. Racks inside an aisle use the same spacing as the gap between
-   aisles, so every rack lines up with the racks above and below it, and the label sits above. */
+
+
+
 .aisle-group {
   row-gap: var(--header-gap);
 }
-/* The aisle editor stays in view while scrolling the map during Edit Layout */
+
+
+
 .content-wrapper {
   overflow-x: clip;
 }
-/* Keeps the editor's place in the page. WarehouseMap pins it under the app header
-   (position: fixed) when scrolling would carry it up into the header. */
+
+
+
 .aisle-editor-slot {
   margin-bottom: 1.5rem;
 }
@@ -3906,7 +3952,9 @@ select.aisle-editor-input {
   position: relative;
   z-index: 30;
 }
-/* Save and Cancel sit to the right of Delete aisle inside the editor header */
+
+
+
 .aisle-editor-header .layout-edit-bar {
   margin-left: auto;
 }
@@ -3915,7 +3963,9 @@ select.aisle-editor-input {
 .aisle-editor-header-bare {
   justify-content: flex-end;
 }
-/* ---------------- Warnings and errors: one message at the bottom center ---------------- */
+
+
+
 .map-toast {
   position: fixed;
   left: 50%;
@@ -3988,8 +4038,9 @@ select.aisle-editor-input {
 @media (prefers-reduced-motion: reduce) {
   .map-toast { animation: none; }
 }
-/* The map does not scroll sideways on desktop, even with the cursor over the aisles.
-   Narrow screens keep sideways scrolling, because the map is wider than the screen there. */
+
+
+
 .warehouse-map-scroll {
   overflow: hidden;
 }
@@ -4000,17 +4051,18 @@ select.aisle-editor-input {
     overflow-x: auto;
   }
 }
-/* Room inside the map area so the aisle frames are not clipped at the edges */
+
+
+
 .warehouse-map-scroll {
   padding: 12px 10px 18px;
   box-sizing: border-box;
 }
-/* ==========================================================================
-   Responsive layer: phones, tablets and desktops
-   Breakpoints: <=520px phone, <=640px small phone/large phone, <=767px phone,
-   768-1023px tablet, >=1024px desktop. Desktop layout is unchanged.
-   ========================================================================== */
-/* Base sizing */
+
+
+
+
+
 @media (max-width: 520px) {
   :root { font-size: 100%; }
 }
@@ -4024,17 +4076,18 @@ select.aisle-editor-input {
 @media (max-width: 640px) {
   :root { --gap: 1rem; }
 }
-/* Text fields: 16px stops phones from zooming in when a field is tapped */
+
+
+
 @media (max-width: 767px) {
   input, select, textarea {
     font-size: 16px;
   }
 }
-/* Header and navigation: the menu row scrolls sideways on phones instead of wrapping into many lines */
+
+
+
 @media (max-width: 767px) {
-  .title-main {
-    font-size: 1.6rem;
-  }
 
   header {
     min-height: 0;
@@ -4053,24 +4106,10 @@ select.aisle-editor-input {
     flex: 0 0 auto;
   }
 }
-/* Dashboards and stat cards */
+
+
+
 @media (max-width: 767px) {
-  .stats-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .stat-box {
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .stat-box:nth-child(2n) {
-    border-right: none;
-  }
-
-  .stat-value {
-    font-size: 1.5rem;
-  }
 
   .dashboard-grid {
     grid-template-columns: minmax(0, 1fr) !important;
@@ -4087,14 +4126,18 @@ select.aisle-editor-input {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-/* Two- and three-column form rows stack on small screens, including rows with inline column sizes */
+
+
+
 @media (max-width: 640px) {
   .grid-2,
   .grid-3 {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
-/* Tables: the table scrolls sideways inside its own box, the page does not */
+
+
+
 .table-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -4106,7 +4149,9 @@ select.aisle-editor-input {
     min-width: 760px;
   }
 }
-/* Modals fit the screen */
+
+
+
 .modal-content {
   max-width: min(500px, calc(100vw - 24px));
   max-height: calc(100vh - 32px);
@@ -4117,7 +4162,9 @@ select.aisle-editor-input {
 .modal-content.wide {
   max-width: min(900px, calc(100vw - 24px));
 }
-/* Full-screen pop-out: fills the window and scrolls inside its body. */
+
+
+
 .modal-overlay:has(.modal-content.full) {
   padding: 0;
 }
@@ -4162,16 +4209,10 @@ select.aisle-editor-input {
     flex: 1 1 100%;
   }
 }
-/* Warehouse map: toolbar, editor and frames fit small screens */
-@media (max-width: 767px) {
-  .floor-toolbar {
-    gap: 0.4rem;
-  }
 
-  .floor-toolbar .floor-tab-add {
-    flex: 1 1 auto;
-    justify-content: center;
-  }
+
+
+@media (max-width: 767px) {
 
   .layout-edit-bar {
     margin-left: 0;
@@ -4205,16 +4246,15 @@ select.aisle-editor-input {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* Touch screens: larger tap targets */
+
+
+
 @media (pointer: coarse) {
   button,
   .olive-button,
-  .nav-btn,
   .floor-tab-select,
   .floor-tab-add,
-  .aisle-edit-btn,
   .aisle-stepper button,
-  .aisle-nudge button,
   .rack-count-stepper button,
   .analytics-scope-toggle {
     min-height: 44px;
@@ -4231,7 +4271,9 @@ select.aisle-editor-input {
     height: 40px;
   }
 }
-/* Login: the artwork moves above the form on small screens */
+
+
+
 @media (max-width: 900px) {
   .login-shell {
     flex-direction: column;
@@ -4247,12 +4289,16 @@ select.aisle-editor-input {
     width: 100%;
   }
 }
-/* Images never run past their container */
+
+
+
 img {
   max-width: 100%;
   height: auto;
 }
-/* ---------------- Recovery email and password reset dialogs ---------------- */
+
+
+
 .recovery-dialog {
   display: flex;
   flex-direction: column;
@@ -4316,7 +4362,9 @@ img {
 .login-forgot:hover {
   text-decoration: underline;
 }
-/* Recovery email: masked address, status badge and links */
+
+
+
 .recovery-address {
   display: flex;
   align-items: center;
@@ -4407,7 +4455,9 @@ img {
   font-size: 12px;
   color: rgba(32, 48, 71, 0.62);
 }
-/* Password reset: progress steps, password checks and success state */
+
+
+
 .recovery-steps {
   display: flex;
   align-items: center;
@@ -4581,12 +4631,9 @@ img {
   font-size: 13px;
   color: rgba(32, 48, 71, 0.72);
 }
-/* ==========================================================================
-   DESIGN SYSTEM PASS
-   Final layer: shared tokens and primitives (type, buttons, inputs, cards,
-   navigation, focus, scrollbars, responsive header). Feature sections above
-   keep their layout; this layer makes them read as one product.
-   ========================================================================== */
+
+
+
 :root {
   --ink-muted: #5b6b82;
   --ink-faint: #8a97a8;
@@ -4605,7 +4652,9 @@ img {
   --space-6: 1.5rem;
   --space-8: 2rem;
 }
-/* Form controls and buttons ignore the page font unless told to inherit it. */
+
+
+
 button, input, select, textarea {
   font-family: inherit;
   font-size: inherit;
@@ -4616,7 +4665,9 @@ button, input, select, textarea {
 button { cursor: pointer; }
 
 button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: 0.55; }
-/* Keyboard focus is always visible; mouse clicks do not show a ring. */
+
+
+
 :focus-visible {
   outline: 2px solid var(--button);
   outline-offset: 2px;
@@ -4630,7 +4681,9 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   overflow: hidden; clip: rect(0, 0, 0, 0);
   white-space: nowrap; border: 0;
 }
-/* Scrollbars stay available (thin and quiet) so long lists can be scrolled by mouse. */
+
+
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(32, 48, 71, 0.25) transparent;
@@ -4650,7 +4703,9 @@ body {
 
 
 ::selection { background: rgba(56, 103, 168, 0.22); }
-/* ---- Type scale ---- */
+
+
+
 .label-micro, .label-table {
   font-family: var(--f-sans);
   font-size: 12px;
@@ -4661,7 +4716,9 @@ body {
   color: var(--ink-muted);
   opacity: 1;
 }
-/* ---- App header and brand ---- */
+
+
+
 .app-header {
   position: sticky;
   top: 0;
@@ -4710,7 +4767,9 @@ body {
 }
 
 .top-nav::-webkit-scrollbar { display: none; }
-/* ---- Buttons ---- */
+
+
+
 .olive-button {
   display: inline-flex;
   align-items: center;
@@ -4751,7 +4810,9 @@ body {
 .olive-button.btn-danger { background: var(--accent); color: #fff; border: 1px solid transparent; }
 
 .olive-button.btn-danger:hover:not(:disabled) { background: #8f0303; }
-/* ---- Inputs ---- */
+
+
+
 input[type='text'], input[type='search'], input[type='number'], input[type='password'],
 input[type='email'], input[type='tel'], input[type='url'], input[type='date'], input[type='datetime-local'],
 select, textarea {
@@ -4770,12 +4831,16 @@ input[type='date']:focus, select:focus, textarea:focus {
 }
 
 ::placeholder { color: var(--ink-faint); opacity: 1; }
-/* ---- Cards and panels ---- */
+
+
+
 .dash-card {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
-/* ---- Login ---- */
+
+
+
 .login-shell {
   padding: var(--space-8);
   gap: 4rem;
@@ -4907,7 +4972,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-family: var(--f-sans);
   font-size: 0.85rem;
 }
-/* ---- Item form: two columns in a landscape dialog ---- */
+
+
+
 .modal-content.landscape {
   max-width: min(1080px, calc(100vw - 24px));
 }
@@ -4952,7 +5019,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* ---- Combobox: a plain text box that suggests saved values (item form) ---- */
+
+
+
 .combobox {
   position: relative;
 }
@@ -4997,7 +5066,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   color: var(--button);
   font-weight: 600;
 }
-/* ---- Dashboard: KPI cards, category bars, activity and attention lists ---- */
+
+
+
 .dash2 {
   --dash-list-height: 360px;
   --dash-row-height: clamp(420px, 62vh, 600px);
@@ -5032,7 +5103,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-size: 0.9rem;
   color: var(--ink-muted);
 }
-/* KPI cards */
+
+
+
 .dash2-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5116,7 +5189,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-size: 0.8rem;
   color: var(--ink-faint);
 }
-/* Layout: each row has a fixed height. Panels fill it, and their lists scroll inside. */
+
+
+
 .dash2-main,
 .dash2-pair {
   display: grid;
@@ -5153,7 +5228,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .dash2-stack > .dash2-panel:last-child {
   flex: 0 0 auto;
 }
-/* Panels */
+
+
+
 .dash2-panel {
   display: flex;
   flex-direction: column;
@@ -5222,7 +5299,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   min-height: 0;
   padding: 0.5rem 1.25rem 0.9rem;
 }
-/* Segmented control */
+
+
+
 .dash2-seg {
   display: inline-flex;
   flex: 0 0 auto;
@@ -5255,7 +5334,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   color: var(--ink);
   box-shadow: var(--shadow-sm);
 }
-/* Category bars */
+
+
+
 .dash2-scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -5317,7 +5398,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
-/* Lists: rows separated by hairlines; the long lists scroll inside their panel */
+
+
+
 .dash2-list {
   list-style: none;
   margin: 0;
@@ -5473,7 +5556,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: rgba(175, 4, 4, 0.1);
   color: var(--accent);
 }
-/* Empty states */
+
+
+
 .dash2-empty {
   display: flex;
   flex-direction: column;
@@ -5501,7 +5586,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   margin: 0;
   font-size: 0.85rem;
 }
-/* Summary tiles */
+
+
+
 .dash2-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5543,7 +5630,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .dash2-stat-small {
   font-size: 0.95rem;
 }
-/* Responsive */
+
+
+
 @media (max-width: 1100px) {
   .dash2-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5581,7 +5670,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     gap: 0.6rem;
   }
 }
-/* Phones: stats stay two-up and compact; category bars fit the width. */
+
+
+
 @media (max-width: 480px) {
   .dash2-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5605,7 +5696,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     font-size: 0.8rem;
   }
 }
-/* ---- Responsive header and layout ---- */
+
+
+
 @media (min-width: 900px) {
   .app-header {
     flex-direction: row;
@@ -5632,7 +5725,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   .login-shell { padding: var(--space-6); gap: 0; }
   .login-panel { padding: 1.75rem 1.5rem 1.5rem; }
 }
-/* ---- Touch: bigger targets ---- */
+
+
+
 @media (pointer: coarse) {
   .olive-button { min-height: 48px; }
   input[type='text'], input[type='search'], input[type='number'], input[type='date'], select {
@@ -5645,9 +5740,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     transition: none !important;
   }
 }
-/* ==========================================================================
-   TOP BAR: brand on the left, links centred, alerts and account on the right
-   ========================================================================== */
+
+
+
 .app-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -5724,7 +5819,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   align-items: center;
   gap: 0.6rem;
 }
-/* Critical alerts */
+
+
+
 .crit {
   position: relative;
 }
@@ -5947,7 +6044,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-size: 1.25rem;
   color: var(--success);
 }
-/* Account */
+
+
+
 .top-avatar {
   display: grid;
   place-items: center;
@@ -5972,7 +6071,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .top-avatar.is-active {
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
 }
-/* Phones: brand and actions on one row, links on the row below */
+
+
+
 @media (max-width: 899px) {
   .app-header {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -6009,31 +6110,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     animation: none;
   }
 }
-/* The chosen item, shown as a summary rather than disabled inputs */
 
 
-/* The chosen item{
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  background: var(--surface-hover);
-  border: 1px solid var(--line-soft);
-  border-radius: 14px;
-}
-/* The camera view: a 16:9 frame with rounded corners, left aligned with the fields */
 
-
-/* The camera view: a 16:9 frame with rounded corners{
-  width: 100% !important;
-  max-width: 560px !important;
-  margin: 0 auto !important;
-  border: 0 !important;
-  border-radius: 14px !important;
-  overflow: hidden;
-  background: #101418;
-}
-/* ---- Login: form on the left, a photo slideshow on the right ---- */
 .login-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
@@ -6063,7 +6142,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   position: relative;
   min-height: 100vh;
 }
-/* The coloured panel sits behind the photo. */
+
+
+
 .login-showcase::before {
   content: "";
   position: absolute;
@@ -6074,14 +6155,16 @@ input[type='date']:focus, select:focus, textarea:focus {
   border-radius: 28px;
   background: linear-gradient(170deg, #a30000 0%, #8c0a34 45%, #a8286f 75%, #b64bc4 100%);
 }
-/* The photo is not clipped by the panel: it rises above the top edge and past the bottom. */
+
+
+
 .login-showcase-slide {
   position: absolute;
   left: 1rem;
   top: 0;
   width: calc(100% - 2rem);
   height: 100%;
-  /* Fill the panel width and keep the head near the top, cropping the bottom. */
+  
   object-fit: cover;
   object-position: center top;
   opacity: 0;
@@ -6138,8 +6221,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
     min-height: 100vh;
-  }/* On phones the photo and its panel are hidden; only the form shows. */
-.login-showcase {
+  }
+  
+  .login-showcase {
     display: none;
   }
   .login-shell > .login-panel {
@@ -6156,9 +6240,11 @@ input[type='date']:focus, select:focus, textarea:focus {
     transition: none;
   }
 }
-/* Desktop: a soft glow and accent in the photo's colours, so the form sits with the photo. */
+
+
+
 @media (min-width: 900px) {
-  /* Soft wash of the photo's violet and red behind the form. */
+  
   .login-shell {
     background:
       radial-gradient(ellipse 30% 40% at 30% 50%, rgba(193, 112, 255, 0.24), rgba(193, 112, 255, 0) 100%),
@@ -6179,7 +6265,7 @@ input[type='date']:focus, select:focus, textarea:focus {
     background: linear-gradient(90deg, #1f2f47, #5a1a4f);
   }
 
-  /* White fields with a lavender border, so they sit well on the wash. */
+  
   .login-panel .input-block input {
     background: #ffffff;
     border-color: #d9d0ec;
@@ -6189,7 +6275,7 @@ input[type='date']:focus, select:focus, textarea:focus {
     border-color: #b9a9dd;
   }
 
-  /* Button states: hover, pressed, and a visible focus ring for keyboard users. */
+  
   .login-button:hover:not(:disabled) {
     filter: brightness(1.12);
   }
@@ -6209,8 +6295,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     outline-offset: 2px;
   }
 }
-/* Desktop: the form sits directly on the white page, with no card colour.
-   Text keeps its normal dark colours. The card is the .login-panel element. */
+
+
+
 @media (min-width: 900px) {
   .login-shell > .login-panel {
     width: min(100%, 380px);
@@ -6226,7 +6313,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     text-wrap: balance;
   }
 }
-/* Desktop: the form card always stays smaller than the photo panel. Its width and spacing scale with the window. */
+
+
+
 @media (min-width: 900px) {
   .login-shell > .login-panel {
     width: clamp(300px, 26vw, 380px);
@@ -6264,7 +6353,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     margin-bottom: clamp(0px, 0.6vh, 6px);
   }
 }
-/* Phones and tablets: the login form is centred, full width up to 400px, with no photo. */
+
+
+
 @media (max-width: 899px) {
   .login-shell {
     justify-items: center;
@@ -6293,7 +6384,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     mask-image: linear-gradient(to right, #000 82%, transparent);
   }
 }
-/* Phones: each inventory row becomes a card. Every field stays visible; nothing is hidden. */
+
+
+
 @media (max-width: 640px) {
   .inv-table-wrap {
     overflow: visible;
@@ -6331,31 +6424,37 @@ input[type='date']:focus, select:focus, textarea:focus {
     justify-self: stretch;
   }
 
-  /* Picture on the left, spanning the card. */
+  
   .inv-item > :nth-child(1)  { grid-column: 1; grid-row: 1 / span 5; }
-  .inv-item > :nth-child(2)  { grid-column: 2 / span 2; grid-row: 1; }   /* item (category is in its meta line) */
-  .inv-item > :nth-child(3)  { grid-column: 2; grid-row: 2; }            /* brand & model */
-  .inv-item > :nth-child(4)  { grid-column: 3; grid-row: 2; }            /* part no. */
-  .inv-item > :nth-child(5)  { grid-column: 2; grid-row: 3; }            /* supplier */
-  .inv-item > :nth-child(6)  { grid-column: 3; grid-row: 3; }            /* location */
-  .inv-item > :nth-child(7)  { grid-column: 2; grid-row: 4; }            /* stock */
-  .inv-item > :nth-child(8)  { grid-column: 3; grid-row: 4; }            /* purchase cost */
-  .inv-item > :nth-child(9)  { grid-column: 2; grid-row: 5; }            /* local cost */
-  .inv-item > :nth-child(10) { grid-column: 3; grid-row: 5; justify-self: end; }  /* actions */
+  .inv-item > :nth-child(2)  { grid-column: 2 / span 2; grid-row: 1; }   
+  .inv-item > :nth-child(3)  { grid-column: 2; grid-row: 2; }            
+  .inv-item > :nth-child(4)  { grid-column: 3; grid-row: 2; }            
+  .inv-item > :nth-child(5)  { grid-column: 2; grid-row: 3; }            
+  .inv-item > :nth-child(6)  { grid-column: 3; grid-row: 3; }            
+  .inv-item > :nth-child(7)  { grid-column: 2; grid-row: 4; }            
+  .inv-item > :nth-child(8)  { grid-column: 3; grid-row: 4; }            
+  .inv-item > :nth-child(9)  { grid-column: 2; grid-row: 5; }            
+  .inv-item > :nth-child(10) { grid-column: 3; grid-row: 5; justify-self: end; }  
 }
-/* Login photo: a horizontal swipe that does not block page scrolling. */
+
+
+
 .login-showcase {
   touch-action: pan-y;
   user-select: none;
 }
-/* Desktop: the login form sits 80px further right. */
+
+
+
 @media (min-width: 900px) {
   .login-shell > .login-panel {
     position: relative;
     left: 80px;
   }
 }
-/* ---- Login: refined form (UI pass). The photo panel and the backgrounds are unchanged. ---- */
+
+
+
 .login-panel {
   -webkit-font-smoothing: antialiased;
 }
@@ -6381,7 +6480,7 @@ input[type='date']:focus, select:focus, textarea:focus {
   height: 40px;
   margin: 0;
   object-fit: contain;
-  /* Push the light backdrop to pure white, then blend it into the cream page. */
+  
   filter: contrast(10);
   mix-blend-mode: multiply;
 }
@@ -6577,7 +6676,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     background: #faf8f4;
   }
 }
-/* Phones and tablets: the form fills the column, centred, and never runs past the screen edge. */
+
+
+
 @media (max-width: 899px) {
   .login-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -6592,7 +6693,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     min-width: 0;
   }
 }
-/* Login brand: top left of the page, set in from the corner (not flush). */
+
+
+
 @media (min-width: 900px) {
   .login-shell {
     position: relative;
@@ -6608,7 +6711,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     margin: 0;
   }
 }
-/* Brand wordmark colour and size, wherever the brand sits. */
+
+
+
 .login-shell > .brand-lockup .brand-wordmark {
   font-size: 1.125rem;
   font-weight: 700;
@@ -6617,7 +6722,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   -webkit-text-fill-color: #111111;
   background: none;
 }
-/* Phones and tablets: the logo and wordmark sit centred above the form. */
+
+
+
 @media (max-width: 899px) {
   .login-shell > .brand-lockup {
     grid-column: 1;
@@ -6640,7 +6747,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     align-content: start;
   }
 }
-/* ---- Stock in / Stock out: a line-item sheet (item, on hand, quantity, after) ---- */
+
+
+
 .stk {
   display: flex;
   flex-direction: column;
@@ -6953,7 +7062,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-size: 0.8125rem;
   color: var(--ink-muted);
 }
-/* The quantity column has a fixed width, so the box never moves when its value changes. */
+
+
+
 .stk-table .stk-qty-cell {
   width: 150px;
   min-width: 150px;
@@ -7194,7 +7305,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   .stk-foot-actions { width: 100%; }
   .stk-foot-actions .stk-btn { flex: 1; }
 }
-/* ---- Inventory list: 9 columns. Related fields are grouped into one cell each. ---- */
+
+
+
 .inv-table {
   min-width: 1240px;
 }
@@ -7354,14 +7467,16 @@ input[type='date']:focus, select:focus, textarea:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Inventory: part number, purchase cost and local cost each have their own column. */
+
+
+
 .inv-partno {
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
-  /* Show the whole part number; long ones wrap at their hyphens. */
+  
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.35;
@@ -7396,7 +7511,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-weight: 700;
   color: var(--ink);
 }
-/* Inventory: supplier column. Long names truncate with an ellipsis; the full value is in the tooltip. */
+
+
+
 .inv-supplier-cell {
   font-size: 0.875rem;
   font-weight: 500;
@@ -7411,7 +7528,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-weight: 400;
   color: var(--ink-faint);
 }
-/* Inventory item cell: the name and the vehicles it fits show in full and wrap onto more lines if needed. */
+
+
+
 .inv-name-text {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -7434,7 +7553,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   flex-shrink: 0;
   margin-top: 0.15em;
 }
-/* Inventory: money and stock figures stay on one line. Column widths are fixed so the header and every row line up. */
+
+
+
 .inv-price-cell,
 .inv-local-value,
 .inv-qty-big,
@@ -7447,8 +7568,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-table .inv-row > * {
   min-width: 0;
 }
-/* Inventory: category and part no. move under the item name between phone and wide-desktop widths,
-   so every column still fits without sideways scrolling. */
+
+
+
 .inv-inline-extra {
   display: none;
 }
@@ -7476,7 +7598,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     min-width: 1000px;
   }
 }
-/* Phones: the list and each card stay inside the screen width. */
+
+
+
 @media (max-width: 640px) {
   .inv-table-wrap,
   .inv-table {
@@ -7492,7 +7616,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
   }
 }
-/* Inventory: stock and cost figures and their headings are left-aligned. */
+
+
+
 .inv-head > .num,
 .inv-item > .inv-stock,
 .inv-item > .inv-price-cell,
@@ -7501,7 +7627,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   justify-content: flex-start;
   align-items: flex-start;
 }
-/* Pinned picture and name take the row's own colour, so they do not show a different box. */
+
+
+
 .inv-item {
   --row-bg: #ffffff;
 }
@@ -7510,7 +7638,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-item:hover {
   --row-bg: #f7f4ed;
 }
-/* Local cost: the figure on top, the discount badge underneath, never overlapping. */
+
+
+
 .inv-local {
   flex-direction: column;
   align-items: flex-start;
@@ -7530,13 +7660,17 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-item > .inv-price-cell {
   text-align: left;
 }
-/* Hide the spin arrows on the quantity box; the number keeps its place. */
+
+
+
 .stk-qty::-webkit-outer-spin-button,
 .stk-qty::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-/* Stock sheet: every column has a fixed width, so a figure changing never moves the columns. */
+
+
+
 .stk-table {
   table-layout: fixed;
 }
@@ -7562,7 +7696,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 .stk-table th:nth-child(7),
 .stk-table td:nth-child(7) { width: 56px; }
-/* ============ Stock card and Suppliers ============ */
+
+
+
 .sc,
 .sup {
   display: flex;
@@ -7672,7 +7808,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .sup-pad {
   padding: 16px;
 }
-/* Buttons */
+
+
+
 .sc-btn,
 .sup-btn {
   display: inline-flex;
@@ -7747,7 +7885,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .sup-icon.is-danger:hover {
   color: var(--accent);
 }
-/* Fields */
+
+
+
 .sc-field,
 .sup-field {
   display: flex;
@@ -7825,7 +7965,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   gap: 8px;
   width: 100%;
 }
-/* Stock card picker */
+
+
+
 .sc-picker {
   display: flex;
   flex-direction: column;
@@ -7942,7 +8084,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   text-align: center;
   color: var(--ink-faint);
 }
-/* Summary cards */
+
+
+
 .sc-summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -8012,7 +8156,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   font-size: 0.9375rem;
   font-weight: 650;
 }
-/* Tables */
+
+
+
 .sc-table-wrap,
 .sup-table-wrap {
   overflow-x: auto;
@@ -8144,7 +8290,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   gap: 16px;
   align-items: start;
 }
-/* Suppliers list */
+
+
+
 .sup-list-tools {
   display: flex;
   flex-wrap: wrap;
@@ -8303,7 +8451,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .sup-linkbtn:hover {
   text-decoration-color: var(--ink);
 }
-/* Responsive */
+
+
+
 @media (max-width: 1100px) {
   .sc-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8325,7 +8475,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: 1fr;
   }
 }
-/* Printing: only the stock card is printed. */
+
+
+
 @media print {
   body.printing-stock-card * {
     visibility: hidden;
@@ -8354,7 +8506,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     margin-bottom: 8px;
   }
 }
-/* Suppliers: the item picker in the link form is a plain list you click. */
+
+
+
 .sup-pick-list {
   max-height: 240px;
   overflow-y: auto;
@@ -8395,7 +8549,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: rgba(56, 103, 168, 0.12);
   font-weight: 600;
 }
-/* Suppliers: the item list in the supplier card scrolls, with its header kept in view. */
+
+
+
 .sup-items-scroll {
   max-height: 420px;
   overflow-y: auto;
@@ -8416,7 +8572,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   gap: 8px;
   flex-wrap: wrap;
 }
-/* Inventory: the action icons have their own space and never run into the cost columns. */
+
+
+
 .inv-actions {
   display: flex;
   align-items: center;
@@ -8429,12 +8587,16 @@ input[type='date']:focus, select:focus, textarea:focus {
 .inv-actions .inv-icon-btn {
   flex: 0 0 auto;
 }
-/* Stock sheet: the purchase price can be typed in the Cost column (admin). */
+
+
+
 .stk-price-input {
   width: 130px;
   text-align: right;
 }
-/* Stock-out: invoice and customer fields, and loss in red. */
+
+
+
 .stk-sale-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -8493,7 +8655,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: 1fr;
   }
 }
-/* ============ Sales and profit ============ */
+
+
+
 .sal {
   display: flex;
   flex-direction: column;
@@ -8932,7 +9096,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     display: none !important;
   }
 }
-/* Stock in history: invoices, and the invoice view */
+
+
+
 .sin-muted {
   margin: 2px 0 0;
   font-size: 0.8125rem;
@@ -9074,7 +9240,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   display: flex;
   gap: 8px;
 }
-/* Invoice dialog: fixed column widths keep the items readable and the footer in view */
+
+
+
 .sin-dialog {
   width: min(960px, 100%);
 }
@@ -9123,7 +9291,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   border-radius: 12px;
   background: var(--surface);
 }
-/* Stock-in supplier dropdown matches the other fields */
+
+
+
 .stk-sale-field select {
   height: 42px;
   padding: 0 12px;
@@ -9152,7 +9322,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
-/* Stock in history: four summary cards on one row */
+
+
+
 .sih .sal-cards {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -9163,7 +9335,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-/* Filter dropdowns match the filter inputs */
+
+
+
 .sal-field select {
   height: 38px;
   min-width: 180px;
@@ -9182,7 +9356,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   border-color: var(--ink);
   box-shadow: var(--focus-ring);
 }
-/* ============ Requests (edit and delete approvals) ============ */
+
+
+
 .req {
   display: flex;
   flex-direction: column;
@@ -9471,7 +9647,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: var(--ink);
   color: #ffffff;
 }
-/* Invoice dialog: info and danger buttons */
+
+
+
 .sin-info {
   padding: 10px 12px;
   background: rgba(31, 157, 139, 0.1);
@@ -9486,7 +9664,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: var(--accent);
   color: #ffffff;
 }
-/* ---- Sales and stock-in history: status, undo, and phone cards ---- */
+
+
+
 .sal-status {
   display: inline-block;
   padding: 2px 8px;
@@ -9514,7 +9694,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   white-space: nowrap;
   text-align: right;
 }
-/* Phones: each history row becomes a labelled card instead of a wide table. */
+
+
+
 @media (max-width: 720px) {
   .stack-phone {
     min-width: 0;
@@ -9600,7 +9782,9 @@ input[type='date']:focus, select:focus, textarea:focus {
     display: inline;
   }
 }
-/* ---- Product pictures that cannot be loaded: a neutral icon in the same space ---- */
+
+
+
 .is-broken {
   display: grid;
   place-items: center;
@@ -9608,7 +9792,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   color: rgba(32, 48, 71, 0.35);
   font-size: 20px;
 }
-/* ---- Invoice dialog: compact icon actions for each line ---- */
+
+
+
 .sin-actions {
   white-space: nowrap;
   text-align: right;
@@ -9664,11 +9850,15 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: var(--ink);
   color: #ffffff;
 }
-/* The page's main landmark takes no box of its own, so the layout stays as it was. */
+
+
+
 .app-content {
   display: contents;
 }
-/* The inventory table keeps the padding it had when it was the page's main element. */
+
+
+
 .inv-table-wrap {
   padding: var(--gap);
   flex: 1;
