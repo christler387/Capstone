@@ -4,7 +4,6 @@ import { Modal } from './components/Modal';
 import { StockCard } from './components/StockCard';
 import { Suppliers } from './components/Suppliers';
 import { Sales } from './components/Sales';
-import { Receipts } from './components/Receipts';
 
 const API_BASE = '/api';
 
@@ -60,12 +59,6 @@ const App: React.FC = () => {
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [stockCardItemId, setStockCardItemId] = useState('');
-  const [selectedReceiptId, setSelectedReceiptId] = useState('');
-  // Opens a sales receipt from another screen (for example right after a sale).
-  const handleOpenReceipt = (receiptId: string) => {
-    setSelectedReceiptId(receiptId);
-    setCurrentSection('receipts');
-  };
   // After a duplicate: reload the list, then open the copy for editing.
   const [openAfterReload, setOpenAfterReload] = useState<string | null>(null);
   useEffect(() => {
@@ -910,7 +903,6 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             onAddMovement={addMovement} 
             onAddItem={handleAddItem}
             selectedItemId={stockToItem}
-            onOpenReceipt={handleOpenReceipt}
             userRole={userRole}
             userName={user || undefined}
             rackLocations={rackLocations}
@@ -938,14 +930,6 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         );
       case 'sales':
         return <Sales userRole={userRole} />;
-      case 'receipts':
-        return (
-          <Receipts
-            userRole={userRole}
-            selectedReceiptId={selectedReceiptId}
-            onSelectReceipt={setSelectedReceiptId}
-          />
-        );
       case 'warehouse': 
         return (
           <WarehouseMap
@@ -1117,7 +1101,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
             <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
             <h1 className="sr-only">
-              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection === 'receipts' ? 'Sales receipts' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation

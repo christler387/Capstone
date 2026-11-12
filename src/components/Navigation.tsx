@@ -18,7 +18,6 @@ const NAV_ITEMS: { id: string; label: string }[] = [
   { id: 'stock-card', label: 'Stock Card' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'sales', label: 'Sales' },
-  { id: 'receipts', label: 'Receipts' },
   { id: 'warehouse', label: 'Warehouse Map' },
 ];
 

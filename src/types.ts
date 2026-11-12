@@ -48,6 +48,9 @@ export interface Movement {
   date: string;
   timestamp: number;
   createdBy?: string;
+  // Stock in: the supplier's invoice number and the supplier. Stock out: the invoice number.
+  reference?: string;
+  supplierId?: number | null;
 }
 
 export type InventoryAuditAction = 'ADD' | 'DELETE' | 'QTY';

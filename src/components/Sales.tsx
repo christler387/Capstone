@@ -283,7 +283,7 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
                 downloadCsv(
                   'sales-history.csv',
                   ['Date', 'Time', 'Reference', 'Item', 'Item ID', 'Quantity', 'Unit cost', 'Unit price', 'Total cost', 'Total sales', 'Gross profit', 'Customer', 'Recorded by'],
-                  history.map((r) => [r.date, r.time.slice(11), r.reference, r.itemName, r.itemId, r.quantity, r.unitCost, r.unitPrice, r.totalCost, r.totalSales, r.grossProfit, r.customer, r.recordedBy]),
+                  history.map((r) => [r.date, r.time.slice(11), r.reference, r.itemName, r.itemId, r.quantity, r.unitCost, r.unitPrice, r.totalCost, r.totalSales, r.grossProfit, r.recordedBy]),
                 )
               }
             >
@@ -296,7 +296,7 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
           <label className="sal-field"><span>To</span><input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)} /></label>
           <label className="sal-field"><span>Item</span><input value={itemFilter} onChange={(e) => setItemFilter(e.target.value)} placeholder="Item name or ID" /></label>
           <label className="sal-field"><span>Recorded by</span><input value={userFilter} onChange={(e) => setUserFilter(e.target.value)} placeholder="Username" /></label>
-          <label className="sal-field sal-field-wide"><span>Search</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Reference, customer, item" /></label>
+          <label className="sal-field sal-field-wide"><span>Search</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Reference or item" /></label>
         </div>
         <p className="sal-total-line">
           Total for the selected range: <strong>{peso(historyTotals.sales)}</strong> sales ·{' '}
@@ -316,7 +316,6 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
                 <th className="num">Total sales</th>
                 <th className="num">Total cost</th>
                 <th className="num">Gross profit</th>
-                <th>Customer</th>
                 <th>Recorded by</th>
               </tr>
             </thead>
@@ -333,7 +332,6 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
                   <td className="num">{peso(r.totalSales)}</td>
                   <td className="num">{peso(r.totalCost)}</td>
                   <td className={`num ${r.grossProfit < 0 ? 'sal-loss' : ''}`}>{peso(r.grossProfit)}</td>
-                  <td>{r.customer || '—'}</td>
                   <td>{r.recordedBy || '—'}</td>
                 </tr>
               ))}
