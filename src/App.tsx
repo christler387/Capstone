@@ -840,7 +840,6 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
   };
 
   const handleAddItem = (rackStr?: string) => {
-    if (userRole === 'staff') return;
     let rack = rackStr || '';
     let level = 'L1';
     

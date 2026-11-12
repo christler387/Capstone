@@ -192,7 +192,7 @@ export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole
         </p>
 
         <div className="sal-table-wrap">
-          <table className="sal-table">
+          <table className="sal-table stack-phone">
             <thead>
               <tr>
                 <th>Date</th>
@@ -215,12 +215,12 @@ export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole
                   onClick={() => setOpenInvoice(inv.reference)}
                   onKeyDown={(e) => { if (e.key === 'Enter') setOpenInvoice(inv.reference); }}
                 >
-                  <td className="sal-nowrap">{inv.date}</td>
-                  <td><span className="sal-code">{invoiceLabel(inv.reference)}</span></td>
-                  <td>{inv.supplier || '—'}</td>
-                  <td className="num">{inv.lineCount}</td>
-                  <td className="num">{inv.totalQty.toLocaleString()}</td>
-                  <td>{inv.recordedBy || '—'}</td>
+                  <td className="sal-nowrap" data-label="Date">{inv.date}</td>
+                  <td data-label="Invoice"><span className="sal-code">{invoiceLabel(inv.reference)}</span></td>
+                  <td data-label="Supplier">{inv.supplier || '—'}</td>
+                  <td className="num" data-label="Items">{inv.lineCount}</td>
+                  <td className="num" data-label="Units">{inv.totalQty.toLocaleString()}</td>
+                  <td data-label="Recorded by">{inv.recordedBy || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -319,6 +319,34 @@ export const InvoiceModal: React.FC<{
     }
   };
 
+  // Undo reverses part or all of a line's stock and keeps it on the stock card. Staff send it for approval.
+  const undoLine = async (line: InvoiceLine) => {
+    const answer = window.prompt(`Units of ${line.itemName} to undo (1 to ${line.qty}):`, String(line.qty));
+    if (answer === null) return;
+    const qty = Number(answer);
+    if (!Number.isInteger(qty) || qty < 1 || qty > line.qty) {
+      setError(`Enter a whole number from 1 to ${line.qty}.`);
+      return;
+    }
+    setError(null);
+    setInfo(null);
+    try {
+      const result = await apiRequest<{ requested?: boolean }>(`/movements/${encodeURIComponent(line.id)}/undo`, {
+        method: 'PATCH',
+        body: JSON.stringify({ qty }),
+      });
+      if (result?.requested) {
+        setInfo(`Sent for approval: undo ${qty} ${line.itemName}. Nothing changes until an admin approves it.`);
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+      onChanged();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not undo the line.');
+    }
+  };
+
   // Admins only: removes every line on the invoice.
   const deleteInvoice = async () => {
     if (!window.confirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`)) return;
@@ -357,7 +385,7 @@ export const InvoiceModal: React.FC<{
         {info && <div className="sin-info" role="status">{info}</div>}
 
         <div className="stk-table-wrap">
-          <table className="stk-table">
+          <table className="stk-table stack-phone">
             <thead>
               <tr>
                 <th className="sin-col-item">Item</th>
@@ -370,11 +398,11 @@ export const InvoiceModal: React.FC<{
             <tbody>
               {detail?.lines.map((line) => (
                 <tr key={line.id}>
-                  <td>
+                  <td data-label="Item">
                     <span className="stk-item-name">{line.itemName}</span>
                     <span className="stk-item-meta">{line.itemId}{line.partNumber ? ` · ${line.partNumber}` : ''}</span>
                   </td>
-                  <td className="num">
+                  <td className="num" data-label="Qty">
                     {editingId === line.id ? (
                       <input
                         className="stk-qty sin-qty"
@@ -389,12 +417,17 @@ export const InvoiceModal: React.FC<{
                       <>{line.qty.toLocaleString()} <span className="inv-uom">{line.unit}</span></>
                     )}
                   </td>
-                  <td>{line.time}</td>
-                  <td>{line.recordedBy || '—'}</td>
-                  <td className="sin-actions">
+                  <td data-label="Time">{line.time}</td>
+                  <td data-label="Recorded by">{line.recordedBy || '—'}</td>
+                  <td className="sin-actions" data-label="">
                     {isAdmin && editingId !== line.id && (
                       <button type="button" className="sin-btn is-ghost" onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}>
                         {iAmAdmin ? 'Edit' : 'Request edit'}
+                      </button>
+                    )}
+                    {editingId !== line.id && (
+                      <button type="button" className="sin-btn is-ghost" onClick={() => undoLine(line)}>
+                        {iAmAdmin ? 'Undo' : 'Request undo'}
                       </button>
                     )}
                     {editingId !== line.id && (

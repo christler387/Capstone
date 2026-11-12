@@ -49,6 +49,7 @@ interface SaleRecord {
   totalSales: number;
   grossProfit: number;
   recordedBy: string;
+  status: 'COMPLETED' | 'VOIDED';
 }
 
 interface SalesProps {
@@ -98,6 +99,8 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
   const [userFilter, setUserFilter] = useState('');
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [historyInfo, setHistoryInfo] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Staff see the sales reports too.
   const isAdmin = true;
@@ -124,12 +127,12 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
     if (userFilter.trim()) params.set('user', userFilter.trim());
     if (search.trim()) params.set('q', search.trim());
     apiRequest<SaleRecord[]>(`/sales?${params}`).then(setHistory).catch((err: Error) => setError(err.message));
-  }, [isAdmin, historyFrom, historyTo, itemFilter, userFilter, search]);
+  }, [isAdmin, historyFrom, historyTo, itemFilter, userFilter, search, refreshKey]);
 
   const historyTotals = useMemo(
     () =>
       history.reduce(
-        (sum, r) => ({
+        (sum, r) => (r.status === 'VOIDED' ? sum : {
           sales: sum.sales + r.totalSales,
           cost: sum.cost + r.totalCost,
           profit: sum.profit + r.grossProfit,
@@ -139,6 +142,24 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
       ),
     [history],
   );
+
+  // Undo returns the stock and marks the sale undone. Staff send it for approval.
+  const undoSale = async (sale: SaleRecord) => {
+    if (!window.confirm(`Undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}? The stock goes back on hand.`)) return;
+    setError(null);
+    setHistoryInfo(null);
+    try {
+      const result = await apiRequest<{ requested?: boolean }>(`/sales/${encodeURIComponent(sale.id)}/undo`, { method: 'PATCH' });
+      if (result.requested) {
+        setHistoryInfo(`Sent for approval: undo of ${sale.reference}. Nothing changes until an admin approves it.`);
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not undo the sale.');
+    }
+  };
 
   if (!isAdmin) {
     return (
@@ -304,8 +325,9 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
           <strong>{peso(historyTotals.profit)}</strong> gross profit · {historyTotals.units.toLocaleString()} unit(s)
           {history.length >= 500 && <span className="sal-muted"> (showing the newest 500)</span>}
         </p>
+        {historyInfo && <div className="sal-note" role="status">{historyInfo}</div>}
         <div className="sal-table-wrap">
-          <table className="sal-table sal-history">
+          <table className="sal-table sal-history stack-phone">
             <thead>
               <tr>
                 <th>Date &amp; time</th>
@@ -318,22 +340,32 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
                 <th className="num">Total cost</th>
                 <th className="num">Gross profit</th>
                 <th>Recorded by</th>
+                <th>Status</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {history.length === 0 && <tr><td colSpan={11} className="sal-empty-cell">No sales match these filters.</td></tr>}
+              {history.length === 0 && <tr><td colSpan={13} className="sal-empty-cell">No sales match these filters.</td></tr>}
               {history.map((r) => (
-                <tr key={r.id}>
-                  <td className="sal-nowrap">{r.time.slice(0, 16).replace(' ', ' · ')}</td>
-                  <td><span className="sal-code">{r.reference}</span></td>
-                  <td><span className="sal-strong">{r.itemName}</span><span className="sal-muted sal-small">{r.itemId}</span></td>
-                  <td className="num">{r.quantity.toLocaleString()}</td>
-                  <td className="num">{peso(r.unitPrice)}</td>
-                  <td className="num">{peso(r.unitCost)}</td>
-                  <td className="num">{peso(r.totalSales)}</td>
-                  <td className="num">{peso(r.totalCost)}</td>
-                  <td className={`num ${r.grossProfit < 0 ? 'sal-loss' : ''}`}>{peso(r.grossProfit)}</td>
-                  <td>{r.recordedBy || '—'}</td>
+                <tr key={r.id} className={r.status === 'VOIDED' ? 'is-void' : undefined}>
+                  <td className="sal-nowrap" data-label="When">{r.time.slice(0, 16).replace(' ', ' · ')}</td>
+                  <td data-label="Reference"><span className="sal-code">{r.reference}</span></td>
+                  <td data-label="Item"><span className="sal-strong">{r.itemName}</span><span className="sal-muted sal-small">{r.itemId}</span></td>
+                  <td className="num" data-label="Qty">{r.quantity.toLocaleString()}</td>
+                  <td className="num" data-label="Unit price">{peso(r.unitPrice)}</td>
+                  <td className="num" data-label="Unit cost">{peso(r.unitCost)}</td>
+                  <td className="num" data-label="Total sales">{peso(r.totalSales)}</td>
+                  <td className="num" data-label="Total cost">{peso(r.totalCost)}</td>
+                  <td className={`num ${r.grossProfit < 0 ? 'sal-loss' : ''}`} data-label="Gross profit">{peso(r.grossProfit)}</td>
+                  <td data-label="Recorded by">{r.recordedBy || '—'}</td>
+                  <td data-label="Status"><span className={`sal-status ${r.status === 'VOIDED' ? 'is-void' : ''}`}>{r.status === 'VOIDED' ? 'Undone' : 'Completed'}</span></td>
+                  <td className="sal-row-actions" data-label="">
+                    {r.status !== 'VOIDED' && (
+                      <button type="button" className="sal-btn is-ghost" onClick={() => undoSale(r)}>
+                        {userRole === 'admin' ? 'Undo' : 'Request undo'}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

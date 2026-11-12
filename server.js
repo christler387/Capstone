@@ -1903,6 +1903,45 @@ async function applyItemDelete(connection, itemId, actorName) {
   return { status: 204 };
 }
 
+// Undoes a sale: the stock comes back through the movement undo, and the sale is marked undone.
+async function applySaleVoid(connection, saleId, actorName) {
+  const [[sale]] = await connection.query("SELECT * FROM sales WHERE id=? FOR UPDATE", [saleId]);
+  if (!sale) return { status: 404, error: "Sale not found." };
+  if (sale.status === "VOIDED") return { status: 409, error: "This sale is already undone." };
+  const undo = await applyMovementUndo(connection, sale.movement_id, Number(sale.quantity), actorName);
+  if (undo.status !== 200) {
+    return { status: 409, error: "The stock movement for this sale was already changed. Check the stock card." };
+  }
+  await connection.query("UPDATE sales SET status='VOIDED' WHERE id=?", [saleId]);
+  return { status: 200 };
+}
+
+app.patch(
+  "/api/sales/:id/undo",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const id = cleanText(req.params.id, 100);
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "SALE_UNDO", id, cleanText(req.body?.reason, 255));
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await applySaleVoid(connection, id, actor.username);
+      if (result.status !== 200) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await connection.commit();
+      res.json({ id, status: "VOIDED" });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
 app.delete(
   "/api/movements/:id",
   ah(async (req, res) => {
@@ -3003,6 +3042,7 @@ app.get(
 
 const saleRow = (row) => ({
   id: row.id,
+  status: row.status,
   date: row.txn_date_str,
   time: row.txn_time_str,
   reference: row.reference,
@@ -3043,7 +3083,7 @@ app.get(
     const [rows] = await pool.query(
       `SELECT id, DATE_FORMAT(txn_date, '%Y-%m-%d') AS txn_date_str, DATE_FORMAT(txn_time, '%Y-%m-%d %H:%i:%s') AS txn_time_str,
               reference, customer, item_id, item_name, quantity, unit_cost, unit_price, total_cost, total_sales,
-              gross_profit, recorded_by
+              gross_profit, recorded_by, status
        FROM sales WHERE ${clauses.join(" AND ")}
        ORDER BY txn_time DESC, id DESC LIMIT 500`,
       extra,
@@ -3448,6 +3488,9 @@ app.post(
         case "ITEM_DELETE":
           result = await applyItemDelete(connection, request.target_id, actor.username);
           break;
+        case "SALE_UNDO":
+          result = await applySaleVoid(connection, request.target_id, actor.username);
+          break;
         default:
           result = { status: 400, error: "This request type cannot be approved here." };
       }
@@ -3780,6 +3823,20 @@ async function sendForApproval(res, actor, type, targetId, reason, newValue = nu
         oldValue: lines.reduce((sum, l) => sum + Number(l.qty), 0),
         newValue: 0,
       };
+    } else if (type === "SALE_UNDO") {
+      const [[sale]] = await connection.query(
+        "SELECT id, item_id, item_name, quantity, reference, status FROM sales WHERE id=?",
+        [targetId],
+      );
+      if (!sale) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Sale not found." });
+      }
+      if (sale.status === "VOIDED") {
+        await connection.rollback();
+        return res.status(409).json({ error: "This sale is already undone." });
+      }
+      info = { itemId: sale.item_id, itemName: sale.item_name, invoice: sale.reference, oldValue: Number(sale.quantity), newValue: 0 };
     } else {
       const [[m]] = await connection.query(
         "SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.id=? AND m.type='IN'",

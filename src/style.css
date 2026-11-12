@@ -10611,3 +10611,116 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: var(--accent);
   color: #ffffff;
 }
+
+/* ---- Sales and stock-in history: status, undo, and phone cards ---- */
+.sal-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(31, 157, 139, 0.12);
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sal-status.is-void {
+  background: var(--surface-hover);
+  color: var(--ink-muted);
+}
+
+.sal-history tr.is-void td {
+  color: var(--ink-faint);
+}
+
+.sal-row-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Phones: each history row becomes a labelled card instead of a wide table. */
+@media (max-width: 720px) {
+  .stack-phone {
+    min-width: 0;
+  }
+
+  .stack-phone thead {
+    display: none;
+  }
+
+  .stack-phone,
+  .stack-phone tbody,
+  .stack-phone tr,
+  .stack-phone td {
+    display: block;
+    width: 100%;
+  }
+
+  .stack-phone tr {
+    margin-bottom: 10px;
+    padding: 6px 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .stack-phone tbody tr:hover {
+    background: var(--surface);
+  }
+
+  .stack-phone td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line-soft);
+    text-align: right;
+    white-space: normal;
+  }
+
+  .stack-phone td:last-child {
+    border-bottom: 0;
+  }
+
+  .stack-phone td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    text-align: left;
+  }
+
+  .stack-phone td:empty {
+    display: none;
+  }
+
+  .stack-phone td[data-label=""]::before {
+    content: none;
+  }
+
+  .stack-phone td.sal-empty-cell,
+  .stack-phone td.stk-empty {
+    display: block;
+    text-align: center;
+  }
+
+  .stack-phone td.sal-empty-cell::before,
+  .stack-phone td.stk-empty::before {
+    content: none;
+  }
+
+  .stack-phone td.sal-row-actions,
+  .stack-phone td.sin-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .stack-phone .sal-strong,
+  .stack-phone .sal-small {
+    display: inline;
+  }
+}

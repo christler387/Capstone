@@ -3,7 +3,7 @@ import { apiRequest } from '../apiClient';
 
 export interface ChangeRequest {
   id: string;
-  type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE' | 'PRICE_CHANGE';
+  type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE' | 'PRICE_CHANGE' | 'MOVEMENT_UNDO' | 'MOVEMENT_DELETE' | 'ITEM_DELETE' | 'SALE_UNDO';
   invoice: string;
   itemId: string;
   itemName: string;
@@ -23,6 +23,10 @@ const TYPE_LABELS: Record<ChangeRequest['type'], string> = {
   STOCK_IN_DELETE: 'Delete line',
   INVOICE_DELETE: 'Delete invoice',
   PRICE_CHANGE: 'Price change',
+  MOVEMENT_UNDO: 'Undo stock in',
+  MOVEMENT_DELETE: 'Delete movement',
+  ITEM_DELETE: 'Delete item',
+  SALE_UNDO: 'Undo sale',
 };
 
 const STATUS_LABELS: Record<ChangeRequest['status'], string> = {
@@ -84,6 +88,8 @@ export const ChangeRequestsPage: React.FC = () => {
 
   const change = (r: ChangeRequest) => {
     if (r.type === 'STOCK_IN_EDIT') return `${r.oldValue ?? '—'} → ${r.newValue ?? '—'}`;
+    if (r.type === 'MOVEMENT_UNDO') return `Undo ${r.newValue ?? '—'} of ${r.oldValue ?? '—'}`;
+    if (r.type === 'SALE_UNDO') return `${r.oldValue ?? '—'} sold, then undone`;
     if (r.type === 'PRICE_CHANGE') return `${r.oldValue?.toFixed(2) ?? '—'} → ${r.newValue?.toFixed(2) ?? '—'}`;
     return `${r.oldValue ?? '—'} removed`;
   };
