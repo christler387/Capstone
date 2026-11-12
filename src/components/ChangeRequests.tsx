@@ -3,12 +3,13 @@ import { apiRequest } from '../apiClient';
 
 interface ChangeRequest {
   id: string;
-  type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE' | 'PRICE_CHANGE' | 'MOVEMENT_UNDO' | 'MOVEMENT_DELETE' | 'ITEM_DELETE' | 'SALE_UNDO';
+  type: 'STOCK_IN_EDIT' | 'STOCK_IN_DELETE' | 'INVOICE_DELETE' | 'PRICE_CHANGE' | 'MOVEMENT_UNDO' | 'MOVEMENT_DELETE' | 'ITEM_DELETE' | 'SALE_UNDO' | 'INVOICE_RENAME';
   invoice: string;
   itemId: string;
   itemName: string;
   oldValue: number | null;
   newValue: number | null;
+  newText: string;
   reason: string;
   requestedBy: string;
   requestedAt: string;
@@ -27,6 +28,7 @@ const TYPE_LABELS: Record<ChangeRequest['type'], string> = {
   MOVEMENT_DELETE: 'Delete movement',
   ITEM_DELETE: 'Delete item',
   SALE_UNDO: 'Undo sale',
+  INVOICE_RENAME: 'Change invoice number',
 };
 
 const STATUS_LABELS: Record<ChangeRequest['status'], string> = {
@@ -88,6 +90,7 @@ export const ChangeRequestsPage: React.FC = () => {
 
   const change = (r: ChangeRequest) => {
     if (r.type === 'STOCK_IN_EDIT') return `${r.oldValue ?? '—'} → ${r.newValue ?? '—'}`;
+    if (r.type === 'INVOICE_RENAME') return `${r.invoice || 'no invoice'} → ${r.newText}`;
     if (r.type === 'MOVEMENT_UNDO') return `Undo ${r.newValue ?? '—'} of ${r.oldValue ?? '—'}`;
     if (r.type === 'SALE_UNDO') return `${r.oldValue ?? '—'} sold, then undone`;
     if (r.type === 'PRICE_CHANGE') return `${r.oldValue?.toFixed(2) ?? '—'} → ${r.newValue?.toFixed(2) ?? '—'}`;
@@ -161,7 +164,7 @@ export const ChangeRequestsPage: React.FC = () => {
                   <td>{TYPE_LABELS[r.type]}</td>
                   <td><span className="req-code">{r.invoice || 'No invoice'}</span></td>
                   <td><span className="req-strong">{r.itemName}</span><span className="req-muted">{r.itemId}</span></td>
-                  <td className="req-nowrap">{change(r)}</td>
+                  <td><span className="req-nowrap">{change(r)}</span>{r.reason && <span className="req-muted req-small">“{r.reason}”</span>}</td>
                   <td>{r.requestedBy}</td>
                   <td><span className={`req-status is-${r.status.toLowerCase()}`}>{STATUS_LABELS[r.status]}</span></td>
                   <td>

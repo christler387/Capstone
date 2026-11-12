@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Item, Movement, UserRole, WarehouseLayout } from './types';
 import { Modal } from './components/Modal';
+import { askReason } from './reasonPrompt';
 
 const API_BASE = '/api';
 
@@ -561,9 +562,11 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
 
   const deleteItem = async (id: string) => {
     const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
+    const reason = userRole === 'admin' ? '' : askReason(`delete ${inventory.find(item => item.id === id)?.name || 'this item'}`);
+    if (reason === null) return;
     const result = await requestJson<{ requested?: boolean } | undefined>(`/inventory/${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      body: JSON.stringify({ createdBy: currentUser }),
+      body: JSON.stringify({ createdBy: currentUser, reason }),
     });
     if (result?.requested) {
       window.alert('Sent for approval. Nothing changes until an admin approves it.');

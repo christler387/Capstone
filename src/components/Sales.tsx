@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserRole } from '../types';
 import { apiRequest } from '../apiClient';
+import { askReason } from '../reasonPrompt';
 
 interface PeriodTotals {
   sales: number;
@@ -146,10 +147,15 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
   // Undo returns the stock and marks the sale undone. Staff send it for approval.
   const undoSale = async (sale: SaleRecord) => {
     if (!window.confirm(`Undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}? The stock goes back on hand.`)) return;
+    const reason = userRole === 'admin' ? '' : askReason(`undo the sale of ${sale.quantity} ${sale.itemName} on ${sale.reference}`);
+    if (reason === null) return;
     setError(null);
     setHistoryInfo(null);
     try {
-      const result = await apiRequest<{ requested?: boolean }>(`/sales/${encodeURIComponent(sale.id)}/undo`, { method: 'PATCH' });
+      const result = await apiRequest<{ requested?: boolean }>(`/sales/${encodeURIComponent(sale.id)}/undo`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason }),
+      });
       if (result.requested) {
         setHistoryInfo(`Sent for approval: undo of ${sale.reference}. Nothing changes until an admin approves it.`);
         return;

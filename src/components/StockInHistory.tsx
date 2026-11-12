@@ -1,3 +1,4 @@
+import { askReason } from '../reasonPrompt';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { UserRole } from '../types';
@@ -294,10 +295,12 @@ const InvoiceModal: React.FC<{
       setError('Quantity must be a whole number of at least 1.');
       return;
     }
+    const reason = iAmAdmin ? '' : askReason(`change this line from ${line.qty} to ${qty}`);
+    if (reason === null) return;
     try {
       const result = await apiRequest<{ requested?: boolean }>(`/stock-in/lines/${encodeURIComponent(line.id)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ qty }),
+        body: JSON.stringify({ qty, reason }),
       });
       setEditingId(null);
       if (result.requested) {
@@ -316,9 +319,14 @@ const InvoiceModal: React.FC<{
   // Admins only: removes the line and takes its stock back out.
   const deleteLine = async (line: InvoiceLine) => {
     if (!window.confirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`)) return;
+    const reason = iAmAdmin ? '' : askReason(`delete ${line.qty} ${line.itemName} from this invoice`);
+    if (reason === null) return;
     setError(null);
     try {
-      const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/lines/${encodeURIComponent(line.id)}`, { method: 'DELETE' });
+      const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/lines/${encodeURIComponent(line.id)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ reason }),
+      });
       if (result?.requested) {
         setInfo('Sent for approval. Nothing changes until an admin approves it.');
         return;
@@ -340,12 +348,14 @@ const InvoiceModal: React.FC<{
       setError(`Enter a whole number from 1 to ${line.qty}.`);
       return;
     }
+    const reason = iAmAdmin ? '' : askReason(`undo ${qty} ${line.itemName}`);
+    if (reason === null) return;
     setError(null);
     setInfo(null);
     try {
       const result = await apiRequest<{ requested?: boolean }>(`/movements/${encodeURIComponent(line.id)}/undo`, {
         method: 'PATCH',
-        body: JSON.stringify({ qty }),
+        body: JSON.stringify({ qty, reason }),
       });
       if (result?.requested) {
         setInfo(`Sent for approval: undo ${qty} ${line.itemName}. Nothing changes until an admin approves it.`);
@@ -359,12 +369,48 @@ const InvoiceModal: React.FC<{
     }
   };
 
+  // Changes the invoice number of this invoice. Staff send it for approval; admins make it at once.
+  const renameInvoice = async () => {
+    const answer = window.prompt('New invoice number:', reference);
+    if (answer === null) return;
+    const newRef = answer.trim();
+    if (!newRef) {
+      setError('Enter the new invoice number.');
+      return;
+    }
+    if (newRef === reference) return;
+    const reason = iAmAdmin ? '' : askReason(`change invoice ${invoiceLabel(reference)} to ${newRef}`);
+    if (reason === null) return;
+    setError(null);
+    setInfo(null);
+    try {
+      const result = await apiRequest<{ requested?: boolean }>('/stock-in/invoice', {
+        method: 'PATCH',
+        body: JSON.stringify({ ref: reference, newRef, reason }),
+      });
+      if (result?.requested) {
+        setInfo(`Sent for approval: invoice ${invoiceLabel(reference)} to ${newRef}. Nothing changes until an admin approves it.`);
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('inventory-changed'));
+      onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the invoice number.');
+    }
+  };
+
   // Admins only: removes every line on the invoice.
   const deleteInvoice = async () => {
     if (!window.confirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`)) return;
+    const reason = iAmAdmin ? '' : askReason(`delete invoice ${invoiceLabel(reference)}`);
+    if (reason === null) return;
     setError(null);
     try {
-      const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`, { method: 'DELETE' });
+      const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ reason }),
+      });
       if (result?.requested) {
         setInfo('Sent for approval. Nothing changes until an admin approves it.');
         return;
@@ -471,6 +517,11 @@ const InvoiceModal: React.FC<{
             {!iAmAdmin && <> · Your changes wait for an admin's approval.</>}
           </span>
           <div className="sin-foot-actions">
+            {detail && reference && (
+              <button type="button" className="sin-btn is-ghost" onClick={renameInvoice}>
+                {iAmAdmin ? 'Change invoice number' : 'Request invoice number change'}
+              </button>
+            )}
             {detail && detail.lines.length > 0 && (
               <button type="button" className="sin-btn is-danger" onClick={deleteInvoice}>
                 {iAmAdmin ? 'Delete invoice' : 'Request invoice delete'}

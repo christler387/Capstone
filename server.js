@@ -674,6 +674,7 @@ async function initializeDatabase() {
     KEY idx_change_requests_invoice (invoice)
   ) ${tableOptions}`);
   await pool.query("ALTER TABLE change_requests MODIFY old_value DECIMAL(12,2) NULL, MODIFY new_value DECIMAL(12,2) NULL");
+  await addColumnIfMissing("change_requests", "new_text", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "reference", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "supplier_id", "INT NULL");
   await backfillStockLedger();
@@ -3185,12 +3186,12 @@ async function removeStockInLine(connection, lineId, actorName) {
 
 async function recordChangeRequest(connection, entry) {
   await connection.query(
-    `INSERT INTO change_requests (id, request_type, target_id, invoice, item_id, item_name, old_value, new_value, reason,
+    `INSERT INTO change_requests (id, request_type, target_id, invoice, item_id, item_name, old_value, new_value, new_text, reason,
        requested_by, status, decided_by, decided_at, decision_note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       `CR-${crypto.randomUUID()}`, entry.type, entry.targetId, entry.invoice || "", entry.itemId, entry.itemName,
-      entry.oldValue ?? null, entry.newValue ?? null, entry.reason || null, entry.requestedBy, entry.status,
+      entry.oldValue ?? null, entry.newValue ?? null, entry.newText || null, entry.reason || null, entry.requestedBy, entry.status,
       entry.decidedBy || null, entry.status === "PENDING" ? null : localDateTimeString(new Date()),
       entry.note || null,
     ],
@@ -3216,12 +3217,16 @@ app.patch(
       );
       if (!line) return res.status(404).json({ error: "Stock-in line not found." });
       if (Number(line.qty) === newQty) return res.json({ id: lineId, qty: newQty, requested: false });
+      const reason = cleanText(req.body?.reason, 255);
+      if (reason.length < 3) {
+        return res.status(400).json({ error: "Enter a note explaining why this change is needed (at least 3 characters)." });
+      }
       const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
         await recordChangeRequest(connection, {
           type: "STOCK_IN_EDIT", targetId: line.id, invoice: line.reference || "", itemId: line.item_id,
-          itemName: line.item_name, oldValue: Number(line.qty), newValue: newQty, requestedBy: actor.username,
+          itemName: line.item_name, oldValue: Number(line.qty), newValue: newQty, reason, requestedBy: actor.username,
           status: "PENDING",
         });
         await connection.commit();
@@ -3281,6 +3286,76 @@ app.delete(
       });
       await connection.commit();
       res.status(204).end();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }),
+);
+
+// Changes the invoice number of a past stock-in invoice. Staff send it for approval; admins make it at once.
+async function applyInvoiceRename(connection, oldRef, newRef) {
+  const [[clash]] = await connection.query("SELECT 1 AS found FROM movements WHERE type='IN' AND reference=? LIMIT 1", [newRef]);
+  if (clash) return { status: 409, error: `Invoice ${newRef} already exists. Choose another number.` };
+  const [result] = await connection.query(
+    "UPDATE movements SET reference=? WHERE type='IN' AND COALESCE(reference, '')=?",
+    [newRef, oldRef],
+  );
+  if (result.affectedRows === 0) return { status: 404, error: "No stock-in lines on this invoice." };
+  return { status: 200 };
+}
+
+app.patch(
+  "/api/stock-in/invoice",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const oldRef = cleanText(req.body?.ref, 64);
+    const newRef = cleanText(req.body?.newRef, 64);
+    const reason = cleanText(req.body?.reason, 255);
+    if (!newRef) return res.status(400).json({ error: "Enter the new invoice number." });
+    if (newRef === oldRef) return res.status(400).json({ error: "The new invoice number is the same as the current one." });
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      if (!isAdmin(actor)) {
+        if (reason.length < 3) {
+          await connection.rollback();
+          return res.status(400).json({ error: "Enter a note explaining why the invoice number must change (at least 3 characters)." });
+        }
+        const [lines] = await connection.query(
+          `SELECT m.item_id, i.name AS item_name FROM movements m JOIN inventory i ON i.id = m.item_id
+           WHERE m.type='IN' AND COALESCE(m.reference, '') = ?`,
+          [oldRef],
+        );
+        if (lines.length === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: "No stock-in lines on this invoice." });
+        }
+        const [[clash]] = await connection.query("SELECT 1 AS found FROM movements WHERE type='IN' AND reference=? LIMIT 1", [newRef]);
+        if (clash) {
+          await connection.rollback();
+          return res.status(409).json({ error: `Invoice ${newRef} already exists. Choose another number.` });
+        }
+        await recordChangeRequest(connection, {
+          type: "INVOICE_RENAME", targetId: oldRef, invoice: oldRef,
+          itemId: lines.length === 1 ? lines[0].item_id : `${lines.length} items`,
+          itemName: lines.length === 1 ? lines[0].item_name : `Invoice ${oldRef || "(no invoice)"}`,
+          newText: newRef, reason, requestedBy: actor.username, status: "PENDING",
+        });
+        await connection.commit();
+        return res.status(202).json({ requested: true });
+      }
+      const result = await applyInvoiceRename(connection, oldRef, newRef);
+      if (result.status !== 200) {
+        await connection.rollback();
+        return res.status(result.status).json({ error: result.error });
+      }
+      await connection.commit();
+      res.json({ ref: newRef });
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -3354,7 +3429,7 @@ app.get(
       params.push(`%${q}%`, `%${q}%`, normalizeItemId(q), `%${q}%`);
     }
     const [rows] = await pool.query(
-      `SELECT id, request_type, invoice, item_id, item_name, old_value, new_value, reason, requested_by,
+      `SELECT id, request_type, invoice, item_id, item_name, old_value, new_value, new_text, reason, requested_by,
               DATE_FORMAT(requested_at, '%Y-%m-%d %H:%i') AS requested_str, status, decided_by,
               DATE_FORMAT(decided_at, '%Y-%m-%d %H:%i') AS decided_str, decision_note
        FROM change_requests WHERE ${clauses.join(" AND ")}
@@ -3365,7 +3440,7 @@ app.get(
       id: r.id, type: r.request_type, invoice: r.invoice, itemId: r.item_id, itemName: r.item_name,
       oldValue: r.old_value === null ? null : Number(r.old_value),
       newValue: r.new_value === null ? null : Number(r.new_value),
-      reason: r.reason || "", requestedBy: r.requested_by,
+      newText: r.new_text || "", reason: r.reason || "", requestedBy: r.requested_by,
       requestedAt: r.requested_str, status: r.status, decidedBy: r.decided_by || "", decidedAt: r.decided_str || "",
       note: r.decision_note || "",
     })));
@@ -3392,6 +3467,9 @@ app.post(
       }
       let result;
       switch (request.request_type) {
+        case "INVOICE_RENAME":
+          result = await applyInvoiceRename(connection, request.target_id, request.new_text);
+          break;
         case "STOCK_IN_EDIT":
           result = await setStockInLineQty(connection, request.target_id, Number(request.new_value), actor.username);
           break;
@@ -3722,6 +3800,9 @@ async function requireSignedIn(req, res) {
 // Creates a pending request for a change a staff member cannot make directly.
 // The details shown on the request are read from the record it is about.
 async function sendForApproval(res, actor, type, targetId, reason, newValue = null) {
+  if (!reason || reason.length < 3) {
+    return res.status(400).json({ error: "Enter a note explaining why this change is needed (at least 3 characters)." });
+  }
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
