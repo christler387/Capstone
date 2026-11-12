@@ -2915,6 +2915,21 @@ app.get(
       filter += " AND (m.reference LIKE ? OR i.name LIKE ? OR m.item_id = ? OR s.name LIKE ?)";
       params.push(`%${q}%`, `%${q}%`, normalizeItemId(q), `%${q}%`);
     }
+    const item = typeof req.query.item === "string" ? req.query.item.trim().slice(0, 64) : "";
+    if (item) {
+      filter += " AND (i.name LIKE ? OR m.item_id = ?)";
+      params.push(`%${item}%`, normalizeItemId(item));
+    }
+    const user = typeof req.query.user === "string" ? req.query.user.trim().slice(0, 64) : "";
+    if (user) {
+      filter += " AND m.created_by = ?";
+      params.push(user);
+    }
+    const supplier = toPositiveInt(req.query.supplier);
+    if (supplier) {
+      filter += " AND m.supplier_id = ?";
+      params.push(supplier);
+    }
     const [rows] = await pool.query(
       `SELECT COALESCE(m.reference, '') AS reference, MAX(s.name) AS supplier_name, MAX(m.supplier_id) AS supplier_id,
               DATE_FORMAT(MIN(m.movement_date), '%Y-%m-%d') AS date_str,

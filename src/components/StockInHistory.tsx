@@ -73,18 +73,31 @@ export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole
   const [preset, setPreset] = useState('month');
   const [range, setRange] = useState(rangeFor('month'));
   const [search, setSearch] = useState('');
+  const [item, setItem] = useState('');
+  const [user, setUser] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [suppliers, setSuppliers] = useState<{ id: number; name: string; supplierId: string }[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [openInvoice, setOpenInvoice] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    apiRequest<{ id: number; name: string; supplierId: string }[]>('/suppliers')
+      .then(setSuppliers)
+      .catch(() => setSuppliers([]));
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams({ from: range.from, to: range.to });
     if (search.trim()) params.set('q', search.trim());
+    if (item.trim()) params.set('item', item.trim());
+    if (user.trim()) params.set('user', user.trim());
+    if (supplierId) params.set('supplier', supplierId);
     apiRequest<InvoiceRow[]>(`/stock-in/invoices?${params}`)
       .then((data) => { setInvoices(data); setError(null); })
       .catch((err: Error) => setError(err.message));
-  }, [range.from, range.to, search, refreshKey]);
+  }, [range.from, range.to, search, item, user, supplierId, refreshKey]);
 
   const summary = useMemo(() => ({
     invoices: invoices.length,
@@ -143,21 +156,39 @@ export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole
                 </button>
               ))}
             </div>
-            {preset === 'custom' && (
-              <>
-                <label className="sal-field"><span>From</span><input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} /></label>
-                <label className="sal-field"><span>To</span><input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} /></label>
-              </>
-            )}
           </div>
         </div>
 
         <div className="sal-filters">
-          <label className="sal-field sal-field-wide">
-            <span>Search</span>
+          <label className="sal-field"><span>From</span>
+            <input type="date" value={range.from} onChange={(e) => { setPreset('custom'); setRange({ ...range, from: e.target.value }); }} />
+          </label>
+          <label className="sal-field"><span>To</span>
+            <input type="date" value={range.to} onChange={(e) => { setPreset('custom'); setRange({ ...range, to: e.target.value }); }} />
+          </label>
+          <label className="sal-field"><span>Supplier</span>
+            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+              <option value="">All suppliers</option>
+              {suppliers.map((sup) => (
+                <option key={sup.id} value={sup.id}>{sup.name} ({sup.supplierId})</option>
+              ))}
+            </select>
+          </label>
+          <label className="sal-field"><span>Item</span>
+            <input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Item name or ID" />
+          </label>
+          <label className="sal-field"><span>Recorded by</span>
+            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Username" />
+          </label>
+          <label className="sal-field sal-field-wide"><span>Search</span>
             <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Invoice, item or supplier" />
           </label>
         </div>
+
+        <p className="sal-total-line">
+          Total for the selected range: <strong>{summary.invoices.toLocaleString()}</strong> invoice(s) ·{' '}
+          <strong>{summary.items.toLocaleString()}</strong> item line(s) · <strong>{summary.units.toLocaleString()}</strong> unit(s)
+        </p>
 
         <div className="sal-table-wrap">
           <table className="sal-table">
