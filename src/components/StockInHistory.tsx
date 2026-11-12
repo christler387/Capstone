@@ -245,6 +245,18 @@ export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole
 };
 
 // One invoice and its items. Only an admin can change a quantity, and only after clicking Edit on that line.
+// A compact icon button for a line. The label is read by screen readers and shown as a tooltip.
+const IconAction: React.FC<{
+  icon: string;
+  label: string;
+  tone?: 'default' | 'danger' | 'primary';
+  onClick: () => void;
+}> = ({ icon, label, tone = 'default', onClick }) => (
+  <button type="button" className={`sin-icon-btn is-${tone}`} onClick={onClick} aria-label={label} title={label}>
+    <i className={`bx ${icon}`} aria-hidden="true"></i>
+  </button>
+);
+
 export const InvoiceModal: React.FC<{
   reference: string;
   isAdmin: boolean;
@@ -420,25 +432,27 @@ export const InvoiceModal: React.FC<{
                   <td data-label="Time">{line.time}</td>
                   <td data-label="Recorded by">{line.recordedBy || '—'}</td>
                   <td className="sin-actions" data-label="">
-                    {isAdmin && editingId !== line.id && (
-                      <button type="button" className="sin-btn is-ghost" onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}>
-                        {iAmAdmin ? 'Edit' : 'Request edit'}
-                      </button>
-                    )}
-                    {editingId !== line.id && (
-                      <button type="button" className="sin-btn is-ghost" onClick={() => undoLine(line)}>
-                        {iAmAdmin ? 'Undo' : 'Request undo'}
-                      </button>
-                    )}
-                    {editingId !== line.id && (
-                      <button type="button" className="sin-btn is-danger" onClick={() => deleteLine(line)}>
-                        {iAmAdmin ? 'Delete' : 'Request delete'}
-                      </button>
-                    )}
-                    {isAdmin && editingId === line.id && (
+                    {editingId === line.id ? (
                       <>
-                        <button type="button" className="sin-btn is-ghost" onClick={() => setEditingId(null)}>Cancel</button>
-                        <button type="button" className="sin-btn is-primary" onClick={() => saveLine(line)}>Save</button>
+                        <IconAction icon="bx-x" label="Cancel" onClick={() => setEditingId(null)} />
+                        <IconAction icon="bx-check" label="Save quantity" tone="primary" onClick={() => saveLine(line)} />
+                      </>
+                    ) : (
+                      <>
+                        {isAdmin && (
+                          <IconAction
+                            icon="bx-edit-alt"
+                            label={iAmAdmin ? 'Edit quantity' : 'Request edit'}
+                            onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}
+                          />
+                        )}
+                        <IconAction icon="bx-undo" label={iAmAdmin ? 'Undo units' : 'Request undo'} onClick={() => undoLine(line)} />
+                        <IconAction
+                          icon="bx-trash"
+                          tone="danger"
+                          label={iAmAdmin ? 'Delete line' : 'Request delete'}
+                          onClick={() => deleteLine(line)}
+                        />
                       </>
                     )}
                   </td>
@@ -452,7 +466,10 @@ export const InvoiceModal: React.FC<{
         </div>
 
         <div className="sin-dialog-foot">
-          <span className="sin-muted">{detail?.lines.length ?? 0} item(s) · {units.toLocaleString()} unit(s)</span>
+          <span className="sin-muted">
+            {detail?.lines.length ?? 0} item(s) · {units.toLocaleString()} unit(s)
+            {!iAmAdmin && <> · Your changes wait for an admin's approval.</>}
+          </span>
           <div className="sin-foot-actions">
             {detail && detail.lines.length > 0 && (
               <button type="button" className="sin-btn is-danger" onClick={deleteInvoice}>

@@ -10290,7 +10290,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 .sin-col-qty { width: 150px; }
 .sin-col-time { width: 80px; }
 .sin-col-by { width: 130px; }
-.sin-col-actions { width: 150px; }
+.sin-col-actions { width: 140px; }
 
 .sin-dialog .stk-item-name {
   white-space: normal;
@@ -10759,4 +10759,54 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: #f4f6f9;
   color: rgba(32, 48, 71, 0.35);
   font-size: 20px;
+}
+
+/* ---- Invoice dialog: compact icon actions for each line ---- */
+.sin-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.sin-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sin-icon-btn:first-child {
+  margin-left: 0;
+}
+
+.sin-icon-btn:hover {
+  background: var(--surface-hover);
+}
+
+.sin-icon-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.sin-icon-btn.is-danger {
+  border-color: rgba(175, 4, 4, 0.25);
+  background: rgba(175, 4, 4, 0.06);
+  color: var(--accent);
+}
+
+.sin-icon-btn.is-danger:hover {
+  background: rgba(175, 4, 4, 0.12);
+}
+
+.sin-icon-btn.is-primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #ffffff;
 }
