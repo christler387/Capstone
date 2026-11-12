@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BarcodeScanner } from './BarcodeScanner';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+
+// The camera scanner loads only when the dialog is opened.
+const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })));
 
 interface ScannerDialogProps {
   onScanSuccess: (value: string) => boolean | void;
@@ -66,7 +68,9 @@ export const ScannerDialog: React.FC<ScannerDialogProps> = ({ onScanSuccess, onC
         </div>
 
         <div className="scanner-dialog-body">
-          <BarcodeScanner onScanSuccess={handleScan} />
+          <Suspense fallback={null}>
+            <BarcodeScanner onScanSuccess={handleScan} />
+          </Suspense>
           {warning && (
             <p role="alert" className="scanner-dialog-warning">
               <i className="bx bx-error-circle" aria-hidden="true"></i> {warning}

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import slide1 from '../assets/login/slide-1.png';
-import slide2 from '../assets/login/slide-2.png';
-import slide3 from '../assets/login/slide-3.png';
+import slide1 from '../assets/login/slide-1.webp';
+import slide2 from '../assets/login/slide-2.webp';
+import slide3 from '../assets/login/slide-3.webp';
 
 // Photos for the login slideshow, shown in order. To add a photo: put the file in
 // src/assets/login/, import it here and add it to this list.

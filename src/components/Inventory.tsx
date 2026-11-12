@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
-import { BarcodeScanner } from './BarcodeScanner';
+import { Suspense, lazy } from 'react';
+
+// The camera scanner loads only when it is opened.
+const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })));
 import { apiRequest } from '../apiClient';
 import { getLocalCost, getReorderQuantity, getStockTotal, isAtReorderPoint } from '../inventoryMetrics';
 
@@ -136,13 +139,15 @@ export const Inventory: React.FC<InventoryProps> = ({
 
   const renderScannerDrawer = () => (
     <div className="inv-scanner">
-      <BarcodeScanner
-        onScanSuccess={(val) => {
-          setSearch(val);
-          setCurrentPage(1);
-          setIsScannerOpen(false);
-        }}
-      />
+      <Suspense fallback={null}>
+        <BarcodeScanner
+          onScanSuccess={(val) => {
+            setSearch(val);
+            setCurrentPage(1);
+            setIsScannerOpen(false);
+          }}
+        />
+      </Suspense>
     </div>
   );
 

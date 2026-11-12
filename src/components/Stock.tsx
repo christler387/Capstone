@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Item, Movement, UserRole } from '../types';
-import { BarcodeScanner } from './BarcodeScanner';
+
+// The camera scanner loads only when it is opened.
+const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })));
 import { apiRequest } from '../apiClient';
 import { Modal } from './Modal';
 import { getLocalCost } from '../inventoryMetrics';
@@ -356,7 +358,9 @@ export const Stock: React.FC<StockProps> = ({
 
         {isScannerOpen && (
           <div className="stk-scanner">
-            <BarcodeScanner onScanSuccess={handleScan} />
+            <Suspense fallback={null}>
+              <BarcodeScanner onScanSuccess={handleScan} />
+            </Suspense>
           </div>
         )}
 

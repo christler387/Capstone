@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { InventoryAuditEntry, Item, Movement, UserRole, WarehouseLayout } from './types';
 import { Modal } from './components/Modal';
-import { StockCard } from './components/StockCard';
-import { Suppliers } from './components/Suppliers';
-import { Sales } from './components/Sales';
-import { StockInHistoryPage } from './components/StockInHistory';
-import { ChangeRequestsPage } from './components/ChangeRequests';
 
 const API_BASE = '/api';
 
@@ -34,11 +29,18 @@ import { Dashboard } from './components/Dashboard';
 import { StaffDashboard } from './components/StaffDashboard';
 import { Inventory } from './components/Inventory';
 import { Stock } from './components/Stock';
-import { WarehouseMap } from './components/WarehouseMap';
 import { Login } from './components/Login';
 import { UserProfile } from './components/UserProfile';
-import skyrunLogo from './assets/Skyrun.png';
+import skyrunLogo from './assets/Skyrun.webp';
 import { isAtReorderPoint } from './inventoryMetrics';
+
+// Screens that are not needed on first load are fetched the first time they are opened.
+const StockCard = React.lazy(() => import('./components/StockCard').then((m) => ({ default: m.StockCard })));
+const Suppliers = React.lazy(() => import('./components/Suppliers').then((m) => ({ default: m.Suppliers })));
+const Sales = React.lazy(() => import('./components/Sales').then((m) => ({ default: m.Sales })));
+const StockInHistoryPage = React.lazy(() => import('./components/StockInHistory').then((m) => ({ default: m.StockInHistoryPage })));
+const ChangeRequestsPage = React.lazy(() => import('./components/ChangeRequests').then((m) => ({ default: m.ChangeRequestsPage })));
+const WarehouseMap = React.lazy(() => import('./components/WarehouseMap').then((m) => ({ default: m.WarehouseMap })));
 
 // The session is kept in sessionStorage, so closing the tab signs the user out.
 // It also expires after 15 minutes without mouse, keyboard, touch or scroll activity.
@@ -1146,7 +1148,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
           />
         </header>
 
-        {renderComponentRouter()}
+        <React.Suspense fallback={null}>{renderComponentRouter()}</React.Suspense>
       </div>
 
       {renderGlobalModals()}
