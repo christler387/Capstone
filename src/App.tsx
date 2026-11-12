@@ -757,7 +757,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
       body: JSON.stringify({ createdBy: currentUser }),
     });
     if (result?.requested) {
-      window.alert('Sent for approval. Nothing changes until the super administrator approves it.');
+      window.alert('Sent for approval. Nothing changes until an admin approves it.');
       return;
     }
     setInventory(prev => prev.filter(i => i.id !== id));
@@ -797,7 +797,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
       body: JSON.stringify({ qty: undoQuantity }),
     });
     if (result.requested) {
-      window.alert('Sent for approval. Nothing changes until the super administrator approves it.');
+      window.alert('Sent for approval. Nothing changes until an admin approves it.');
       return;
     }
     setMovements(prev => result.deleted

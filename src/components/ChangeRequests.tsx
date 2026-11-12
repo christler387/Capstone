@@ -32,8 +32,8 @@ const STATUS_LABELS: Record<ChangeRequest['status'], string> = {
 
 // Edit and delete requests for stock-in invoices. Opened in its own tab from the profile.
 export const ChangeRequestsPage: React.FC = () => {
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [role, setRole] = useState<'admin' | 'staff' | null>(null);
+  const isAdmin = role === 'admin';
   const [view, setView] = useState<'pending' | 'audit'>('pending');
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
   const [search, setSearch] = useState('');
@@ -42,11 +42,8 @@ export const ChangeRequestsPage: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    apiRequest<{ isSuperAdmin: boolean; role: 'admin' | 'staff' }>('/me')
-      .then((me) => {
-        setIsSuperAdmin(me.isSuperAdmin);
-        setRole(me.role);
-      })
+    apiRequest<{ role: 'admin' | 'staff' }>('/me')
+      .then((me) => setRole(me.role))
       .catch(() => setRole('staff'));
   }, []);
 
@@ -96,7 +93,7 @@ export const ChangeRequestsPage: React.FC = () => {
           <span className="req-kicker">Administration</span>
           <h2 className="req-title">Requests</h2>
           <p className="req-subtitle">
-            Changes to stock-in invoices wait here for the super administrator. Every request and decision is kept.
+            Changes to stock-in invoices by staff wait here for an admin. Every request and decision is kept.
           </p>
         </div>
         <div className="req-tabs" role="tablist" aria-label="View">
@@ -109,10 +106,8 @@ export const ChangeRequestsPage: React.FC = () => {
         </div>
       </header>
 
-      {!isSuperAdmin && (
-        <div className="req-note" role="note">
-          {role === 'admin' ? 'Only the super administrator can approve or reject requests.' : 'Your requests are listed here. The super administrator decides on them.'}
-        </div>
+      {!isAdmin && (
+        <div className="req-note" role="note">Your requests are listed here. An admin decides on them.</div>
       )}
       {error && <div className="req-alert" role="alert">{error}</div>}
 
@@ -167,7 +162,7 @@ export const ChangeRequestsPage: React.FC = () => {
                     ) : '—'}
                   </td>
                   <td className="req-actions">
-                    {isSuperAdmin && r.status === 'PENDING' && (
+                    {isAdmin && r.status === 'PENDING' && (
                       <>
                         <button type="button" className="req-btn is-ghost" onClick={() => decide(r, false)}>Reject</button>
                         <button type="button" className="req-btn is-primary" onClick={() => decide(r, true)}>Approve</button>

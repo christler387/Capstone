@@ -110,7 +110,7 @@ async function getAuthenticatedUser(req) {
   const token = readSessionToken(req);
   if (!token) return null;
   const [[user]] = await pool.query(
-    `SELECT u.id, u.username, u.role, u.is_super_admin
+    `SELECT u.id, u.username, u.role
      FROM user_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > NOW()
@@ -630,7 +630,6 @@ async function initializeDatabase() {
   }
   await createStockCardTables();
   await createSalesTable();
-  await addColumnIfMissing("users", "is_super_admin", "TINYINT(1) NOT NULL DEFAULT 0");
   await pool.query(`CREATE TABLE IF NOT EXISTS change_requests (
     id VARCHAR(64) PRIMARY KEY,
     request_type VARCHAR(32) NOT NULL,
@@ -650,13 +649,6 @@ async function initializeDatabase() {
     KEY idx_change_requests_status (status),
     KEY idx_change_requests_invoice (invoice)
   ) ${tableOptions}`);
-  // The super administrator is the account named in SUPER_ADMIN_USERNAME (set it in the server environment).
-  // It is applied only while no super administrator exists, so it does not undo a later change.
-  const superAdminName = cleanText(process.env.SUPER_ADMIN_USERNAME, 64);
-  const [[superCount]] = await pool.query("SELECT COUNT(*) AS n FROM users WHERE is_super_admin = 1");
-  if (superAdminName && Number(superCount.n) === 0) {
-    await pool.query("UPDATE users SET is_super_admin = 1 WHERE username = ? AND role = 'admin'", [superAdminName]);
-  }
   await addColumnIfMissing("movements", "reference", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "supplier_id", "INT NULL");
   await backfillStockLedger();
@@ -1910,7 +1902,7 @@ app.delete(
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const id = cleanText(req.params.id, 64);
-    if (!canDelete(actor)) return sendForApproval(res, actor, "MOVEMENT_DELETE", id, cleanText(req.body?.reason, 255));
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "MOVEMENT_DELETE", id, cleanText(req.body?.reason, 255));
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -1940,7 +1932,7 @@ app.patch(
     if (!Number.isInteger(requestedQty) || requestedQty < 1) {
       return res.status(400).json({ error: "Undo quantity must be a positive whole number." });
     }
-    if (!canEdit(actor)) {
+    if (!isAdmin(actor)) {
       return sendForApproval(res, actor, "MOVEMENT_UNDO", id, cleanText(req.body?.reason, 255), requestedQty);
     }
     const connection = await pool.getConnection();
@@ -1969,7 +1961,7 @@ app.delete(
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const itemId = normalizeItemId(req.params.id);
-    if (!canDelete(actor)) return sendForApproval(res, actor, "ITEM_DELETE", itemId, cleanText(req.body?.reason, 255));
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "ITEM_DELETE", itemId, cleanText(req.body?.reason, 255));
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3151,7 +3143,7 @@ app.get(
   }),
 );
 
-// Changes the stock-in line quantity by the difference. Shared by a direct super-admin edit and an approved request.
+// Changes the stock-in line quantity by the difference. Shared by a direct admin edit and an approved request.
 async function setStockInLineQty(connection, lineId, newQty, actorName) {
   const [[line]] = await connection.query(
     "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN' FOR UPDATE",
@@ -3224,7 +3216,7 @@ async function recordChangeRequest(connection, entry) {
   );
 }
 
-// An admin's quantity change waits for the super admin. A super admin's change is made straight away.
+// A staff member's quantity change waits for an admin. An admin's change is made straight away.
 app.patch(
   "/api/stock-in/lines/:id",
   ah(async (req, res) => {
@@ -3235,7 +3227,7 @@ app.patch(
     if (!Number.isInteger(newQty) || newQty < 1) {
       return res.status(400).json({ error: "Quantity must be a positive whole number." });
     }
-    if (!canEdit(actor)) {
+    if (!isAdmin(actor)) {
       const [[line]] = await pool.query(
         `SELECT m.id, m.item_id, m.qty, m.reference, i.name AS item_name
          FROM movements m JOIN inventory i ON i.id = m.item_id WHERE m.id=? AND m.type='IN'`,
@@ -3279,14 +3271,14 @@ app.patch(
   }),
 );
 
-// Deleting a stock-in line is for the super admin only.
+// Deleting a stock-in line is for admins only.
 app.delete(
   "/api/stock-in/lines/:id",
   ah(async (req, res) => {
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const lineId = cleanText(req.params.id, 64);
-    if (!canDelete(actor)) return sendForApproval(res, actor, "STOCK_IN_DELETE", lineId, cleanText(req.body?.reason, 255));
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "STOCK_IN_DELETE", lineId, cleanText(req.body?.reason, 255));
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3317,14 +3309,14 @@ app.delete(
   }),
 );
 
-// Deletes a whole invoice (all its stock-in lines). Super admin only.
+// Deletes a whole invoice (all its stock-in lines). Admins only.
 app.delete(
   "/api/stock-in/invoice",
   ah(async (req, res) => {
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const reference = cleanText(req.query.ref, 64);
-    if (!canDelete(actor)) return sendForApproval(res, actor, "INVOICE_DELETE", reference, cleanText(req.body?.reason, 255));
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "INVOICE_DELETE", reference, cleanText(req.body?.reason, 255));
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3361,7 +3353,7 @@ app.delete(
   }),
 );
 
-// Requests: the list is for every admin (the audit), approving and rejecting is for the super admin.
+// Requests: the list is the audit trail; approving and rejecting is for admins.
 app.get(
   "/api/change-requests",
   ah(async (req, res) => {
@@ -3371,7 +3363,7 @@ app.get(
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
     const clauses = ["1 = 1"];
     const params = [];
-    if (actor.role !== "admin" && !canDelete(actor)) {
+    if (actor.role !== "admin") {
       clauses.push("requested_by = ?");
       params.push(actor.username);
     }
@@ -3400,7 +3392,7 @@ app.get(
 app.post(
   "/api/change-requests/:id/approve",
   ah(async (req, res) => {
-    const actor = await requireSuperAdmin(req, res);
+    const actor = await requireAdmin(req, res);
     if (!actor) return;
     const id = cleanText(req.params.id, 64);
     const connection = await pool.getConnection();
@@ -3472,7 +3464,7 @@ app.post(
 app.post(
   "/api/change-requests/:id/reject",
   ah(async (req, res) => {
-    const actor = await requireSuperAdmin(req, res);
+    const actor = await requireAdmin(req, res);
     if (!actor) return;
     const id = cleanText(req.params.id, 64);
     const note = cleanText(req.body?.note, 255);
@@ -3492,7 +3484,7 @@ app.get(
   ah(async (req, res) => {
     const actor = await getAuthenticatedUser(req);
     if (!actor) return res.status(401).json({ error: "Sign in." });
-    res.json({ username: actor.username, role: actor.role, isSuperAdmin: canDelete(actor), canEdit: canEdit(actor) });
+    res.json({ username: actor.username, role: actor.role });
   }),
 );
 
@@ -3727,10 +3719,8 @@ async function requireAdmin(req, res) {
   return actor;
 }
 
-// Staff and admins both use the everyday features. Edits and undos by staff go to the super admin;
-// deletes go to the super admin, whoever asks. Admins hold the super administrator powers.
-const canEdit = (actor) => Boolean(actor) && (actor.role === "admin" || Number(actor.is_super_admin) === 1);
-const canDelete = (actor) => Boolean(actor) && (actor.role === "admin" || Number(actor.is_super_admin) === 1);
+// Admins make every change directly. Staff use the everyday features; their edits, undos and deletes wait for an admin.
+const isAdmin = (actor) => Boolean(actor) && actor.role === "admin";
 
 async function requireSignedIn(req, res) {
   const actor = await getAuthenticatedUser(req);
@@ -3741,7 +3731,7 @@ async function requireSignedIn(req, res) {
   return actor;
 }
 
-// Creates a pending request for a change a staff member (or an admin, for deletes) cannot make directly.
+// Creates a pending request for a change a staff member cannot make directly.
 // The details shown on the request are read from the record it is about.
 async function sendForApproval(res, actor, type, targetId, reason, newValue = null) {
   const connection = await pool.getConnection();
@@ -3804,13 +3794,6 @@ async function sendForApproval(res, actor, type, targetId, reason, newValue = nu
   } finally {
     connection.release();
   }
-}
-
-async function requireSuperAdmin(req, res) {
-  // Admins are the super administrators; staff are refused here.
-  const actor = await requireAdmin(req, res);
-  if (!actor) return null;
-  return actor;
 }
 
 function toPositiveInt(value) {

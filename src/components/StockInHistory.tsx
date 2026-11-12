@@ -257,12 +257,12 @@ export const InvoiceModal: React.FC<{
   const [editQty, setEditQty] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [iAmAdmin, setIAmAdmin] = useState(false);
 
   useEffect(() => {
-    apiRequest<{ isSuperAdmin: boolean }>('/me')
-      .then((me) => setIsSuperAdmin(me.isSuperAdmin))
-      .catch(() => setIsSuperAdmin(false));
+    apiRequest<{ role: string }>('/me')
+      .then((me) => setIAmAdmin(me.role === 'admin'))
+      .catch(() => setIAmAdmin(false));
   }, []);
 
   const load = () =>
@@ -289,7 +289,7 @@ export const InvoiceModal: React.FC<{
       });
       setEditingId(null);
       if (result.requested) {
-        setInfo(`Sent for approval: ${line.itemName} from ${line.qty} to ${qty}. Nothing changes until the super administrator approves it.`);
+        setInfo(`Sent for approval: ${line.itemName} from ${line.qty} to ${qty}. Nothing changes until an admin approves it.`);
         onChanged();
         return;
       }
@@ -301,14 +301,14 @@ export const InvoiceModal: React.FC<{
     }
   };
 
-  // Super administrator only: removes the line and takes its stock back out.
+  // Admins only: removes the line and takes its stock back out.
   const deleteLine = async (line: InvoiceLine) => {
     if (!window.confirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`)) return;
     setError(null);
     try {
       const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/lines/${encodeURIComponent(line.id)}`, { method: 'DELETE' });
       if (result?.requested) {
-        setInfo('Sent for approval. Nothing changes until the super administrator approves it.');
+        setInfo('Sent for approval. Nothing changes until an admin approves it.');
         return;
       }
       window.dispatchEvent(new CustomEvent('inventory-changed'));
@@ -319,14 +319,14 @@ export const InvoiceModal: React.FC<{
     }
   };
 
-  // Super administrator only: removes every line on the invoice.
+  // Admins only: removes every line on the invoice.
   const deleteInvoice = async () => {
     if (!window.confirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`)) return;
     setError(null);
     try {
       const result = await apiRequest<{ requested?: boolean } | undefined>(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`, { method: 'DELETE' });
       if (result?.requested) {
-        setInfo('Sent for approval. Nothing changes until the super administrator approves it.');
+        setInfo('Sent for approval. Nothing changes until an admin approves it.');
         return;
       }
       window.dispatchEvent(new CustomEvent('inventory-changed'));
@@ -394,12 +394,12 @@ export const InvoiceModal: React.FC<{
                   <td className="sin-actions">
                     {isAdmin && editingId !== line.id && (
                       <button type="button" className="sin-btn is-ghost" onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}>
-                        {isSuperAdmin ? 'Edit' : 'Request edit'}
+                        {iAmAdmin ? 'Edit' : 'Request edit'}
                       </button>
                     )}
                     {editingId !== line.id && (
                       <button type="button" className="sin-btn is-danger" onClick={() => deleteLine(line)}>
-                        {isSuperAdmin ? 'Delete' : 'Request delete'}
+                        {iAmAdmin ? 'Delete' : 'Request delete'}
                       </button>
                     )}
                     {isAdmin && editingId === line.id && (
@@ -423,7 +423,7 @@ export const InvoiceModal: React.FC<{
           <div className="sin-foot-actions">
             {detail && detail.lines.length > 0 && (
               <button type="button" className="sin-btn is-danger" onClick={deleteInvoice}>
-                {isSuperAdmin ? 'Delete invoice' : 'Request invoice delete'}
+                {iAmAdmin ? 'Delete invoice' : 'Request invoice delete'}
               </button>
             )}
             {detail && reference && (
