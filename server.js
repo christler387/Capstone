@@ -4,7 +4,6 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
-import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -726,33 +725,6 @@ function toMovement(row) {
 }
 
 // The old and new quantity stored with a QTY audit entry.
-function quantityChangeOf(itemData) {
-  let data = itemData;
-  if (typeof data === "string") {
-    try {
-      data = JSON.parse(data);
-    } catch {
-      return undefined;
-    }
-  }
-  if (!data || !Number.isFinite(Number(data.oldQuantity))) return undefined;
-  return { from: Number(data.oldQuantity), to: Number(data.newQuantity) };
-}
-
-function toInventoryAudit(row) {
-  const created = new Date(row.created_at);
-  return {
-    id: row.id,
-    itemId: row.item_id,
-    itemName: row.item_name,
-    action: row.action,
-    date: created.toISOString().slice(0, 10),
-    timestamp: created.getTime(),
-    createdBy: row.created_by || undefined,
-    quantityChange: row.action === "QTY" ? quantityChangeOf(row.item_data) : undefined,
-  };
-}
-
 // ---- Passwords ----
 // New passwords are stored as "scrypt$<salt>$<hash>" with a random salt per password. Older
 // accounts still have an unsalted SHA-256 hash (64 hex characters); they are upgraded on sign-in.
@@ -1766,7 +1738,8 @@ app.post(
 app.put(
   "/api/inventory/:id",
   ah(async (req, res) => {
-    const { imageFileName, ...itemData } = req.body || {};
+    const itemData = { ...(req.body || {}) };
+    delete itemData.imageFileName;
     const itemId = normalizeItemId(req.params.id);
     const [[previousRow]] = await pool.query("SELECT image FROM inventory WHERE id=?", [itemId]);
     const previousPicture = previousRow?.image || null;
@@ -2060,108 +2033,6 @@ app.delete(
       }
       await connection.commit();
       res.status(204).end();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }),
-);
-
-app.get(
-  "/api/inventory-audit",
-  ah(async (req, res) => {
-    const actor = await requireSignedIn(req, res);
-    if (!actor) return;
-    const [rows] = await pool.query(
-      "SELECT * FROM inventory_audit ORDER BY created_at DESC LIMIT 1000",
-    );
-    res.json(rows.map(toInventoryAudit));
-  }),
-);
-
-app.patch(
-  "/api/inventory-audit/:id/undo",
-  ah(async (req, res) => {
-    const actor = await requireAdmin(req, res);
-    if (!actor) return;
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [[audit]] = await connection.query(
-        "SELECT * FROM inventory_audit WHERE id=? FOR UPDATE",
-        [req.params.id],
-      );
-      if (!audit) {
-        await connection.rollback();
-        return res.status(404).json({ error: "Audit entry not found." });
-      }
-      if (!audit.item_data && audit.action === "DELETE") {
-        await connection.rollback();
-        return res.status(400).json({
-          error:
-            "This audit entry cannot be undone because its item snapshot is unavailable.",
-        });
-      }
-
-      if (audit.action === "ADD") {
-        await connection.query("DELETE FROM inventory WHERE id=?", [
-          audit.item_id,
-        ]);
-      } else if (audit.action === "QTY") {
-        const change = quantityChangeOf(audit.item_data);
-        if (!change) {
-          await connection.rollback();
-          return res.status(400).json({
-            error: "This entry cannot be undone because its quantity details are unavailable.",
-          });
-        }
-        const [result] = await connection.query(
-          "UPDATE inventory SET quantity = GREATEST(0, quantity - ?), version = version + 1 WHERE id=?",
-          [change.to - change.from, audit.item_id],
-        );
-        if (result.affectedRows === 0) {
-          await connection.rollback();
-          return res.status(404).json({ error: "Item not found." });
-        }
-        await recordStockLedger(connection, {
-          sourceId: `UNDO-AUD-${audit.id}`,
-          itemId: audit.item_id,
-          type: "INVENTORY_CORRECTION",
-          reference: audit.id,
-          description: "Quantity change undone",
-          qtyIn: change.to < change.from ? change.from - change.to : 0,
-          qtyOut: change.to > change.from ? change.to - change.from : 0,
-          balanceAfter: await currentItemQuantity(connection, audit.item_id),
-        });
-      } else {
-        const item =
-          typeof audit.item_data === "string"
-            ? JSON.parse(audit.item_data)
-            : audit.item_data;
-        await connection.query(
-          `INSERT INTO inventory (${INVENTORY_COLUMNS})
-           VALUES (${INVENTORY_PLACEHOLDERS})`,
-          inventoryValues(audit.item_id, item),
-        );
-        if (Number(item.quantity) > 0) {
-          await recordStockLedger(connection, {
-            sourceId: `BB-${audit.item_id}`,
-            itemId: audit.item_id,
-            type: "BEGINNING_BALANCE",
-            reference: `BB-${audit.item_id}`,
-            description: "Item restored, opening balance",
-            qtyIn: Number(item.quantity),
-            balanceAfter: Number(item.quantity),
-          });
-        }
-      }
-      await connection.query("DELETE FROM inventory_audit WHERE id=?", [
-        req.params.id,
-      ]);
-      await connection.commit();
-      res.json({ ok: true, action: audit.action });
     } catch (error) {
       await connection.rollback();
       throw error;

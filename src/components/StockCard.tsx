@@ -65,12 +65,9 @@ export const TXN_LABELS: Record<string, string> = {
   PRICE_CHANGE: 'Price Change',
 };
 
-const formatPeso = (value: number) =>
-  `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 const formatDateTime = (value: string) => value.slice(0, 16).replace(' ', ' · ');
 
-export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, selectedItemId, onSelectItem, onItemRenamed, userRole }) => {
+export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, selectedItemId, onSelectItem, onItemRenamed }) => {
   // Staff have the same features as admins.
   const isAdmin = true;
   const [itemSearch, setItemSearch] = useState('');

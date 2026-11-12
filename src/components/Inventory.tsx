@@ -35,7 +35,6 @@ export const Inventory: React.FC<InventoryProps> = ({
   onAddItem,
   onZoomImage,
   onLocateOnMap,
-  userRole = 'staff',
   onOpenStockCard,
 }) => {
   // How many suppliers each item is linked to, shown on the row.

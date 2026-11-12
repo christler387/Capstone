@@ -43,10 +43,8 @@ interface SuppliersProps {
 }
 
 const EMPTY_FORM = { name: '', contactPerson: '', contactNumber: '', email: '', address: '', notes: '' };
-const formatPeso = (value: number) =>
-  `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export const Suppliers: React.FC<SuppliersProps> = ({ inventory, userRole, onOpenStockCard, onItemRenamed }) => {
+export const Suppliers: React.FC<SuppliersProps> = ({ inventory, onOpenStockCard, onItemRenamed }) => {
   // Staff have the same features as admins.
   const isAdmin = true;
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);

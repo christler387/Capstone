@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { InventoryAuditEntry, Item, Movement, UserRole, WarehouseLayout } from './types';
+import { Item, Movement, UserRole, WarehouseLayout } from './types';
 import { Modal } from './components/Modal';
 
 const API_BASE = '/api';
@@ -60,7 +60,6 @@ function clearStoredSession() {
 const App: React.FC = () => {
   const [inventory, setInventory] = useState<Item[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
-  const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   // Requests open as a pop-out over the current page, so no second sign-in is needed.
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [currentSection, setCurrentSection] = useState('dashboard');
@@ -105,7 +104,6 @@ const App: React.FC = () => {
     Promise.all([
       reloadInventory(),
       reloadMovements(),
-      requestJson<InventoryAuditEntry[]>('/inventory-audit').then(setInventoryAudit),
     ]).then(() => undefined);
 
   // Keep the screens current while others work: refresh when the window is shown again and every 30 seconds.
@@ -133,13 +131,11 @@ const App: React.FC = () => {
     Promise.all([
       requestJson<Item[]>('/inventory'),
       requestJson<Movement[]>('/movements'),
-      requestJson<InventoryAuditEntry[]>('/inventory-audit'),
     ])
-      .then(([loadedInventory, loadedMovements, loadedInventoryAudit]) => {
+      .then(([loadedInventory, loadedMovements]) => {
         if (!active) return;
         setInventory(loadedInventory);
         setMovements(loadedMovements);
-        setInventoryAudit(loadedInventoryAudit);
       })
       .catch((error: Error) => {
         if (active) setDatabaseError(`Database unavailable: ${error.message}`);
@@ -157,13 +153,6 @@ const App: React.FC = () => {
     setSessionNotice(null);
     setUser(username);
     setUserRole(role);
-  };
-
-  const handleSwitchRole = (newRole: UserRole, newName: string) => {
-    sessionStorage.setItem('skyrun_session_user', newName);
-    sessionStorage.setItem('skyrun_session_role', newRole);
-    setUser(newName);
-    setUserRole(newRole);
   };
 
   const handleLogout = async () => {
@@ -557,7 +546,6 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       body: JSON.stringify({ ...item, createdBy: currentUser }),
     });
     setInventory(prev => [...prev, savedItem]);
-    setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
   const updateItem = async (id: string, data: Item) => {
@@ -567,12 +555,9 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       body: JSON.stringify({ ...data, updatedBy: currentUser }),
     });
     setInventory(prev => prev.map(i => i.id === id ? savedItem : i));
-    // A quantity change adds an audit entry, so the activity list is refreshed too.
-    setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
   const deleteItem = async (id: string) => {
-    const deletedItem = inventory.find(item => item.id === id);
     const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
     const result = await requestJson<{ requested?: boolean } | undefined>(`/inventory/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -583,7 +568,6 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       return;
     }
     setInventory(prev => prev.filter(i => i.id !== id));
-    if (deletedItem) setInventoryAudit(await requestJson<InventoryAuditEntry[]>('/inventory-audit'));
   };
 
   // An item's Item ID changed: update the screen at once, then reload the data in the background.
@@ -608,37 +592,6 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     });
     setMovements(prev => (prev.some(m => m.id === savedMovement.id) ? prev : [...prev, savedMovement]));
     await reloadInventory();
-  };
-
-  const undoMovement = async (movementId: string, undoQuantity: number) => {
-    const movementToUndo = movements.find(m => m.id === movementId);
-    if (!movementToUndo) return;
-
-    const result = await requestJson<{ deleted: boolean; movement?: Movement; requested?: boolean }>(`/movements/${encodeURIComponent(movementId)}/undo`, {
-      method: 'PATCH',
-      body: JSON.stringify({ qty: undoQuantity }),
-    });
-    if (result.requested) {
-      window.alert('Sent for approval. Nothing changes until an admin approves it.');
-      return;
-    }
-    setMovements(prev => result.deleted
-      ? prev.filter(m => m.id !== movementId)
-      : prev.map(m => m.id === movementId && result.movement ? result.movement : m));
-    await reloadInventory();
-  };
-
-  const undoInventoryAudit = async (auditId: string) => {
-    if (userRole !== 'admin') return;
-    await requestJson(`/inventory-audit/${encodeURIComponent(auditId)}/undo`, { method: 'PATCH' });
-    const [loadedInventory, loadedMovements, loadedInventoryAudit] = await Promise.all([
-      requestJson<Item[]>('/inventory'),
-      requestJson<Movement[]>('/movements'),
-      requestJson<InventoryAuditEntry[]>('/inventory-audit'),
-    ]);
-    setInventory(loadedInventory);
-    setMovements(loadedMovements);
-    setInventoryAudit(loadedInventoryAudit);
   };
 
   const bulkUpdateInventory = async (newInventory: Item[]) => {
@@ -784,7 +737,6 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
             layout={layout}
             onLayoutChange={setLayout}
             onEditItem={handleEditItem} 
-            onAddItem={handleAddItem}
             onBulkUpdate={bulkUpdateInventory}
             initialRack={locateRack}
             onClearInitialRack={() => setLocateRack(null)}
@@ -796,14 +748,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
           <UserProfile 
             user={user || (userRole === 'staff' ? 'Warehouse Staff' : 'Administrator')} 
             role={userRole}
-            movements={movements} 
-            inventory={inventory} 
-            inventoryAudit={inventoryAudit}
             onLogout={handleLogout} 
-            onGoToDashboard={() => setCurrentSection('dashboard')} 
-            onUndoMovement={undoMovement}
-            onUndoInventoryAudit={undoInventoryAudit}
-            onSwitchRole={handleSwitchRole}
             onChangePassword={handleChangePassword}
             onChangeUsername={handleChangeUsername}
             onCreateUser={handleCreateUser}

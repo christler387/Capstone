@@ -116,7 +116,6 @@ interface WarehouseMapProps {
   layout: WarehouseLayout;
   onLayoutChange?: (layout: WarehouseLayout) => void;
   onEditItem: (id: string) => void;
-  onAddItem: (rack?: string) => void;
   onBulkUpdate: (newInventory: Item[]) => void | Promise<void>;
   initialRack?: string | null;
   onClearInitialRack?: () => void;
@@ -129,7 +128,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   layout: savedLayout,
   onLayoutChange,
   onEditItem,
-  onAddItem,
   onBulkUpdate,
   initialRack,
   onClearInitialRack,
@@ -248,7 +246,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   // Aisles at or below UNPLACED_ROW are parked off the grid (for example after an interrupted save).
   // They are listed in a tray instead of stretching the grid.
   const onGridAisles = aisles.filter(aisle => aisle.gridRow < UNPLACED_ROW);
-  const unplacedAisles = aisles.filter(aisle => aisle.gridRow >= UNPLACED_ROW);
   const analyticsAisles = analyticsScope === 'all' ? layout.flatMap(floor => floor.aisles) : aisles;
 
   // ---- Optimizer ----
@@ -842,17 +839,6 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
     } finally {
       setIsSavingLayout(false);
     }
-  };
-
-  // Puts a parked aisle at the first spot where it fits on the grid.
-  const placeUnplacedAisle = (aisleId: number) => {
-    const floor = getDraftFloor(aisleId);
-    const aisle = getDraftAisle(aisleId);
-    if (!floor || !aisle) return;
-    const cell = findFreeCell(floor, footprintOf(aisle));
-    updateDraft(copy => {
-      placeAisle(copy, aisleId, floor.id, cell.gridCol, cell.gridRow);
-    });
   };
 
   // Converts a pointer position into a grid cell, using the grid's real padding, gaps and track sizes.

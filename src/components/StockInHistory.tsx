@@ -68,7 +68,7 @@ function rangeFor(preset: string): { from: string; to: string } {
 
 const invoiceLabel = (reference: string) => reference || 'No invoice';
 
-export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ userRole, onAddItemsToInvoice }) => {
+export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ onAddItemsToInvoice }) => {
   // Staff have the same features as admins; edits and deletes are sent for approval.
   const isAdmin = true;
   const [preset, setPreset] = useState('month');

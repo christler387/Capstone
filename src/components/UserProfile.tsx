@@ -1,18 +1,11 @@
 import React, { useState } from "react";
-import { InventoryAuditEntry, Movement, Item, UserRole } from "../types";
+import { UserRole } from "../types";
 import { RecoveryEmailDialog } from "./RecoveryEmailDialog";
 
 interface UserProfileProps {
   user: string;
   role?: UserRole;
-  movements: Movement[];
-  inventory: Item[];
-  inventoryAudit: InventoryAuditEntry[];
   onLogout: () => void;
-  onGoToDashboard: () => void;
-  onUndoMovement?: (id: string, qty: number) => void;
-  onUndoInventoryAudit?: (id: string) => Promise<void>;
-  onSwitchRole?: (role: UserRole, name: string) => void;
   onChangePassword?: (
     currentPassword: string,
     newPassword: string,
@@ -77,24 +70,12 @@ async function requestUserApi<T>(
 export const UserProfile: React.FC<UserProfileProps> = ({
   user,
   role = "staff",
-  movements,
-  inventory,
-  inventoryAudit,
   onLogout,
-  onGoToDashboard,
-  onUndoMovement,
-  onUndoInventoryAudit,
-  onSwitchRole,
   onChangePassword,
   onChangeUsername,
   onCreateUser,
   onOpenRequests,
 }) => {
-  const [filterType, setFilterType] = useState<"ALL" | "IN" | "OUT">("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
-  const [undoQuantity, setUndoQuantity] = useState("");
-  const [undoError, setUndoError] = useState<string | null>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
@@ -139,63 +120,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     (role !== "staff" && user.toLowerCase().includes("admin"))
       ? "ADMIN"
       : "OPERATIONAL STAFF";
-
-  const auditEntries = [
-    ...movements.map((movement) => ({
-      ...movement,
-      auditType: movement.type as "IN" | "OUT",
-    })),
-    ...inventoryAudit.map((entry) => ({ ...entry, auditType: entry.action })),
-  ].sort((a, b) => b.timestamp - a.timestamp);
-  const totalActions = auditEntries.length;
-  const inCount = movements.filter((m) => m.type === "IN").length;
-  const outCount = movements.filter((m) => m.type === "OUT").length;
-  const totalQtyMoved = movements.reduce((sum, m) => sum + m.qty, 0);
-
-  const filteredMovements = auditEntries
-    .filter((m) => {
-      if (filterType !== "ALL" && m.auditType !== filterType) return false;
-      if (!searchQuery.trim()) return true;
-      const query = searchQuery.toLowerCase();
-      const item = inventory.find((i) => i.id === m.itemId);
-      const itemName = (
-        "itemName" in m ? m.itemName : item?.name || ""
-      ).toLowerCase();
-      const itemId = m.itemId.toLowerCase();
-      const movementId = m.id.toLowerCase();
-      return (
-        itemName.includes(query) ||
-        itemId.includes(query) ||
-        movementId.includes(query)
-      );
-    })
-    .sort((a, b) => b.timestamp - a.timestamp);
-
-  const handleUndo = (movement: Movement) => {
-    const quantity = Number(undoQuantity);
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > movement.qty)
-      return;
-    if (onUndoMovement) {
-      onUndoMovement(movement.id, quantity);
-      setConfirmUndoId(null);
-      setUndoQuantity("");
-    }
-  };
-
-  const handleAuditUndo = async (auditId: string) => {
-    if (!onUndoInventoryAudit) return;
-    setUndoError(null);
-    try {
-      await onUndoInventoryAudit(auditId);
-      setConfirmUndoId(null);
-    } catch (error) {
-      setUndoError(
-        error instanceof Error
-          ? error.message
-          : "Unable to undo this audit entry.",
-      );
-    }
-  };
 
   const clearPasswordForm = () => {
     setCurrentPassword("");

@@ -41,7 +41,6 @@ export const Stock: React.FC<StockProps> = ({
   onAddMovement,
   onAddItem,
   selectedItemId,
-  userRole = 'staff',
   userName,
 }) => {
   const [tab, setTab] = useState<Tab>('in');
