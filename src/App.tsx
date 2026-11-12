@@ -1051,7 +1051,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         isOpen={isRequestsOpen}
         onClose={() => setIsRequestsOpen(false)}
         title="Requests"
-        type="wide"
+        type="full"
       >
         <ChangeRequestsPage />
       </Modal>
