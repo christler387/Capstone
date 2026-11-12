@@ -243,7 +243,7 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
           </div>
         </div>
         <div className="sal-table-wrap">
-          <table className="sal-table">
+          <table className="sal-table stack-phone">
             <thead>
               <tr>
                 <th>Period</th>
@@ -258,12 +258,12 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
               {series.length === 0 && <tr><td colSpan={6} className="sal-empty-cell">No sales in this period.</td></tr>}
               {series.map((r) => (
                 <tr key={r.period}>
-                  <td className="sal-strong">{r.period}</td>
-                  <td className="num">{r.units.toLocaleString()}</td>
-                  <td className="num">{peso(r.sales)}</td>
-                  <td className="num">{peso(r.cogs)}</td>
-                  <td className="num">{peso(r.profit)}</td>
-                  <td>
+                  <td className="sal-strong" data-label="Period">{r.period}</td>
+                  <td className="num" data-label="Units">{r.units.toLocaleString()}</td>
+                  <td className="num" data-label="Sales">{peso(r.sales)}</td>
+                  <td className="num" data-label="Cost of goods">{peso(r.cogs)}</td>
+                  <td className="num" data-label="Gross profit">{peso(r.profit)}</td>
+                  <td data-label="Sales bar">
                     <div className="sal-bar" aria-hidden="true">
                       <span className="sal-bar-sales" style={{ width: `${(r.sales / maxSales) * 100}%` }} />
                       <span className="sal-bar-profit" style={{ width: `${Math.max(0, (r.profit / maxSales) * 100)}%` }} />
@@ -281,16 +281,16 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
         <section className="sal-card-wide">
           <div className="sal-block-head"><h3>Best-selling items</h3></div>
           <div className="sal-table-wrap">
-            <table className="sal-table">
+            <table className="sal-table stack-phone">
               <thead><tr><th>Item</th><th className="num">Units</th><th className="num">Sales</th><th className="num">Gross profit</th></tr></thead>
               <tbody>
                 {topItems.length === 0 && <tr><td colSpan={4} className="sal-empty-cell">No sales in this period.</td></tr>}
                 {topItems.map((t) => (
                   <tr key={t.itemId}>
-                    <td><span className="sal-strong">{t.itemName}</span><span className="sal-muted sal-small">{t.itemId}</span></td>
-                    <td className="num">{t.units.toLocaleString()}</td>
-                    <td className="num">{peso(t.sales)}</td>
-                    <td className="num">{peso(t.profit)}</td>
+                    <td data-label="Item"><span className="sal-strong">{t.itemName}</span><span className="sal-muted sal-small">{t.itemId}</span></td>
+                    <td className="num" data-label="Units">{t.units.toLocaleString()}</td>
+                    <td className="num" data-label="Sales">{peso(t.sales)}</td>
+                    <td className="num" data-label="Gross profit">{peso(t.profit)}</td>
                   </tr>
                 ))}
               </tbody>

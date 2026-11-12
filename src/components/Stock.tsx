@@ -436,7 +436,7 @@ export const Stock: React.FC<StockProps> = ({
         )}
 
         <div className="stk-table-wrap">
-          <table className="stk-table">
+          <table className="stk-table stack-phone">
             <thead>
               <tr>
                 <th scope="col">Item</th>
@@ -468,7 +468,7 @@ export const Stock: React.FC<StockProps> = ({
                 const discount = Number(item?.discount) || 0;
                 return (
                   <tr key={line.itemId} className={short ? 'is-short' : ''}>
-                    <td>
+                    <td data-label="Item">
                       <span className="stk-item-name">{item?.name ?? 'Unknown item'}</span>
                       <span className="stk-item-meta">
                         <span className="stk-code">{line.itemId}</span>
@@ -476,10 +476,10 @@ export const Stock: React.FC<StockProps> = ({
                         {item?.supplier && <span> · {item.supplier}</span>}
                       </span>
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="On hand">
                       {onHand.toLocaleString()} <span className="inv-uom">{item?.unitOfMeasure || 'PCS'}</span>
                     </td>
-                    <td className="num stk-qty-cell">
+                    <td className="num stk-qty-cell" data-label={isIn ? 'Add' : 'Deduct'}>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -491,7 +491,7 @@ export const Stock: React.FC<StockProps> = ({
                         onChange={(event) => setQty(line.itemId, event.target.value)}
                       />
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Cost">
                       {item ? (
                         <div className="inv-cost">
                           {isAdmin && isIn ? (
@@ -520,10 +520,10 @@ export const Stock: React.FC<StockProps> = ({
                       )}
                     </td>
                     {isIn ? (
-                      <td className="num inv-total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
+                      <td className="num inv-total" data-label="Total">{line.qty > 0 ? formatPeso(lineTotal) : '—'}</td>
                     ) : (
                       <>
-                        <td className="num">
+                        <td className="num" data-label="Selling price">
                           <input
                             type="number"
                             min="0"
@@ -536,20 +536,20 @@ export const Stock: React.FC<StockProps> = ({
                             onChange={(e) => setSellPrices((prev) => ({ ...prev, [line.itemId]: e.target.value }))}
                           />
                         </td>
-                        <td className="num inv-total">{sellPrice > 0 && line.qty > 0 ? formatPeso(saleTotal) : '—'}</td>
-                        <td className={`num ${saleProfit < 0 ? 'stk-loss' : ''}`}>
+                        <td className="num inv-total" data-label="Sales">{sellPrice > 0 && line.qty > 0 ? formatPeso(saleTotal) : '—'}</td>
+                        <td className={`num ${saleProfit < 0 ? 'stk-loss' : ''}`} data-label="Profit">
                           {sellPrice > 0 && line.qty > 0 ? formatPeso(saleProfit) : '—'}
                         </td>
                       </>
                     )}
-                    <td className="num">
+                    <td className="num" data-label="After">
                       {line.qty > 0 ? (
                         <span className={short ? 'stk-after is-short' : 'stk-after'}>{after.toLocaleString()}</span>
                       ) : (
                         <span className="stk-after is-idle">—</span>
                       )}
                     </td>
-                    <td className="stk-remove-cell">
+                    <td className="stk-remove-cell" data-label="">
                       <button
                         type="button"
                         className="stk-remove"
