@@ -3728,9 +3728,9 @@ async function requireAdmin(req, res) {
 }
 
 // Staff and admins both use the everyday features. Edits and undos by staff go to the super admin;
-// deletes go to the super admin, whoever asks.
+// deletes go to the super admin, whoever asks. Admins hold the super administrator powers.
 const canEdit = (actor) => Boolean(actor) && (actor.role === "admin" || Number(actor.is_super_admin) === 1);
-const canDelete = (actor) => Boolean(actor) && Number(actor.is_super_admin) === 1;
+const canDelete = (actor) => Boolean(actor) && (actor.role === "admin" || Number(actor.is_super_admin) === 1);
 
 async function requireSignedIn(req, res) {
   const actor = await getAuthenticatedUser(req);
@@ -3807,12 +3807,9 @@ async function sendForApproval(res, actor, type, targetId, reason, newValue = nu
 }
 
 async function requireSuperAdmin(req, res) {
+  // Admins are the super administrators; staff are refused here.
   const actor = await requireAdmin(req, res);
   if (!actor) return null;
-  if (!actor.is_super_admin) {
-    res.status(403).json({ error: "Super administrator access is required." });
-    return null;
-  }
   return actor;
 }
 
