@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Item, Movement, UserRole } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { apiRequest } from '../apiClient';
@@ -13,6 +12,8 @@ interface StockProps {
   inventory: Item[];
   onAddMovement: (movement: Movement) => Promise<void> | void;
   onAddItem: (rack?: string) => void;
+  stockInPrefill?: { invoice: string; supplierId: string } | null;
+  onPrefillUsed?: () => void;
   selectedItemId?: string;
   userRole?: UserRole;
   userName?: string;
@@ -32,6 +33,8 @@ const addLine = (lines: Line[], itemId: string): Line[] =>
   lines.some((line) => line.itemId === itemId) ? lines : [...lines, { itemId, qty: 0 }];
 
 export const Stock: React.FC<StockProps> = ({
+  stockInPrefill,
+  onPrefillUsed,
   inventory,
   onAddMovement,
   onAddItem,
@@ -46,13 +49,18 @@ export const Stock: React.FC<StockProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  useEffect(() => {
+    if (!stockInPrefill) return;
+    setTab('in');
+    setStockInInvoice(stockInPrefill.invoice);
+    setStockInSupplierId(stockInPrefill.supplierId);
+    onPrefillUsed?.();
+  }, [stockInPrefill]);
   // Stock-out details: the invoice number, the customer, and each item's selling price.
   const [saleReference, setSaleReference] = useState('');
   const [stockInInvoice, setStockInInvoice] = useState('');
   const [stockInSupplierId, setStockInSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<{ id: number; name: string; supplierId: string; isActive: boolean }[]>([]);
-  // Changes after each stock-in, so the history reloads.
-  const [historyKey, setHistoryKey] = useState(0);
   useEffect(() => {
     apiRequest<{ id: number; name: string; supplierId: string; isActive: boolean }[]>('/suppliers')
       .then(setSuppliers)
@@ -285,7 +293,6 @@ export const Stock: React.FC<StockProps> = ({
         setStockInInvoice('');
         setStockInSupplierId('');
       }
-      setHistoryKey((k) => k + 1);
       setIsConfirmOpen(false);
     } catch (recordError) {
       const message = recordError instanceof Error ? recordError.message : 'Could not record the movement.';
@@ -591,17 +598,6 @@ export const Stock: React.FC<StockProps> = ({
         </footer>
       </section>
 
-      {isIn && (
-        <StockInHistory
-          refreshKey={historyKey}
-          isAdmin={isAdmin}
-          onAddToInvoice={(invoice, supplierId) => {
-            setStockInInvoice(invoice);
-            setStockInSupplierId(supplierId);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
-      )}
 
       <Modal
         isOpen={isConfirmOpen}
@@ -645,249 +641,4 @@ export const Stock: React.FC<StockProps> = ({
       </Modal>
     </div>
   );
-};
-
-
-interface InvoiceRow {
-  reference: string;
-  supplier: string;
-  supplierId: number | null;
-  date: string;
-  lastRecorded: string;
-  lineCount: number;
-  totalQty: number;
-  recordedBy: string;
-}
-
-interface InvoiceLine {
-  id: string;
-  itemId: string;
-  itemName: string;
-  partNumber: string;
-  unit: string;
-  qty: number;
-  time: string;
-  recordedBy: string;
-}
-
-interface InvoiceDetail {
-  reference: string;
-  supplier: string;
-  supplierId: number | null;
-  date: string;
-  lines: InvoiceLine[];
-}
-
-const invoiceLabel = (reference: string) => reference || 'No invoice';
-
-// Stock in grouped by invoice. Click an invoice to see its items; only an admin can change a quantity there.
-const StockInHistory: React.FC<{
-  refreshKey: number;
-  isAdmin: boolean;
-  onAddToInvoice: (invoice: string, supplierId: string) => void;
-}> = ({ refreshKey, isAdmin, onAddToInvoice }) => {
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
-  const [search, setSearch] = useState('');
-  const [openInvoice, setOpenInvoice] = useState<string | null>(null);
-  const [localKey, setLocalKey] = useState(0);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (search.trim()) params.set('q', search.trim());
-    apiRequest<InvoiceRow[]>(`/stock-in/invoices?${params}`)
-      .then(setInvoices)
-      .catch(() => setInvoices([]));
-  }, [search, refreshKey, localKey]);
-
-  return (
-    <section className="sin-card" aria-labelledby="sin-title">
-      <div className="sin-head">
-        <div>
-          <h3 id="sin-title">Stock in history</h3>
-          <p className="sin-muted">Click an invoice to see its items.</p>
-        </div>
-        <input type="search" placeholder="Search invoice, item or supplier" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
-      <div className="stk-table-wrap">
-        <table className="stk-table sin-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Invoice</th>
-              <th>Supplier</th>
-              <th className="num">Items</th>
-              <th className="num">Total qty</th>
-              <th>Recorded by</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.length === 0 && (
-              <tr><td colSpan={6} className="stk-empty">No stock-in records yet.</td></tr>
-            )}
-            {invoices.map((inv) => (
-              <tr
-                key={inv.reference || '(none)'}
-                className="sin-row"
-                tabIndex={0}
-                onClick={() => setOpenInvoice(inv.reference)}
-                onKeyDown={(e) => { if (e.key === 'Enter') setOpenInvoice(inv.reference); }}
-              >
-                <td className="sin-nowrap">{inv.date}</td>
-                <td><span className="stk-code">{invoiceLabel(inv.reference)}</span></td>
-                <td>{inv.supplier || '—'}</td>
-                <td className="num">{inv.lineCount}</td>
-                <td className="num">{inv.totalQty.toLocaleString()}</td>
-                <td>{inv.recordedBy || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {openInvoice !== null && (
-        <InvoiceModal
-          reference={openInvoice}
-          isAdmin={isAdmin}
-          onClose={() => setOpenInvoice(null)}
-          onChanged={() => setLocalKey((k) => k + 1)}
-          onAddItems={(detail) => {
-            setOpenInvoice(null);
-            onAddToInvoice(detail.reference, detail.supplierId ? String(detail.supplierId) : '');
-          }}
-        />
-      )}
-    </section>
-  );
-};
-
-const InvoiceModal: React.FC<{
-  reference: string;
-  isAdmin: boolean;
-  onClose: () => void;
-  onChanged: () => void;
-  onAddItems: (detail: InvoiceDetail) => void;
-}> = ({ reference, isAdmin, onClose, onChanged, onAddItems }) => {
-  const [detail, setDetail] = useState<InvoiceDetail | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editQty, setEditQty] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const load = () =>
-    apiRequest<InvoiceDetail>(`/stock-in/invoice?ref=${encodeURIComponent(reference)}`)
-      .then(setDetail)
-      .catch((err: Error) => setError(err.message));
-
-  useEffect(() => {
-    load();
-  }, [reference]);
-
-  const saveLine = async (line: InvoiceLine) => {
-    setError(null);
-    const qty = Number(editQty);
-    if (!Number.isInteger(qty) || qty < 1) {
-      setError('Quantity must be a whole number of at least 1.');
-      return;
-    }
-    try {
-      await apiRequest(`/stock-in/lines/${encodeURIComponent(line.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ qty }),
-      });
-      setEditingId(null);
-      window.dispatchEvent(new CustomEvent('inventory-changed'));
-      onChanged();
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not change the quantity.');
-    }
-  };
-
-  const total = detail ? detail.lines.reduce((sum, l) => sum + l.qty, 0) : 0;
-
-  const dialog = (
-    <div className="sin-overlay" role="dialog" aria-modal="true" aria-label={`Invoice ${invoiceLabel(reference)}`} onClick={onClose}>
-      <div className="sin-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="sin-dialog-head">
-          <div>
-            <span className="sin-kicker">Invoice</span>
-            <h3>{invoiceLabel(reference)}</h3>
-            <p className="sin-muted">
-              {detail?.supplier || 'No supplier'}{detail?.date ? ` · ${detail.date}` : ''}
-            </p>
-          </div>
-          <button type="button" className="sin-close" aria-label="Close" onClick={onClose}>
-            <i className="bx bx-x" aria-hidden="true"></i>
-          </button>
-        </div>
-
-        {error && <div className="sin-alert" role="alert">{error}</div>}
-
-        <div className="stk-table-wrap">
-          <table className="stk-table">
-            <thead>
-              <tr>
-                <th className="sin-col-item">Item</th>
-                <th className="num sin-col-qty">Qty</th>
-                <th className="sin-col-time">Time</th>
-                <th className="sin-col-by">Recorded by</th>
-                <th className="sin-col-actions" aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {detail?.lines.map((line) => (
-                <tr key={line.id}>
-                  <td><span className="stk-item-name">{line.itemName}</span><span className="stk-item-meta">{line.itemId}{line.partNumber ? ` · ${line.partNumber}` : ''}</span></td>
-                  <td className="num">
-                    {editingId === line.id ? (
-                      <input
-                        className="stk-qty sin-qty"
-                        type="number"
-                        min="1"
-                        inputMode="numeric"
-                        value={editQty}
-                        onChange={(e) => setEditQty(e.target.value)}
-                        aria-label={`New quantity for ${line.itemName}`}
-                      />
-                    ) : (
-                      <>{line.qty.toLocaleString()} <span className="inv-uom">{line.unit}</span></>
-                    )}
-                  </td>
-                  <td>{line.time}</td>
-                  <td>{line.recordedBy || '—'}</td>
-                  <td className="sin-actions">
-                    {isAdmin && editingId !== line.id && (
-                      <button type="button" className="sin-btn is-ghost" onClick={() => { setEditingId(line.id); setEditQty(String(line.qty)); }}>
-                        Edit
-                      </button>
-                    )}
-                    {isAdmin && editingId === line.id && (
-                      <>
-                        <button type="button" className="sin-btn is-ghost" onClick={() => setEditingId(null)}>Cancel</button>
-                        <button type="button" className="sin-btn is-primary" onClick={() => saveLine(line)}>Save</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {detail && detail.lines.length === 0 && (
-                <tr><td colSpan={5} className="stk-empty">No items on this invoice.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="sin-dialog-foot">
-          <span className="sin-muted">{detail?.lines.length ?? 0} item(s) · {total.toLocaleString()} unit(s)</span>
-          <div className="sin-foot-actions">
-            {detail && reference && (
-              <button type="button" className="sin-btn is-primary" onClick={() => onAddItems(detail)}>
-                Add items to this invoice
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-  return createPortal(dialog, document.body);
 };

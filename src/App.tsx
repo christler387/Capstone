@@ -4,6 +4,7 @@ import { Modal } from './components/Modal';
 import { StockCard } from './components/StockCard';
 import { Suppliers } from './components/Suppliers';
 import { Sales } from './components/Sales';
+import { StockInHistoryPage } from './components/StockInHistory';
 
 const API_BASE = '/api';
 
@@ -59,6 +60,8 @@ const App: React.FC = () => {
   const [inventoryAudit, setInventoryAudit] = useState<InventoryAuditEntry[]>([]);
   const [currentSection, setCurrentSection] = useState('dashboard');
   const [stockCardItemId, setStockCardItemId] = useState('');
+  // Set when "Add items to this invoice" is used on the stock-in history page.
+  const [stockInPrefill, setStockInPrefill] = useState<{ invoice: string; supplierId: string } | null>(null);
   // After a duplicate: reload the list, then open the copy for editing.
   const [openAfterReload, setOpenAfterReload] = useState<string | null>(null);
   useEffect(() => {
@@ -903,6 +906,8 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             onAddMovement={addMovement} 
             onAddItem={handleAddItem}
             selectedItemId={stockToItem}
+            stockInPrefill={stockInPrefill}
+            onPrefillUsed={() => setStockInPrefill(null)}
             userRole={userRole}
             userName={user || undefined}
             rackLocations={rackLocations}
@@ -930,6 +935,16 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
         );
       case 'sales':
         return <Sales userRole={userRole} />;
+      case 'stock-in-history':
+        return (
+          <StockInHistoryPage
+            userRole={userRole}
+            onAddItemsToInvoice={(invoice, supplierId) => {
+              setStockInPrefill({ invoice, supplierId });
+              setCurrentSection('stock');
+            }}
+          />
+        );
       case 'warehouse': 
         return (
           <WarehouseMap
@@ -1101,7 +1116,7 @@ After an undo, check the **Qty** on the Inventory tab to make sure the number is
             <img className="brand-logo" src={skyrunLogo} alt="" aria-hidden="true" />
             <span className="brand-wordmark brand-wordmark--header">SKYRUN</span>
             <h1 className="sr-only">
-              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
+              {currentSection === 'warehouse' ? 'Warehouse Map' : currentSection === 'stock-card' ? 'Stock Card' : currentSection === 'sales' ? 'Sales & profit' : currentSection === 'stock-in-history' ? 'Stock in history' : currentSection.charAt(0).toUpperCase() + currentSection.slice(1)}
             </h1>
           </div>
           <Navigation

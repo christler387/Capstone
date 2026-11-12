@@ -2907,8 +2907,12 @@ app.get(
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 64) : "";
     const params = [];
     let filter = "";
+    const from = isIsoDate(req.query.from) ? req.query.from : "";
+    const to = isIsoDate(req.query.to) ? req.query.to : "";
+    if (from) { filter += " AND m.movement_date >= ?"; params.push(from); }
+    if (to) { filter += " AND m.movement_date <= ?"; params.push(to); }
     if (q) {
-      filter = " AND (m.reference LIKE ? OR i.name LIKE ? OR m.item_id = ? OR s.name LIKE ?)";
+      filter += " AND (m.reference LIKE ? OR i.name LIKE ? OR m.item_id = ? OR s.name LIKE ?)";
       params.push(`%${q}%`, `%${q}%`, normalizeItemId(q), `%${q}%`);
     }
     const [rows] = await pool.query(
