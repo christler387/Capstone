@@ -659,6 +659,8 @@ async function initializeDatabase() {
   await createStockCardTables();
   await createSalesTable();
   await createLoginThrottleTable();
+  await addIndexIfMissing("movements", "idx_movements_type_item", "type, item_id, movement_date, qty");
+  await addIndexIfMissing("movements", "idx_movements_recent", "movement_date, created_at");
   await loadLoginThrottle();
   await pool.query(`CREATE TABLE IF NOT EXISTS change_requests (
     id VARCHAR(64) PRIMARY KEY,
@@ -3604,13 +3606,75 @@ app.get(
   }),
 );
 
+// Reorder figures for every item, worked out in the database. The formulas are the ones the app has always used:
+// demand from the stock-out history, then the economic order quantity, reorder point and order quantity.
+// Adds an index once, so queries on large tables stay fast. The check keeps it safe to run on every start.
+async function addIndexIfMissing(table, name, columns) {
+  const [[row]] = await pool.query(
+    "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+    [table, name],
+  );
+  if (Number(row.n) === 0) await pool.query(`CREATE INDEX \`${name}\` ON \`${table}\` (${columns})`);
+}
+
+async function reorderMetricsForAll() {
+  const [rows] = await pool.query(`
+    SELECT i.id, i.price, i.quantity, i.ordering_cost, i.holding_cost, i.lead_time_days, i.safety_stock,
+           COALESCE(d.total_out, 0) AS total_out, COALESCE(d.cnt, 0) AS cnt,
+           DATE_FORMAT(d.first_date, '%Y-%m-%d') AS first_date, DATE_FORMAT(d.last_date, '%Y-%m-%d') AS last_date
+    FROM inventory i
+    LEFT JOIN (
+      SELECT item_id, SUM(qty) AS total_out, COUNT(*) AS cnt, MIN(movement_date) AS first_date, MAX(movement_date) AS last_date
+      FROM movements WHERE type = 'OUT' GROUP BY item_id
+    ) d ON d.item_id = i.id`);
+  return rows.map((row) => {
+    const cnt = Number(row.cnt);
+    const totalOut = Number(row.total_out);
+    let annualDemand = 0;
+    if (cnt > 0) {
+      const first = Date.parse(row.first_date);
+      const last = Date.parse(row.last_date);
+      const spanDays = cnt > 1 && Number.isFinite(first) && Number.isFinite(last) ? Math.max(1, (last - first) / 86400000) : 365;
+      annualDemand = (totalOut * 365) / spanDays;
+    }
+    const price = Number(row.price) || 0;
+    const orderingCost = Number(row.ordering_cost || 100);
+    const holdingCost = Number(row.holding_cost || price * 0.2);
+    const leadTimeDays = Number(row.lead_time_days || 7);
+    const safetyStock = Number(row.safety_stock ?? 10);
+    const quantity = Number(row.quantity) || 0;
+    const eoq = annualDemand > 0 && orderingCost > 0 && holdingCost > 0
+      ? Math.sqrt((2 * annualDemand * orderingCost) / holdingCost)
+      : 0;
+    const rop = (annualDemand / 12) * (leadTimeDays / 30) + safetyStock;
+    const round = (value) => Math.round(value * 100) / 100;
+    return { id: row.id, totalOut, eoq: round(eoq), rop: round(rop), reorderQty: Math.max(0, Math.ceil(rop - quantity)) };
+  });
+}
+
+// The figures change only when stock moves, so they are reused for a minute instead of recalculated per request.
+let reorderCache = { at: 0, data: null };
+app.get(
+  "/api/reorder-metrics",
+  ah(async (req, res) => {
+    if (!(await requireSignedIn(req, res))) return;
+    if (!reorderCache.data || Date.now() - reorderCache.at > 60_000) {
+      reorderCache = { at: Date.now(), data: await reorderMetricsForAll() };
+    }
+    res.json(reorderCache.data);
+  }),
+);
+
 app.get(
   "/api/movements",
   ah(async (req, res) => {
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
+    // The newest movements only; the full history is not sent to every screen.
+    const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200));
     const [rows] = await pool.query(
-      "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC",
+      "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC LIMIT ?",
+      [limit],
     );
     res.json(rows.map(toMovement));
   }),

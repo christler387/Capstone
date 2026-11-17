@@ -28,7 +28,7 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
 }
 import { Login } from './components/Login';
 import skyrunLogo from './assets/Skyrun.webp';
-import { isAtReorderPoint } from './inventoryMetrics';
+import { isAtReorderPoint, setReorderMetrics, ReorderMetric } from './inventoryMetrics';
 
 // Screens that are not needed on first load are fetched the first time they are opened.
 const StockCard = React.lazy(() => import('./components/StockCard').then((m) => ({ default: m.StockCard })));
@@ -101,21 +101,29 @@ const App: React.FC = () => {
 
   // Other people use the system too, so lists are reloaded from the server after every change
   // instead of being patched from memory.
-  const reloadInventory = () => requestJson<Item[]>('/inventory').then(setInventory);
-  const reloadMovements = () => requestJson<Movement[]>('/movements').then(setMovements);
+  const [, setMetricsVersion] = useState(0);
+  // The reorder figures are worked out on the server; this brings the latest ones and redraws the screens.
+  const reloadMetrics = () =>
+    requestJson<Array<ReorderMetric & { id: string }>>('/reorder-metrics').then((list) => {
+      setReorderMetrics(list);
+      setMetricsVersion((v) => v + 1);
+    });
+  const reloadInventory = () => requestJson<Item[]>('/inventory').then(setInventory).then(reloadMetrics);
+  // The newest 200 movements are enough for the recent activity; the reorder figures do not need the full history.
+  const reloadMovements = () => requestJson<Movement[]>('/movements?limit=200').then(setMovements);
   const reloadAll = () =>
     Promise.all([
       reloadInventory(),
       reloadMovements(),
     ]).then(() => undefined);
 
-  // Keep the screens current while others work: refresh when the window is shown again and every 30 seconds.
+  // Keep the screens current while others work: refresh when the window is shown again and every 5 minutes.
   useEffect(() => {
     if (!user) return;
     const refresh = () => {
       if (document.visibilityState === 'visible') reloadAll().catch(() => undefined);
     };
-    const timer = window.setInterval(refresh, 30_000);
+    const timer = window.setInterval(refresh, 300_000);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
@@ -135,12 +143,13 @@ const App: React.FC = () => {
     let active = true;
     Promise.all([
       requestJson<Item[]>('/inventory'),
-      requestJson<Movement[]>('/movements'),
+      requestJson<Movement[]>('/movements?limit=200'),
     ])
       .then(([loadedInventory, loadedMovements]) => {
         if (!active) return;
         setInventory(loadedInventory);
         setMovements(loadedMovements);
+        void reloadMetrics().catch(() => undefined);
       })
       .catch((error: Error) => {
         if (active) setDatabaseError(`Database unavailable: ${error.message}`);
@@ -917,7 +926,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
           <Navigation
             currentSection={currentSection}
             onSectionChange={setCurrentSection}
-            criticalItems={inventory.filter((item) => isAtReorderPoint(item, movements))}
+            criticalItems={inventory.filter((item) => isAtReorderPoint(item))}
             movements={movements}
             onOpenItem={handleGoToStock}
             userName={user || ''}

@@ -28,7 +28,7 @@ interface CriticalAlertsProps {
   onOpenItem: (id: string) => void;
 }
 
-export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({ criticalItems, movements, onOpenItem }) => {
+export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({ criticalItems, onOpenItem }) => {
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [seen, setSeen] = useState<string[]>(readSeen);
@@ -144,7 +144,7 @@ export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({ criticalItems, m
                     <span className="crit-item-main">
                       <span className="crit-item-name">{item.name}</span>
                       <span className="crit-item-sub">
-                        {item.id} · Reorder point {Math.round(getRop(item, movements)).toLocaleString()}
+                        {item.id} · Reorder point {Math.round(getRop(item)).toLocaleString()}
                       </span>
                     </span>
                     <span className="crit-item-qty">{item.quantity.toLocaleString()} left</span>

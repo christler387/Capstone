@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AisleOrientation, Item, Movement, WarehouseAisle, WarehouseFloor, WarehouseLayout } from '../types';
 import { Modal } from './Modal';
-import { isAtReorderPoint } from '../inventoryMetrics';
+import { isAtReorderPoint , getReorderMetric } from '../inventoryMetrics';
 
 // Density uses this capacity for racks that have no capacity set. Three racks make the old 1000 per aisle.
 const DEFAULT_RACK_CAPACITY = 1000 / 3;
@@ -124,7 +124,6 @@ interface WarehouseMapProps {
 
 export const WarehouseMap: React.FC<WarehouseMapProps> = ({
   inventory,
-  movements,
   layout: savedLayout,
   onLayoutChange,
   onEditItem,
@@ -226,11 +225,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
 
   const normalizeRack = (r: string | undefined) => r ? r.replace(/-/g, '').toUpperCase() : '';
 
-  const getStockOutQty = (item: Item): number => {
-    return movements
-      .filter(m => m.itemId === item.id && m.type === 'OUT')
-      .reduce((sum, m) => sum + m.qty, 0);
-  };
+  const getStockOutQty = (item: Item): number => getReorderMetric(item)?.totalOut ?? 0;
 
   const getItemDemand = (item: Item): 'HIGH' | 'MEDIUM' | 'LOW' => {
     const stockOutQty = getStockOutQty(item);
@@ -1015,7 +1010,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                       {levelItems.map(i => (
                         <div
                           key={i.id}
-                          className={`item-token ${isAtReorderPoint(i, movements) ? 'low-stock-alert' : ''}`}
+                          className={`item-token ${isAtReorderPoint(i) ? 'low-stock-alert' : ''}`}
                           style={{ cursor: 'pointer' }}
                           onClick={() => onEditItem(i.id)}
                         >
@@ -1348,7 +1343,7 @@ export const WarehouseMap: React.FC<WarehouseMapProps> = ({
                   </div>
                   {aisle.racks.map(rack => {
                     const rackSpecificItems = inventory.filter(item => normalizeRack(item.rack) === normalizeRack(rack.code));
-                    const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item, movements));
+                    const hasLowStock = rackSpecificItems.some(item => isAtReorderPoint(item));
                     return (
                       <div
                         key={rack.id}

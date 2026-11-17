@@ -77,7 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, i) => sum + getStockTotal(i), 0);
   const lowStock = inventory
-    .filter((i) => isAtReorderPoint(i, movements))
+    .filter((i) => isAtReorderPoint(i))
     .sort((a, b) => a.quantity - b.quantity || a.name.localeCompare(b.name));
 
   const catData = inventory.reduce((acc, i) => {
@@ -100,9 +100,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
   const reorderRows = inventory
     .map((item) => ({
       item,
-      eoq: getEoq(item, movements),
-      rop: getRop(item, movements),
-      reorderQty: getReorderQuantity(item, movements),
+      eoq: getEoq(item),
+      rop: getRop(item),
+      reorderQty: getReorderQuantity(item),
     }))
     .filter(({ reorderQty }) => reorderQty > 0)
     .sort((a, b) => (a.reorderQty !== b.reorderQty ? b.reorderQty - a.reorderQty : b.item.quantity - a.item.quantity));
@@ -191,7 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ inventory, movements, onGo
             ) : (
               <ul className="dash2-list dash2-list--scroll" aria-label="Items at or below reorder point">
                 {lowStock.map((item) => {
-                  const rop = getRop(item, movements);
+                  const rop = getRop(item);
                   return (
                     <li key={item.id}>
                       <button type="button" className="dash2-row-button" onClick={() => onGoToStock(item.id)}>

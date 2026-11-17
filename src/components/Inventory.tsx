@@ -29,7 +29,6 @@ const formatPeso = (value: number) =>
 
 export const Inventory: React.FC<InventoryProps> = ({
   inventory,
-  movements = [],
   onEditItem,
   onDeleteItem,
   onGoToStock,
@@ -111,7 +110,7 @@ export const Inventory: React.FC<InventoryProps> = ({
   // "All" plus every category in use, so a newly added category gets its own filter button.
   const categoryOptions = ['ALL', ...Array.from(new Set(inventory.map(i => (i.category || '').trim().toUpperCase()).filter(Boolean))).sort()];
   const totalValue = inventory.reduce((sum, i) => sum + getStockTotal(i), 0);
-  const lowCount = inventory.filter(i => isAtReorderPoint(i, movements)).length;
+  const lowCount = inventory.filter(i => isAtReorderPoint(i)).length;
 
   const filteredInventory = inventory
     .filter(i => {
@@ -281,8 +280,8 @@ export const Inventory: React.FC<InventoryProps> = ({
           )}
 
           {pageItems.map(i => {
-            const needsReorder = isAtReorderPoint(i, movements);
-            const reorderQuantity = getReorderQuantity(i, movements);
+            const needsReorder = isAtReorderPoint(i);
+            const reorderQuantity = getReorderQuantity(i);
             const discount = Number(i.discount) || 0;
             return (
               <div

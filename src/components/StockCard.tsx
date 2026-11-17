@@ -68,7 +68,7 @@ const TXN_LABELS: Record<string, string> = {
 
 const formatDateTime = (value: string) => value.slice(0, 16).replace(' ', ' · ');
 
-export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, selectedItemId, onSelectItem, onItemRenamed }) => {
+export const StockCard: React.FC<StockCardProps> = ({ inventory, selectedItemId, onSelectItem, onItemRenamed }) => {
   // Staff have the same features as admins.
   const isAdmin = true;
   const [itemSearch, setItemSearch] = useState('');
@@ -132,7 +132,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, movements, sele
   useEffect(loadLinks, [selectedItemId]);
 
   const supplierById = useMemo(() => new Map(suppliers.map((s) => [s.id, s])), [suppliers]);
-  const reorderLevel = item ? Math.ceil(getRop(item, movements)) : 0;
+  const reorderLevel = item ? Math.ceil(getRop(item)) : 0;
 
   const suggestions = useMemo(() => {
     const query = itemSearch.trim().toLowerCase();
