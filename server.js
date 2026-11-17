@@ -709,6 +709,8 @@ async function initializeDatabase() {
   await createStockCardTables();
   await createSalesTable();
   await createLoginThrottleTable();
+  // Sales keep the part number of the item sold. Older databases were missing this column.
+  await addColumnIfMissing("sales", "part_number", "VARCHAR(100) NULL");
   await addIndexIfMissing("movements", "idx_movements_type_item", "type, item_id, movement_date, qty");
   await addIndexIfMissing("movements", "idx_movements_recent", "movement_date, created_at");
   await loadLoginThrottle();
@@ -1729,7 +1731,10 @@ app.get(
       where.push("(name LIKE ? OR id LIKE ? OR category LIKE ? OR brand LIKE ? OR part_number LIKE ? OR barcode LIKE ? OR compatible_vehicles LIKE ? OR supplier LIKE ?)");
       for (let i = 0; i < 8; i += 1) params.push(pattern);
     }
-    if (category !== "ALL") {
+    if (category === "UNCATEGORIZED") {
+      // Items with no category are listed under "UNCATEGORIZED" in the summary.
+      where.push("(category IS NULL OR TRIM(category) = '')");
+    } else if (category !== "ALL") {
       where.push("UPPER(TRIM(category)) = ?");
       params.push(category);
     }
