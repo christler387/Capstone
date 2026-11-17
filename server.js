@@ -102,6 +102,12 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .filter(Boolean);
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)) }));
 app.use(compression());
+// Data responses are checked with the browser on each use (ETag), so an unchanged list costs no download.
+// They are never stored in shared caches, because they depend on who is signed in.
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "private, no-cache");
+  next();
+});
 app.use(express.json({ limit: "10mb" }));
 
 // Express 4 does not catch rejected promises in async handlers; this forwards them to the error handler.
@@ -4580,6 +4586,8 @@ app.post(
 );
 
 app.use("/api/uploads", express.static(uploadsDirectory, { maxAge: "30d", immutable: true }));
+// Built files have a hash in their name, so they can be kept for a year.
+app.use("/assets", express.static(path.join(__dirname, "dist", "assets"), { maxAge: "365d", immutable: true }));
 app.use(express.static(path.join(__dirname, "dist")));
 // Regex works on Express 4 and 5, and unknown /api routes get a JSON 404 instead of index.html.
 app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
