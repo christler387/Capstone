@@ -56,6 +56,10 @@ export const pool = mysql.createPool({
   database: DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
+  // Requests wait in a queue of at most 100; beyond that they fail fast with "busy" instead of hanging.
+  queueLimit: 100,
+  connectTimeout: 10000,
+  enableKeepAlive: true,
   decimalNumbers: true,
   // Return DATE columns as "YYYY-MM-DD" strings so timezone shifts can't change the day.
   dateStrings: ["DATE"],
@@ -654,6 +658,8 @@ async function initializeDatabase() {
   }
   await createStockCardTables();
   await createSalesTable();
+  await createLoginThrottleTable();
+  await loadLoginThrottle();
   await pool.query(`CREATE TABLE IF NOT EXISTS change_requests (
     id VARCHAR(64) PRIMARY KEY,
     request_type VARCHAR(32) NOT NULL,
@@ -1025,7 +1031,7 @@ app.put(
       recordLoginFailure(attemptsKey, 5);
       return res.status(401).json({ error: "Current password is incorrect." });
     }
-    loginFailures.delete(attemptsKey);
+    clearThrottle(attemptsKey);
 
     await pool.query("UPDATE users SET password_hash=? WHERE id=?", [
       hashPassword(newPasswordString),
@@ -1318,12 +1324,57 @@ const LOGIN_LOCK_MS = 15 * 60 * 1000;
 const LOGIN_MAX_FAILURES_PER_ACCOUNT = 5;
 const LOGIN_MAX_FAILURES_PER_IP = 30;
 const loginFailures = new Map(); // key -> { count, windowStart, lockedUntil }
+const throttleWarning = (error) => console.warn("Sign-in limit could not be saved:", error.message);
+
+async function createLoginThrottleTable() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS login_throttle (
+    throttle_key VARCHAR(190) PRIMARY KEY,
+    failures INT NOT NULL,
+    window_start BIGINT NOT NULL,
+    locked_until BIGINT NOT NULL DEFAULT 0
+  ) ${tableOptions}`);
+}
+
+// Loads the limits still in force, so a restart does not reset them.
+async function loadLoginThrottle() {
+  const now = Date.now();
+  await pool.query("DELETE FROM login_throttle WHERE locked_until < ? AND window_start < ?", [now, now - LOGIN_WINDOW_MS]);
+  const [rows] = await pool.query("SELECT throttle_key, failures, window_start, locked_until FROM login_throttle");
+  for (const row of rows) {
+    loginFailures.set(row.throttle_key, {
+      count: Number(row.failures),
+      windowStart: Number(row.window_start),
+      lockedUntil: Number(row.locked_until),
+    });
+  }
+}
+
+// Writes one limit to the table. Failures are logged; the in-memory limit still applies.
+function saveThrottle(key) {
+  const entry = loginFailures.get(key);
+  if (!entry) {
+    void pool.query("DELETE FROM login_throttle WHERE throttle_key=?", [key]).catch(throttleWarning);
+    return;
+  }
+  void pool
+    .query(
+      `INSERT INTO login_throttle (throttle_key, failures, window_start, locked_until) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE failures=VALUES(failures), window_start=VALUES(window_start), locked_until=VALUES(locked_until)`,
+      [key, entry.count, entry.windowStart, entry.lockedUntil],
+    )
+    .catch(throttleWarning);
+}
+
+function clearThrottle(key) {
+  loginFailures.delete(key);
+  saveThrottle(key);
+}
 
 function lockRemainingMs(key) {
   const entry = loginFailures.get(key);
   if (!entry || !entry.lockedUntil) return 0;
   const remaining = entry.lockedUntil - Date.now();
-  if (remaining <= 0) loginFailures.delete(key);
+  if (remaining <= 0) clearThrottle(key);
   return Math.max(0, remaining);
 }
 
@@ -1342,6 +1393,7 @@ function recordLoginFailure(key, maxFailures) {
   entry.count += 1;
   if (entry.count >= maxFailures) entry.lockedUntil = now + LOGIN_LOCK_MS;
   loginFailures.set(key, entry);
+  saveThrottle(key);
 }
 
 function tooManyLoginsResponse(res, waitMs, message = "Too many failed sign-in attempts.") {
@@ -1397,7 +1449,7 @@ app.post(
       if (nowLocked > 0) return tooManyLoginsResponse(res, nowLocked);
       return res.status(401).json({ error: "Invalid login details." });
     }
-    loginFailures.delete(accountKey);
+    clearThrottle(accountKey);
     if (isLegacyPasswordHash(user.password_hash)) {
       await pool.query("UPDATE users SET password_hash=? WHERE id=?", [hashPassword(String(password)), user.id]);
     }
@@ -4491,6 +4543,13 @@ app.use((error, _req, res, _next) => {
       .status(503)
       .json({ error: "The system is busy with another change. Please try again." });
   }
+  if (
+    ["POOL_ENQUEUELIMIT", "ETIMEDOUT", "ECONNREFUSED", "PROTOCOL_CONNECTION_LOST", "PROTOCOL_SEQUENCE_TIMEOUT"].includes(error?.code)
+  ) {
+    return res
+      .status(503)
+      .json({ error: "The server is busy or the database is not reachable. Please try again shortly." });
+  }
   if (error?.code === "ER_NO_REFERENCED_ROW_2") {
     return res.status(400).json({ error: "Referenced item does not exist." });
   }
@@ -4500,10 +4559,36 @@ app.use((error, _req, res, _next) => {
 // Hostinger's Node.js launcher requires listen() within 3 seconds and does not
 // run the entry file as `node server.js`, so the server listens first and the
 // database setup runs in the background.
+// Stops taking requests, closes the database pool, then exits. A hard exit follows if it takes too long.
+async function shutdown(server, code) {
+  const forced = setTimeout(() => process.exit(code), 10000);
+  forced.unref();
+  server.close();
+  try {
+    await pool.end();
+  } catch {
+    // The pool may already be closed.
+  }
+  process.exit(code);
+}
+
 export function startServer() {
-  app.listen(port, () =>
+  const server = app.listen(port, () =>
     console.log(`API listening on http://localhost:${port}`),
   );
+
+  // A failed promise in one request must not take the whole site down.
+  process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled promise rejection:", reason);
+  });
+  // An unexpected crash is logged, the server shuts down cleanly, and the host restarts it.
+  process.on("uncaughtException", (error) => {
+    console.error("Uncaught exception, shutting down:", error);
+    void shutdown(server, 1);
+  });
+  for (const signal of ["SIGTERM", "SIGINT"]) {
+    process.on(signal, () => void shutdown(server, 0));
+  }
 
   initializeDatabase()
     .then(() => {
