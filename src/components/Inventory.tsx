@@ -117,7 +117,11 @@ export const Inventory: React.FC<InventoryProps> = ({
   useEffect(() => {
     const bump = () => setRefreshKey((k) => k + 1);
     window.addEventListener('inventory-changed', bump);
-    return () => window.removeEventListener('inventory-changed', bump);
+    window.addEventListener('data-changed', bump);
+    return () => {
+      window.removeEventListener('inventory-changed', bump);
+      window.removeEventListener('data-changed', bump);
+    };
   }, []);
   useEffect(() => {
     let active = true;

@@ -103,6 +103,11 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
   const [error, setError] = useState<string | null>(null);
   const [historyInfo, setHistoryInfo] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const bump = () => setRefreshKey((k) => k + 1);
+    window.addEventListener('data-changed', bump);
+    return () => window.removeEventListener('data-changed', bump);
+  }, []);
 
   // Staff see the sales reports too.
   const isAdmin = true;
@@ -110,7 +115,7 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
   useEffect(() => {
     if (!isAdmin) return;
     apiRequest<Summary>('/sales/summary').then(setSummary).catch((err: Error) => setError(err.message));
-  }, [isAdmin]);
+  }, [isAdmin, refreshKey]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -118,7 +123,7 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
     apiRequest<SeriesRow[]>(`/sales/series?${params}`).then(setSeries).catch((err: Error) => setError(err.message));
     const top = new URLSearchParams({ from: reportFrom, to: reportTo });
     apiRequest<TopItem[]>(`/sales/top-items?${top}`).then(setTopItems).catch(() => setTopItems([]));
-  }, [isAdmin, granularity, reportFrom, reportTo]);
+  }, [isAdmin, granularity, reportFrom, reportTo, refreshKey]);
 
   useEffect(() => {
     if (!isAdmin) return;

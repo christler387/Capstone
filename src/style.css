@@ -7601,7 +7601,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .inv-table-wrap,
   .inv-table {
     width: 100%;
@@ -9697,7 +9697,7 @@ input[type='date']:focus, select:focus, textarea:focus {
 
 
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .stack-phone {
     min-width: 0;
   }
@@ -9999,5 +9999,36 @@ input[type='date']:focus, select:focus, textarea:focus {
 
   .ask-actions .ask-btn {
     flex: 1 1 auto;
+  }
+}
+
+/* Tablets: inventory cards wrap as a row, so the cost and location cells never overlap. */
+@media (max-width: 900px) {
+  .inv-row.inv-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px 14px;
+  }
+
+  .inv-row.inv-item > * {
+    min-width: 0;
+    flex: 1 1 150px;
+  }
+
+  .inv-row.inv-item > :first-child {
+    flex: 0 0 56px;
+  }
+
+  .inv-row.inv-item > .inv-price-cell,
+  .inv-row.inv-item > .inv-local {
+    flex: 1 1 130px;
+  }
+}
+
+/* Tablets: the cards label their own fields, so the table header is hidden. */
+@media (max-width: 900px) {
+  .inv-table .inv-head {
+    display: none;
   }
 }

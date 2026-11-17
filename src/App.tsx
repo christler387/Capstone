@@ -682,6 +682,26 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     }
   };
 
+  // Live updates: when anyone saves a change, this browser reloads its data and tells the open screens.
+  useEffect(() => {
+    if (!user || typeof EventSource === 'undefined') return;
+    let timer: number | null = null;
+    const source = new EventSource('/api/events');
+    source.addEventListener('changed', () => {
+      // Several saves in a row cause one refresh.
+      if (timer !== null) return;
+      timer = window.setTimeout(() => {
+        timer = null;
+        void reloadAll().catch(() => undefined);
+        window.dispatchEvent(new CustomEvent('data-changed'));
+      }, 300);
+    });
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      source.close();
+    };
+  }, [user]);
+
   // The screens that need every item wait until it has loaded.
   useEffect(() => {
     if (user && FULL_SECTIONS.includes(currentSection)) void ensureFull().catch(() => undefined);

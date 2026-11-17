@@ -77,6 +77,12 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, selectedItemId,
   const [type, setType] = useState('');
   const [reference, setReference] = useState('');
   const [card, setCard] = useState<StockCardResponse | null>(null);
+  const [liveVersion, setLiveVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setLiveVersion((v) => v + 1);
+    window.addEventListener('data-changed', bump);
+    return () => window.removeEventListener('data-changed', bump);
+  }, []);
   const [links, setLinks] = useState<ItemSupplier[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +126,7 @@ export const StockCard: React.FC<StockCardProps> = ({ inventory, selectedItemId,
     return () => {
       cancelled = true;
     };
-  }, [selectedItemId, from, to, type, reference]);
+  }, [selectedItemId, from, to, type, reference, liveVersion]);
 
   const loadLinks = () => {
     if (!selectedItemId) return;

@@ -103,19 +103,52 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)) }));
-app.use(compression());
+// The live stream is not compressed, so each event is sent at once.
+app.use(compression({ filter: (req, res) => req.path !== "/api/events" && compression.filter(req, res) }));
 
 // Shared data (inventory, reorder figures, movements) is kept as text, and as gzip, until the next change.
 // Every write to the API moves the version on, so no one is shown data older than the last save.
 let dataVersion = 0;
+// Browsers that are open and signed in. Each save tells all of them that the data has changed.
+const liveClients = new Set();
+function announceChange() {
+  for (const client of liveClients) client.write(`event: changed\ndata: ${dataVersion}\n\n`);
+}
 app.use((req, res, next) => {
   if (req.method !== "GET" && req.path.startsWith("/api")) {
     res.on("finish", () => {
       dataVersion += 1;
+      announceChange();
     });
   }
   next();
 });
+
+app.get(
+  "/api/events",
+  async (req, res, next) => {
+    try {
+    if (!(await requireSignedIn(req, res))) return;
+    res.set({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.flushHeaders();
+    res.write("retry: 5000\n\n");
+    liveClients.add(res);
+    // A comment every 25 seconds keeps the connection open through proxies.
+    const heartbeat = setInterval(() => res.write(": ping\n\n"), 25000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      liveClients.delete(res);
+    });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 const responseCache = new Map();
 const gzipAsync = promisify(zlib.gzip);
 

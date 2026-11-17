@@ -84,6 +84,11 @@ export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ onAddIte
   const [error, setError] = useState<string | null>(null);
   const [openInvoice, setOpenInvoice] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const bump = () => setRefreshKey((k) => k + 1);
+    window.addEventListener('data-changed', bump);
+    return () => window.removeEventListener('data-changed', bump);
+  }, []);
 
   useEffect(() => {
     apiRequest<{ id: number; name: string; supplierId: string }[]>('/suppliers')
