@@ -119,18 +119,25 @@ app.use((req, res, next) => {
 const responseCache = new Map();
 const gzipAsync = promisify(zlib.gzip);
 
-async function sendCached(req, res, key, build) {
+// Returns the cached result for a key, rebuilding it only after a save.
+async function cachedValue(key, build) {
   let entry = responseCache.get(key);
   if (!entry || entry.version !== dataVersion) {
     const version = dataVersion;
-    entry = { version, text: JSON.stringify(await build()), gz: null };
+    entry = { version, data: await build(), text: null, gz: null, map: null };
     responseCache.set(key, entry);
   }
+  return entry;
+}
+
+async function sendCached(req, res, key, build) {
+  const entry = await cachedValue(key, build);
   const etag = `W/"${key}-v${entry.version}"`;
   res.setHeader("ETag", etag);
   if (req.headers["if-none-match"] === etag) return res.status(304).end();
   res.setHeader("Vary", "Accept-Encoding");
   res.type("application/json");
+  if (!entry.text) entry.text = JSON.stringify(entry.data);
   if (String(req.headers["accept-encoding"] || "").includes("gzip")) {
     // Level 1 is much quicker to produce than the default and still shrinks the data about as well.
     if (!entry.gz) entry.gz = await gzipAsync(entry.text, { level: 1 });
@@ -778,6 +785,7 @@ function toMovement(row) {
     date,
     timestamp,
     createdBy: row.created_by || undefined,
+    itemName: row.item_name || undefined,
   };
 }
 
@@ -1688,6 +1696,64 @@ function inventoryValues(id, item) {
     ...ITEM_DESCRIPTOR_FIELDS.map(([field]) => (item[field] || "").toString().trim() || null),
   ];
 }
+
+app.get(
+  "/api/inventory/summary",
+  ah(async (req, res) => {
+    if (!(await requireSignedIn(req, res))) return;
+    await sendCached(req, res, "summary", inventorySummary);
+  }),
+);
+
+// Columns the Inventory screen can sort by. Anything else falls back to the name.
+const INVENTORY_SORTS = {
+  name: "name", id: "id", category: "category", quantity: "quantity", price: "price",
+  rack: "rack", brand: "brand", partNumber: "part_number", supplier: "supplier",
+};
+
+app.get(
+  "/api/inventory/page",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const q = cleanText(req.query.q, 64);
+    const category = cleanText(req.query.category, 64).toUpperCase() || "ALL";
+    const sortColumn = INVENTORY_SORTS[req.query.sort] || "name";
+    const direction = req.query.dir === "desc" ? "DESC" : "ASC";
+    const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
+    const pageSize = Math.min(100, Math.max(1, Math.floor(Number(req.query.pageSize)) || 10));
+    const where = [];
+    const params = [];
+    if (q) {
+      const pattern = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+      where.push("(name LIKE ? OR id LIKE ? OR category LIKE ? OR brand LIKE ? OR part_number LIKE ? OR barcode LIKE ? OR compatible_vehicles LIKE ? OR supplier LIKE ?)");
+      for (let i = 0; i < 8; i += 1) params.push(pattern);
+    }
+    if (category !== "ALL") {
+      where.push("UPPER(TRIM(category)) = ?");
+      params.push(category);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM inventory ${whereSql}`, params);
+    const [rows] = await pool.query(
+      `SELECT * FROM inventory ${whereSql} ORDER BY ${sortColumn} ${direction}, id ASC LIMIT ? OFFSET ?`,
+      [...params, pageSize, (page - 1) * pageSize],
+    );
+    const metrics = await reorderMap();
+    const items = rows.map((row) => {
+      const item = toItem(row);
+      const metric = metrics.get(item.id);
+      const rop = metric ? metric.rop : 0;
+      return {
+        ...item,
+        reorderPoint: Math.round(rop),
+        reorderQuantity: metric ? metric.reorderQty : 0,
+        needsReorder: item.quantity < rop,
+      };
+    });
+    res.json({ items, total: Number(total), page, pageSize });
+  }),
+);
 
 app.get(
   "/api/inventory",
@@ -3662,6 +3728,65 @@ async function addIndexIfMissing(table, name, columns) {
   if (Number(row.n) === 0) await pool.query(`CREATE INDEX \`${name}\` ON \`${table}\` (${columns})`);
 }
 
+async function reorderMap() {
+  const entry = await cachedValue("reorder", reorderMetricsForAll);
+  if (!entry.map) entry.map = new Map(entry.data.map((m) => [m.id, m]));
+  return entry.map;
+}
+
+// The stock value of one item, the same figure the app has always shown.
+const stockValueOf = (item) => {
+  const discount = Math.min(100, Math.max(0, Number(item.discount) || 0));
+  return (Number(item.price) || 0) * (1 - discount / 100) * (Number(item.quantity) || 0);
+};
+
+// Totals, categories and the two alert lists, worked out once per data version.
+async function inventorySummary() {
+  const [rows] = await pool.query("SELECT * FROM inventory ORDER BY id");
+  const metrics = await reorderMap();
+  const categories = new Map();
+  const lowStock = [];
+  const reorderRows = [];
+  let totalValue = 0;
+  let totalUnits = 0;
+  let lowCount = 0;
+  let reorderCount = 0;
+  for (const row of rows) {
+    const item = toItem(row);
+    const value = stockValueOf(item);
+    const quantity = Number(item.quantity) || 0;
+    totalValue += value;
+    totalUnits += quantity;
+    const key = (item.category || "").trim().toUpperCase() || "UNCATEGORIZED";
+    const category = categories.get(key) || { name: key, value: 0, units: 0 };
+    category.value += value;
+    category.units += quantity;
+    categories.set(key, category);
+    const metric = metrics.get(item.id);
+    const rop = metric ? metric.rop : 0;
+    if (quantity < rop) {
+      lowCount += 1;
+      lowStock.push({ id: item.id, name: item.name, quantity, rop: Math.round(rop) });
+    }
+    if (metric && metric.reorderQty > 0) {
+      reorderCount += 1;
+      reorderRows.push({ id: item.id, name: item.name, quantity, eoq: Math.round(metric.eoq), rop: Math.round(rop), reorderQty: metric.reorderQty });
+    }
+  }
+  lowStock.sort((x, y) => x.quantity - y.quantity || x.name.localeCompare(y.name));
+  reorderRows.sort((x, y) => (x.reorderQty !== y.reorderQty ? y.reorderQty - x.reorderQty : y.quantity - x.quantity));
+  return {
+    totalItems: rows.length,
+    totalValue,
+    totalUnits,
+    categories: [...categories.values()],
+    lowCount,
+    lowStock: lowStock.slice(0, 500),
+    reorderCount,
+    reorderRows: reorderRows.slice(0, 500),
+  };
+}
+
 async function reorderMetricsForAll() {
   const [rows] = await pool.query(`
     SELECT i.id, i.price, i.quantity, i.ordering_cost, i.holding_cost, i.lead_time_days, i.safety_stock,
@@ -3714,7 +3839,7 @@ app.get(
     const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200));
     await sendCached(req, res, `movements-${limit}`, async () => {
       const [rows] = await pool.query(
-        "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC LIMIT ?",
+        `SELECT m.*, i.name AS item_name FROM movements m LEFT JOIN inventory i ON i.id = m.item_id ORDER BY m.movement_date DESC, m.created_at DESC LIMIT ?`,
         [limit],
       );
       return rows.map(toMovement);

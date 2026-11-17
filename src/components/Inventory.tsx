@@ -1,17 +1,16 @@
 import { askText, askNotice } from './AppDialog';
 import React, { useEffect, useState } from 'react';
-import { Item, Movement, UserRole } from '../types';
+import { InventorySummary, Item, UserRole } from '../types';
 import { Suspense, lazy } from 'react';
 
 // The camera scanner loads only when it is opened.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })));
 import { apiRequest } from '../apiClient';
 import { ProductImage } from './ProductImage';
-import { getLocalCost, getReorderQuantity, getStockTotal, isAtReorderPoint } from '../inventoryMetrics';
+import { getLocalCost } from '../inventoryMetrics';
 
 interface InventoryProps {
-  inventory: Item[];
-  movements?: Movement[];
+  summary: InventorySummary | null;
   onEditItem: (id: string) => void;
   onDeleteItem: (id: string) => void;
   onGoToStock: (id: string) => void;
@@ -28,7 +27,7 @@ const formatPeso = (value: number) =>
   `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const Inventory: React.FC<InventoryProps> = ({
-  inventory,
+  summary,
   onEditItem,
   onDeleteItem,
   onGoToStock,
@@ -106,33 +105,57 @@ export const Inventory: React.FC<InventoryProps> = ({
     return rack;
   };
 
-  const totalItems = inventory.length;
-  // "All" plus every category in use, so a newly added category gets its own filter button.
-  const categoryOptions = ['ALL', ...Array.from(new Set(inventory.map(i => (i.category || '').trim().toUpperCase()).filter(Boolean))).sort()];
-  const totalValue = inventory.reduce((sum, i) => sum + getStockTotal(i), 0);
-  const lowCount = inventory.filter(i => isAtReorderPoint(i)).length;
-
-  const filteredInventory = inventory
-    .filter(i => {
-      const matchesSearch = [i.name, i.id, i.category, i.brand || '', i.partNumber || '', i.barcode || '', i.compatibleVehicles || '', i.supplier || ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
-      const matchesCategory = categoryFilter === 'ALL' || (i.category || '').trim().toUpperCase() === categoryFilter;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      const valA = String(a[sortField]).toLowerCase();
-      const valB = String(b[sortField]).toLowerCase();
-      return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  // The page of items comes from the server, with the search, category and sort applied there.
+  const [pageRows, setPageRows] = useState<Item[]>([]);
+  const [matchCount, setMatchCount] = useState(0);
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAppliedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    const bump = () => setRefreshKey((k) => k + 1);
+    window.addEventListener('inventory-changed', bump);
+    return () => window.removeEventListener('inventory-changed', bump);
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      q: appliedSearch,
+      category: categoryFilter,
+      sort: String(sortField),
+      dir: sortDirection,
+      page: String(currentPage),
+      pageSize: String(PAGE_SIZE),
     });
+    apiRequest<{ items: Item[]; total: number }>(`/inventory/page?${params}`)
+      .then((data) => {
+        if (!active) return;
+        setPageRows(data.items);
+        setMatchCount(data.total);
+      })
+      .catch(() => {
+        if (active) setPageRows([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [appliedSearch, categoryFilter, sortField, sortDirection, currentPage, refreshKey]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / PAGE_SIZE));
+  const totalItems = summary?.totalItems ?? 0;
+  // "All" plus every category in use, so a newly added category gets its own filter button.
+  const categoryOptions = ['ALL', ...(summary?.categories.map((c) => c.name).sort() ?? [])];
+  const totalValue = summary?.totalValue ?? 0;
+  const lowCount = summary?.lowCount ?? 0;
+  const filteredCount = matchCount;
+
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
   const displayedPage = Math.min(currentPage, totalPages);
   useEffect(() => {
     setPageInput(String(displayedPage));
   }, [displayedPage]);
-  const pageItems = filteredInventory.slice(
-    (displayedPage - 1) * PAGE_SIZE,
-    displayedPage * PAGE_SIZE
-  );
+  const pageItems = pageRows;
 
   // Staff have the same features; deletes are sent for approval by the server.
   const isAdmin = true;
@@ -275,13 +298,13 @@ export const Inventory: React.FC<InventoryProps> = ({
           {pageItems.length === 0 && (
             <div className="inv-empty">
               <i className="bx bx-package" aria-hidden="true"></i>
-              <p>{inventory.length === 0 ? 'No items yet.' : 'No items match your search.'}</p>
+              <p>{totalItems === 0 ? 'No items yet.' : 'No items match your search.'}</p>
             </div>
           )}
 
           {pageItems.map(i => {
-            const needsReorder = isAtReorderPoint(i);
-            const reorderQuantity = getReorderQuantity(i);
+            const needsReorder = Boolean(i.needsReorder);
+            const reorderQuantity = (i.reorderQuantity ?? 0);
             const discount = Number(i.discount) || 0;
             return (
               <div
@@ -448,9 +471,9 @@ export const Inventory: React.FC<InventoryProps> = ({
 
       <footer className="inv-pager">
         <span className="inv-pager-summary">
-          {filteredInventory.length === 0
+          {filteredCount === 0
             ? 'No items'
-            : `Showing ${(displayedPage - 1) * PAGE_SIZE + 1}–${Math.min(displayedPage * PAGE_SIZE, filteredInventory.length)} of ${filteredInventory.length}`}
+            : `Showing ${(displayedPage - 1) * PAGE_SIZE + 1}–${Math.min(displayedPage * PAGE_SIZE, filteredCount)} of ${filteredCount}`}
         </span>
 
         <div className="inv-pager-controls">

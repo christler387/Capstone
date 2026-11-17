@@ -1,7 +1,7 @@
 import { AppDialog } from './components/AppDialog';
 import { askNotice } from './components/AppDialog';
-import React, { useEffect, useState } from 'react';
-import { Item, Movement, UserRole, WarehouseLayout } from './types';
+import React, { useEffect, useRef, useState } from 'react';
+import { InventorySummary, Item, Movement, UserRole, WarehouseLayout } from './types';
 import { Modal } from './components/Modal';
 import { askReason } from './reasonPrompt';
 
@@ -28,7 +28,7 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
 }
 import { Login } from './components/Login';
 import skyrunLogo from './assets/Skyrun.webp';
-import { isAtReorderPoint, setReorderMetrics, ReorderMetric } from './inventoryMetrics';
+import { setReorderMetrics, ReorderMetric } from './inventoryMetrics';
 
 // Screens that are not needed on first load are fetched the first time they are opened.
 const StockCard = React.lazy(() => import('./components/StockCard').then((m) => ({ default: m.StockCard })));
@@ -81,11 +81,12 @@ const App: React.FC = () => {
     return () => window.removeEventListener('inventory-changed', onChanged);
   }, []);
   useEffect(() => {
-    if (openAfterReload && inventory.some((i) => i.id === openAfterReload)) {
-      setOpenAfterReload(null);
-      handleEditItem(openAfterReload);
-    }
-  }, [inventory, openAfterReload]);
+    if (!openAfterReload) return;
+    const id = openAfterReload;
+    setOpenAfterReload(null);
+    // The copy was just made, so the list is reloaded before the editor looks for it.
+    void reloadFull().then((list) => handleEditItem(id, list));
+  }, [openAfterReload]);
   const [user, setUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('staff');
   const [databaseError, setDatabaseError] = useState<string | null>(null);
@@ -101,15 +102,29 @@ const App: React.FC = () => {
 
   // Other people use the system too, so lists are reloaded from the server after every change
   // instead of being patched from memory.
-  const [, setMetricsVersion] = useState(0);
-  // The reorder figures are worked out on the server; this brings the latest ones and redraws the screens.
-  const reloadMetrics = () =>
-    requestJson<Array<ReorderMetric & { id: string }>>('/reorder-metrics').then((list) => {
-      setReorderMetrics(list);
-      setMetricsVersion((v) => v + 1);
+  const [summary, setSummary] = useState<InventorySummary | null>(null);
+  // The full item list and the reorder figures are large. They are loaded only by the screens that need every item.
+  const [fullLoaded, setFullLoaded] = useState(false);
+  const fullLoadedRef = useRef(false);
+  const latestInventory = useRef<Item[]>([]);
+  latestInventory.current = inventory;
+  const FULL_SECTIONS = ['stock', 'warehouse', 'supplier', 'stock-card'];
+  const reloadFull = (): Promise<Item[]> =>
+    Promise.all([
+      requestJson<Item[]>('/inventory'),
+      requestJson<Array<ReorderMetric & { id: string }>>('/reorder-metrics'),
+    ]).then(([list, metrics]) => {
+      setReorderMetrics(metrics);
+      setInventory(list);
+      fullLoadedRef.current = true;
+      setFullLoaded(true);
+      return list;
     });
-  const reloadInventory = () => requestJson<Item[]>('/inventory').then(setInventory).then(reloadMetrics);
-  // The newest 200 movements are enough for the recent activity; the reorder figures do not need the full history.
+  const ensureFull = (): Promise<Item[]> => (fullLoadedRef.current ? Promise.resolve(latestInventory.current) : reloadFull());
+  const loadSummary = () => requestJson<InventorySummary>('/inventory/summary').then(setSummary);
+  const reloadInventory = () =>
+    Promise.all([loadSummary(), fullLoadedRef.current ? reloadFull() : Promise.resolve()]).then(() => undefined);
+  // The newest 200 movements are enough for the recent activity.
   const reloadMovements = () => requestJson<Movement[]>('/movements?limit=200').then(setMovements);
   const reloadAll = () =>
     Promise.all([
@@ -117,13 +132,14 @@ const App: React.FC = () => {
       reloadMovements(),
     ]).then(() => undefined);
 
-  // Keep the screens current while others work: refresh when the window is shown again and every 5 minutes.
+  // Keep the screens current while others work: refresh when the window is shown again and every minute.
+  // Unchanged data comes back as "not modified", so the regular refresh costs very little.
   useEffect(() => {
     if (!user) return;
     const refresh = () => {
       if (document.visibilityState === 'visible') reloadAll().catch(() => undefined);
     };
-    const timer = window.setInterval(refresh, 300_000);
+    const timer = window.setInterval(refresh, 60_000);
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
@@ -141,15 +157,9 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    Promise.all([
-      requestJson<Item[]>('/inventory'),
-      requestJson<Movement[]>('/movements?limit=200'),
-    ])
-      .then(([loadedInventory, loadedMovements]) => {
+    Promise.all([loadSummary(), reloadMovements()])
+      .then(() => {
         if (!active) return;
-        setInventory(loadedInventory);
-        setMovements(loadedMovements);
-        void reloadMetrics().catch(() => undefined);
       })
       .catch((error: Error) => {
         if (active) setDatabaseError(`Database unavailable: ${error.message}`);
@@ -547,9 +557,9 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     setCurrentSection('warehouse');
   };
 
-  const handleEditItem = (id: string) => {
-    const item = inventory.find(i => i.id === id);
-    setEditingItem(item);
+  const handleEditItem = async (id: string, freshList?: Item[]) => {
+    const list = freshList ?? (await ensureFull());
+    setEditingItem(list.find(i => i.id === id));
     setIsItemModalOpen(true);
   };
 
@@ -560,6 +570,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       body: JSON.stringify({ ...item, createdBy: currentUser }),
     });
     setInventory(prev => [...prev, savedItem]);
+    void loadSummary().catch(() => undefined);
   };
 
   const updateItem = async (id: string, data: Item) => {
@@ -569,6 +580,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       body: JSON.stringify({ ...data, updatedBy: currentUser }),
     });
     setInventory(prev => prev.map(i => i.id === id ? savedItem : i));
+    void loadSummary().catch(() => undefined);
   };
 
   const deleteItem = async (id: string) => {
@@ -584,6 +596,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       return;
     }
     setInventory(prev => prev.filter(i => i.id !== id));
+    void loadSummary().catch(() => undefined);
   };
 
   // An item's Item ID changed: update the screen at once, then reload the data in the background.
@@ -631,7 +644,8 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     }
   };
 
-  const handleAddItem = (rackStr?: string) => {
+  const handleAddItem = async (rackStr?: string) => {
+    const list = await ensureFull();
     let rack = rackStr || '';
     let level = 'L1';
     
@@ -641,7 +655,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       level = `L${parts[1]}`;
     }
 
-    const nextId = String(Math.max(0, ...inventory.map(i => parseInt(i.id, 10) || 0)) + 1).padStart(3, '0');
+    const nextId = String(Math.max(0, ...list.map(i => parseInt(i.id, 10) || 0)) + 1).padStart(3, '0');
     setEditingItem({ id: nextId, name: '', category: '', rack, level, quantity: 0, price: 0 } as Item);
     setIsItemModalOpen(true);
   };
@@ -668,13 +682,21 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     }
   };
 
+  // The screens that need every item wait until it has loaded.
+  useEffect(() => {
+    if (user && FULL_SECTIONS.includes(currentSection)) void ensureFull().catch(() => undefined);
+  }, [user, currentSection]);
+
   const renderComponentRouter = () => {
+    if (FULL_SECTIONS.includes(currentSection) && !fullLoaded) {
+      return <div className="sal-placeholder">Loading the item list…</div>;
+    }
     switch (currentSection) {
       case 'dashboard': 
         if (userRole === 'staff') {
           return (
             <StaffDashboard 
-              inventory={inventory} 
+              summary={summary} 
               movements={movements} 
               onGoToStock={handleGoToStock} 
               onGoToWarehouse={handleLocateOnMap}
@@ -683,12 +705,11 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
             />
           );
         }
-        return <Dashboard inventory={inventory} movements={movements} onGoToStock={handleGoToStock} />;
+        return <Dashboard summary={summary} movements={movements} onGoToStock={handleGoToStock} />;
       case 'inventory': 
         return (
           <Inventory 
-            inventory={inventory} 
-            movements={movements}
+            summary={summary} 
             onEditItem={handleEditItem} 
             onDeleteItem={setConfirmDelete} 
             onGoToStock={handleGoToStock}
@@ -926,7 +947,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
           <Navigation
             currentSection={currentSection}
             onSectionChange={setCurrentSection}
-            criticalItems={inventory.filter((item) => isAtReorderPoint(item))}
+            criticalItems={summary?.lowStock ?? []}
             movements={movements}
             onOpenItem={handleGoToStock}
             userName={user || ''}

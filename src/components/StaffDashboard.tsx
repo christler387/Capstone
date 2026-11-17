@@ -1,9 +1,9 @@
 import React from 'react';
-import { Item, Movement } from '../types';
+import { InventorySummary, Movement } from '../types';
 import { Dashboard } from './Dashboard';
 
 interface StaffDashboardProps {
-  inventory: Item[];
+  summary: InventorySummary | null;
   movements: Movement[];
   onGoToStock: (id: string) => void;
   onGoToWarehouse?: (rack: string) => void;
@@ -12,16 +12,15 @@ interface StaffDashboardProps {
 }
 
 export const StaffDashboard: React.FC<StaffDashboardProps> = ({
-  inventory,
+  summary,
   movements,
   onGoToStock
 }) => {
   return (
-    <Dashboard 
-      inventory={inventory} 
-      movements={movements} 
-      onGoToStock={onGoToStock} 
+    <Dashboard
+      summary={summary}
+      movements={movements}
+      onGoToStock={onGoToStock}
     />
   );
 };
-

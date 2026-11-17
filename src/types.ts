@@ -35,6 +35,10 @@ export interface Item {
   discount?: number;
   // Where the item is bought from. The same item name can come from different suppliers.
   supplier?: string;
+  // Filled in by the inventory page: the reorder point, the order quantity, and whether the item needs ordering now.
+  reorderPoint?: number;
+  reorderQuantity?: number;
+  needsReorder?: boolean;
 }
 
 // Item fields that are typed in, with suggestions drawn from the values already saved.
@@ -42,6 +46,8 @@ export type ItemDescriptorField = 'category' | 'brand' | 'itemType' | 'model' | 
 
 export interface Movement {
   id: string;
+  // The item's name, when the server sends it with the movement.
+  itemName?: string;
   itemId: string;
   type: MovementType;
   qty: number;
@@ -82,3 +88,15 @@ export interface WarehouseFloor {
 }
 
 export type WarehouseLayout = WarehouseFloor[];
+
+// Totals and alert lists for the dashboard and the alerts. Worked out on the server.
+export interface InventorySummary {
+  totalItems: number;
+  totalValue: number;
+  totalUnits: number;
+  categories: { name: string; value: number; units: number }[];
+  lowCount: number;
+  lowStock: { id: string; name: string; quantity: number; rop: number }[];
+  reorderCount: number;
+  reorderRows: { id: string; name: string; quantity: number; eoq: number; rop: number; reorderQty: number }[];
+}

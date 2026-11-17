@@ -1,11 +1,12 @@
 import React from 'react';
-import { Item, Movement } from '../types';
+import { Movement } from '../types';
+import type { AlertItem } from './CriticalAlerts';
 import { CriticalAlerts } from './CriticalAlerts';
 
 interface NavigationProps {
   currentSection: string;
   onSectionChange: (section: string) => void;
-  criticalItems: Item[];
+  criticalItems: AlertItem[];
   movements: Movement[];
   onOpenItem: (id: string) => void;
   userName: string;

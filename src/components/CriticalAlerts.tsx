@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Item, Movement } from '../types';
-import { getRop } from '../inventoryMetrics';
+import { InventorySummary, Movement } from '../types';
+
+// An item that needs ordering, as the server summarises it.
+export type AlertItem = InventorySummary['lowStock'][number];
 
 // Items the user has already seen in the alert panel. Stored per browser.
 const SEEN_KEY = 'skyrun_seen_critical_ids';
@@ -23,7 +25,7 @@ function writeSeen(ids: string[]) {
 }
 
 interface CriticalAlertsProps {
-  criticalItems: Item[];
+  criticalItems: AlertItem[];
   movements: Movement[];
   onOpenItem: (id: string) => void;
 }
@@ -144,7 +146,7 @@ export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({ criticalItems, o
                     <span className="crit-item-main">
                       <span className="crit-item-name">{item.name}</span>
                       <span className="crit-item-sub">
-                        {item.id} · Reorder point {Math.round(getRop(item)).toLocaleString()}
+                        {item.id} · Reorder point {Math.round(item.rop).toLocaleString()}
                       </span>
                     </span>
                     <span className="crit-item-qty">{item.quantity.toLocaleString()} left</span>
