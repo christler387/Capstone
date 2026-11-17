@@ -6,6 +6,8 @@ import mysql from "mysql2/promise";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import path from "node:path";
+import zlib from "node:zlib";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
   storeProductImage,
@@ -102,6 +104,41 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .filter(Boolean);
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)) }));
 app.use(compression());
+
+// Shared data (inventory, reorder figures, movements) is kept as text, and as gzip, until the next change.
+// Every write to the API moves the version on, so no one is shown data older than the last save.
+let dataVersion = 0;
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.path.startsWith("/api")) {
+    res.on("finish", () => {
+      dataVersion += 1;
+    });
+  }
+  next();
+});
+const responseCache = new Map();
+const gzipAsync = promisify(zlib.gzip);
+
+async function sendCached(req, res, key, build) {
+  let entry = responseCache.get(key);
+  if (!entry || entry.version !== dataVersion) {
+    const version = dataVersion;
+    entry = { version, text: JSON.stringify(await build()), gz: null };
+    responseCache.set(key, entry);
+  }
+  const etag = `W/"${key}-v${entry.version}"`;
+  res.setHeader("ETag", etag);
+  if (req.headers["if-none-match"] === etag) return res.status(304).end();
+  res.setHeader("Vary", "Accept-Encoding");
+  res.type("application/json");
+  if (String(req.headers["accept-encoding"] || "").includes("gzip")) {
+    // Level 1 is much quicker to produce than the default and still shrinks the data about as well.
+    if (!entry.gz) entry.gz = await gzipAsync(entry.text, { level: 1 });
+    res.setHeader("Content-Encoding", "gzip");
+    return res.send(entry.gz);
+  }
+  return res.send(entry.text);
+}
 // Data responses are checked with the browser on each use (ETag), so an unchanged list costs no download.
 // They are never stored in shared caches, because they depend on who is signed in.
 app.use("/api", (_req, res, next) => {
@@ -1657,8 +1694,10 @@ app.get(
   ah(async (req, res) => {
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
-    const [rows] = await pool.query("SELECT * FROM inventory ORDER BY id");
-    res.json(rows.map(toItem));
+    await sendCached(req, res, "inventory", async () => {
+      const [rows] = await pool.query("SELECT * FROM inventory ORDER BY id");
+      return rows.map(toItem);
+    });
   }),
 );
 
@@ -3658,16 +3697,11 @@ async function reorderMetricsForAll() {
   });
 }
 
-// The figures change only when stock moves, so they are reused for a minute instead of recalculated per request.
-let reorderCache = { at: 0, data: null };
 app.get(
   "/api/reorder-metrics",
   ah(async (req, res) => {
     if (!(await requireSignedIn(req, res))) return;
-    if (!reorderCache.data || Date.now() - reorderCache.at > 60_000) {
-      reorderCache = { at: Date.now(), data: await reorderMetricsForAll() };
-    }
-    res.json(reorderCache.data);
+    await sendCached(req, res, "reorder", reorderMetricsForAll);
   }),
 );
 
@@ -3678,11 +3712,13 @@ app.get(
     if (!actor) return;
     // The newest movements only; the full history is not sent to every screen.
     const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200));
-    const [rows] = await pool.query(
-      "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC LIMIT ?",
-      [limit],
-    );
-    res.json(rows.map(toMovement));
+    await sendCached(req, res, `movements-${limit}`, async () => {
+      const [rows] = await pool.query(
+        "SELECT * FROM movements ORDER BY movement_date DESC, created_at DESC LIMIT ?",
+        [limit],
+      );
+      return rows.map(toMovement);
+    });
   }),
 );
 
