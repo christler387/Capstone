@@ -4787,11 +4787,89 @@ app.post(
 app.use("/api/uploads", express.static(uploadsDirectory, { maxAge: "30d", immutable: true }));
 // Built files have a hash in their name, so they can be kept for a year.
 app.use("/assets", express.static(path.join(__dirname, "dist", "assets"), { maxAge: "365d", immutable: true }));
+// Agents learn where the summary, sitemap and Markdown version are from the Link header on the home page.
+const HOME_LINKS = [
+  '</llms.txt>; rel="describedby"; type="text/plain"',
+  '</sitemap.xml>; rel="sitemap"; type="application/xml"',
+  '</index.md>; rel="alternate"; type="text/markdown"',
+].join(", ");
+app.use((req, res, next) => {
+  if (req.path === "/") {
+    res.set("Link", HOME_LINKS);
+    res.vary("Accept");
+  }
+  next();
+});
+// Agents that ask for Markdown get the home page as Markdown, which costs far fewer tokens than HTML.
+app.get("/", (req, res, next) => {
+  if (req.accepts(["html", "text/markdown"]) !== "text/markdown") return next();
+  res.type("text/markdown; charset=utf-8");
+  res.vary("Accept");
+  res.sendFile(path.join(__dirname, "dist", "index.md"));
+});
 app.use(express.static(path.join(__dirname, "dist")));
+
+// Read-only MCP endpoint. It offers one tool, which returns the public description of the site and no inventory data.
+const MCP_PROTOCOL_VERSION = "2025-06-18";
+const SITE_DESCRIPTION =
+  "Skyrun AutoSupply is the warehouse and inventory system for Skyrun auto parts: stock in and out, stock card, sales and profit, suppliers and the warehouse map. Sign-in is required to use it.";
+const SITE_INFO_TOOL = {
+  name: "get_site_info",
+  description: "Describe Skyrun AutoSupply and where its public resources are.",
+  inputSchema: { type: "object", properties: {}, additionalProperties: false },
+};
+const SITE_INFO_TEXT = `${SITE_DESCRIPTION}\nSite summary: https://skyrun.site/llms.txt\nSitemap: https://skyrun.site/sitemap.xml\nMarkdown: https://skyrun.site/index.md`;
+app.get("/.well-known/mcp/server-card.json", (_req, res) => {
+  res.set("Cache-Control", "public, max-age=3600");
+  res.json({
+    name: "skyrun-autosupply",
+    title: "Skyrun AutoSupply",
+    description: SITE_DESCRIPTION,
+    version: "1.0.0",
+    websiteUrl: "https://skyrun.site/",
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    serverInfo: { name: "skyrun-autosupply", version: "1.0.0" },
+    transport: { type: "streamable-http", endpoint: "/mcp" },
+    capabilities: { tools: { listChanged: false } },
+    tools: [SITE_INFO_TOOL],
+  });
+});
+app.get("/mcp", (_req, res) => res.status(405).set("Allow", "POST").end());
+app.post("/mcp", (req, res) => {
+  const message = req.body;
+  if (!message || typeof message !== "object" || message.jsonrpc !== "2.0") {
+    return res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid request." } });
+  }
+  // Notifications have no id and need no reply.
+  if (message.id === undefined) return res.status(202).end();
+  const reply = (result) => res.json({ jsonrpc: "2.0", id: message.id, result });
+  switch (message.method) {
+    case "initialize":
+      return reply({
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: { name: "skyrun-autosupply", version: "1.0.0" },
+      });
+    case "ping":
+      return reply({});
+    case "tools/list":
+      return reply({ tools: [SITE_INFO_TOOL] });
+    case "tools/call":
+      if (message.params?.name === SITE_INFO_TOOL.name) {
+        return reply({ content: [{ type: "text", text: SITE_INFO_TEXT }], isError: false });
+      }
+      return res.json({ jsonrpc: "2.0", id: message.id, error: { code: -32602, message: "Unknown tool." } });
+    default:
+      return res.json({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Method not found." } });
+  }
+});
+
 // Regex works on Express 4 and 5, and unknown /api routes get a JSON 404 instead of index.html.
 app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
+// The app has no pages besides the home page, so any other address is missing: a real 404 status.
+// The app shell is still sent so a browser shows the sign-in page, but the status tells agents the page does not exist.
 app.get(/^\/(?!api\/).*/, (_req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+  res.status(404).sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 app.use((error, _req, res, _next) => {

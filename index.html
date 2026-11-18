@@ -4,10 +4,70 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Skyrun AutoSupply: warehouse inventory, stock in and out, stock card, sales and profit, suppliers and the warehouse map." />
+    <link rel="canonical" href="https://skyrun.site/" />
     <title>SKYRUN | AUTO SUPPLY MANAGEMENT</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://skyrun.site/#organization",
+            "name": "Skyrun",
+            "url": "https://skyrun.site/",
+            "description": "Skyrun sells auto parts and runs Skyrun AutoSupply, its warehouse and inventory system."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://skyrun.site/#website",
+            "url": "https://skyrun.site/",
+            "name": "Skyrun AutoSupply",
+            "inLanguage": "en",
+            "publisher": { "@id": "https://skyrun.site/#organization" }
+          },
+          {
+            "@type": "WebPage",
+            "@id": "https://skyrun.site/#webpage",
+            "url": "https://skyrun.site/",
+            "name": "Skyrun AutoSupply",
+            "description": "Sign-in page for Skyrun AutoSupply, the warehouse and inventory system for Skyrun auto parts.",
+            "isPartOf": { "@id": "https://skyrun.site/#website" },
+            "about": { "@id": "https://skyrun.site/#organization" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "Skyrun AutoSupply",
+            "url": "https://skyrun.site/",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "description": "Warehouse and inventory management: stock in and out, stock card, sales and profit, suppliers and the warehouse map. Sign-in is required.",
+            "provider": { "@id": "https://skyrun.site/#organization" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="public-intro">
+        <h1>Skyrun AutoSupply</h1>
+        <p>Warehouse and inventory management for Skyrun auto parts. Staff and administrators record stock in and stock out, follow each item's stock card, track sales and profit, manage suppliers, and locate items on the warehouse map.</p>
+        <p>Sign-in is required to use the system.</p>
+        <h2>Features</h2>
+        <ul>
+          <li>Dashboard: stock value, low stock, reorder plan and recent activity</li>
+          <li>Inventory: the item list, with item details and pictures</li>
+          <li>Stock: stock in and stock out, grouped by invoice number</li>
+          <li>Stock card: the full history of one item</li>
+          <li>Stock in history: stock-in invoices</li>
+          <li>Sales: sales and profit reports and sales history</li>
+          <li>Supplier: suppliers and the items they supply</li>
+          <li>Warehouse map: floors, aisles and racks</li>
+        </ul>
+        <p>For AI agents: <a href="/llms.txt">site summary (llms.txt)</a>, <a href="/index.md">Markdown version of this page</a>, <a href="/sitemap.xml">sitemap</a>.</p>
+      </main>
+    </div>
+    <noscript>Skyrun AutoSupply needs JavaScript to show the sign-in form.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

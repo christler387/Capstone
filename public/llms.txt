@@ -2,13 +2,24 @@
 
 > Warehouse and inventory management for Skyrun auto parts. Staff and administrators record stock in and stock out, follow each item's stock card, track sales and profit, manage suppliers, and locate items on the warehouse map. Sign-in is required.
 
-## Main sections
+## Public pages
 
-- [Dashboard](/): stock value, low stock, reorder plan and recent activity
-- [Inventory](/): the item list, with item details and pictures
-- [Stock](/): stock in and stock out sheets, grouped by invoice number
-- [Stock card](/): the full history of one item
-- [Stock in history](/): stock-in invoices, with edit, undo and delete
-- [Sales](/): sales and profit reports and sales history
-- [Supplier](/): suppliers and the items they supply
-- [Warehouse map](/): floors, aisles and racks
+- [Sign-in page](https://skyrun.site/): the only public page; it describes the system and shows the sign-in form
+- [Markdown version of the sign-in page](https://skyrun.site/index.md): the same description as Markdown
+
+## Resources
+
+- [Sitemap](https://skyrun.site/sitemap.xml): every public page
+- [Robots rules](https://skyrun.site/robots.txt): crawling and Content-Signal rules
+- [MCP server card](https://skyrun.site/.well-known/mcp/server-card.json): the read-only MCP endpoint at https://skyrun.site/mcp
+
+## Signed-in screens (not public)
+
+- Dashboard: stock value, low stock, reorder plan and recent activity
+- Inventory: the item list, with item details and pictures
+- Stock: stock in and stock out, grouped by invoice number
+- Stock card: the full history of one item
+- Stock in history: stock-in invoices, with edit, undo and delete
+- Sales: sales and profit reports and sales history
+- Supplier: suppliers and the items they supply
+- Warehouse map: floors, aisles and racks
