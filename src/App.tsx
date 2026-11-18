@@ -563,6 +563,9 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     setIsItemModalOpen(true);
   };
 
+  // The item saved last from the stock screen, so the stock sheet can list it straight away.
+  const [lastAddedItemId, setLastAddedItemId] = useState<string | undefined>();
+
   const addItem = async (item: Item) => {
     const currentUser = sessionStorage.getItem('skyrun_session_user') || user || 'Unknown';
     const savedItem = await requestJson<Item>('/inventory', {
@@ -571,6 +574,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     });
     setInventory(prev => [...prev, savedItem]);
     void loadSummary().catch(() => undefined);
+    return savedItem;
   };
 
   const updateItem = async (id: string, data: Item) => {
@@ -669,7 +673,9 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       await addItem(data);
       await deleteItem(editingItem.id);
     } else {
-      await addItem(data);
+      const savedItem = await addItem(data);
+      // An item received on an invoice is already on that invoice, so it does not go on the sheet.
+      if (!receive) setLastAddedItemId(savedItem.id);
       if (receive) {
         try {
           await requestJson('/movements', {
@@ -764,6 +770,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
             onAddMovement={addMovement} 
             onAddItem={handleAddItem}
             selectedItemId={stockToItem}
+            newItemId={lastAddedItemId}
             stockInPrefill={stockInPrefill}
             onPrefillUsed={() => setStockInPrefill(null)}
             userRole={userRole}

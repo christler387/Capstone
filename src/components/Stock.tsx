@@ -17,6 +17,8 @@ interface StockProps {
   stockInPrefill?: { invoice: string; supplierId: string } | null;
   onPrefillUsed?: () => void;
   selectedItemId?: string;
+  // The item just saved as new: it goes on the sheet below straight away.
+  newItemId?: string;
   userRole?: UserRole;
   userName?: string;
   // Every rack code in the warehouse layout. Not used by this screen; kept so the app can pass it.
@@ -41,6 +43,7 @@ export const Stock: React.FC<StockProps> = ({
   onAddMovement,
   onAddItem,
   selectedItemId,
+  newItemId,
   userName,
 }) => {
   const [tab, setTab] = useState<Tab>('in');
@@ -108,6 +111,15 @@ export const Stock: React.FC<StockProps> = ({
     if (!selectedItemId || !itemById.has(selectedItemId)) return;
     setSheets((prev) => ({ ...prev, [tab]: addLine(prev[tab], selectedItemId) }));
   }, [selectedItemId, tab]);
+
+  // A new item saved from this screen goes on the current sheet. The value present when the screen opens is skipped.
+  const seenNewItemId = useRef(newItemId);
+  useEffect(() => {
+    if (!newItemId || newItemId === seenNewItemId.current) return;
+    seenNewItemId.current = newItemId;
+    if (!itemById.has(newItemId)) return;
+    setSheets((prev) => ({ ...prev, [tab]: addLine(prev[tab], newItemId) }));
+  }, [newItemId]);
 
   const changeTab = (next: Tab) => {
     setTab(next);
@@ -381,7 +393,7 @@ export const Stock: React.FC<StockProps> = ({
           {search.trim() && (
             <div className="stk-suggest" role="listbox" aria-label="Matching items">
               {canAddNewItem && (
-                <button type="button" className="stk-suggest-row is-add" onClick={() => onAddItem()}>
+                <button type="button" className="stk-suggest-row is-add" onClick={() => { setSearch(''); onAddItem(); }}>
                   <i className="bx bx-plus" aria-hidden="true"></i> Add a new item
                 </button>
               )}
