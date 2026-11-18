@@ -660,7 +660,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
     setIsItemModalOpen(true);
   };
 
-    const handleSaveItem = async (data: Item) => {
+    const handleSaveItem = async (data: Item, receive?: { invoice: string; qty: number }) => {
     const exists = inventory.find(i => i.id === data.id || (editingItem && i.id === editingItem.id));
     if (exists && (!editingItem || editingItem.id === data.id)) {
       await updateItem(data.id, data);
@@ -670,6 +670,23 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
       await deleteItem(editingItem.id);
     } else {
       await addItem(data);
+      if (receive) {
+        try {
+          await requestJson('/movements', {
+            method: 'POST',
+            body: JSON.stringify({ itemId: data.id, type: 'IN', qty: receive.qty, reference: receive.invoice }),
+          });
+        } catch (receiveError) {
+          // The item is already saved at zero; say so, so the stock is not entered twice by mistake.
+          await reloadInventory().catch(() => undefined);
+          throw new Error(
+            `The item was saved, but its stock was not received on invoice ${receive.invoice}: ${
+              receiveError instanceof Error ? receiveError.message : 'unknown error'
+            }. Use Stock in to receive it.`,
+          );
+        }
+        await reloadInventory();
+      }
     }
     setIsItemModalOpen(false);
     setEditingItem(undefined);

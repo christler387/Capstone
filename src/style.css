@@ -10032,3 +10032,26 @@ input[type='date']:focus, select:focus, textarea:focus {
     display: none;
   }
 }
+
+/* ---- New item: receive the first stock on an invoice ---- */
+.receive-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.receive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.receive-invoice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}

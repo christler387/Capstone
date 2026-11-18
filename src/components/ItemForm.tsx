@@ -12,7 +12,7 @@ const DESCRIPTOR_FIELDS: ItemDescriptorField[] = ["category", "brand", "model", 
 interface ItemFormProps {
   item?: Partial<Item>;
   existingItems?: Item[];
-  onSave: (data: Item) => void | Promise<void>;
+  onSave: (data: Item, receive?: { invoice: string; qty: number }) => void | Promise<void>;
   onCancel: () => void;
   readOnly?: boolean;
   // Every rack code in the warehouse layout, for the Rack Location dropdown.
@@ -127,6 +127,9 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   );
   // A saved item's quantity changes only through stock in and stock out.
   const isExistingItem = item?.version !== undefined;
+  // A new item can receive its first stock on an invoice, instead of as an opening balance.
+  const [receiveNow, setReceiveNow] = useState(false);
+  const [receiveInvoice, setReceiveInvoice] = useState('');
   const [formData, setFormData] = useState<ItemFormData>({
     id: "",
     name: "",
@@ -353,10 +356,28 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       return;
     }
 
+    // Stock received on an invoice: the item is created at zero, and the quantity is recorded on the invoice.
+    let receive: { invoice: string; qty: number } | undefined;
+    let quantityToSave = formData.quantity;
+    if (!isExistingItem && receiveNow) {
+      const invoice = receiveInvoice.trim();
+      const qty = Number(formData.quantity);
+      if (!invoice) {
+        setError('Enter the invoice number the stock was received on.');
+        return;
+      }
+      if (!Number.isInteger(qty) || qty < 1) {
+        setError('Enter the quantity received (a whole number of at least 1).');
+        return;
+      }
+      receive = { invoice, qty };
+      quantityToSave = 0;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await onSave({ ...formData, ...descriptors, id, name, category, barcode } as Item);
+      await onSave({ ...formData, quantity: quantityToSave, ...descriptors, id, name, category, barcode } as Item, receive);
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -746,6 +767,25 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             <span style={{ display: 'block', marginTop: 4, fontSize: '0.75rem', color: 'var(--ink-faint)' }}>
               Changed only by stock in or stock out
             </span>
+          )}
+          {!isExistingItem && !readOnly && (
+            <div className="receive-box">
+              <label className="receive-toggle">
+                <input type="checkbox" checked={receiveNow} onChange={(e) => setReceiveNow(e.target.checked)} />
+                <span>Receive this stock on an invoice now</span>
+              </label>
+              {receiveNow && (
+                <label className="label-micro receive-invoice">
+                  Invoice number <span className="text-accent">*</span>
+                  <input
+                    className="form-input"
+                    value={receiveInvoice}
+                    onChange={(e) => setReceiveInvoice(e.target.value)}
+                    placeholder="e.g. VIS-INV-0001"
+                  />
+                </label>
+              )}
+            </div>
           )}
         </div>
 
