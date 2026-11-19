@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { UserRole } from '../types';
 import { apiRequest } from '../apiClient';
 import { askReason } from '../reasonPrompt';
+import { Modal } from './Modal';
 
 interface PeriodTotals {
   sales: number;
@@ -102,6 +103,30 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [historyInfo, setHistoryInfo] = useState<string | null>(null);
+  // The sale whose items are shown in the pop-out, and its items once loaded.
+  const [openSale, setOpenSale] = useState<string | null>(null);
+  const [saleLines, setSaleLines] = useState<SaleRecord[] | null>(null);
+  useEffect(() => {
+    if (openSale === null) {
+      setSaleLines(null);
+      return;
+    }
+    let cancelled = false;
+    setSaleLines(null);
+    // The reference search returns every line of the sale; only the exact reference is kept.
+    apiRequest<SaleRecord[]>(`/sales?${new URLSearchParams({ q: openSale })}`)
+      .then((rows) => {
+        if (!cancelled) setSaleLines(rows.filter((row) => row.reference === openSale));
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setSaleLines([]);
+        setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openSale]);
   const [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
     const bump = () => setRefreshKey((k) => k + 1);
@@ -337,6 +362,59 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
           <strong>{peso(historyTotals.profit)}</strong> gross profit · {historyTotals.units.toLocaleString()} unit(s)
           {history.length >= 500 && <span className="sal-muted"> (showing the newest 500)</span>}
         </p>
+        <Modal
+          isOpen={openSale !== null}
+          onClose={() => setOpenSale(null)}
+          title={`Sale ${openSale ?? ''}`}
+          type="wide"
+        >
+          {saleLines === null && <p className="sal-muted">Loading the items…</p>}
+          {saleLines !== null && saleLines.length === 0 && <p className="sal-muted">No items were found for this sale.</p>}
+          {saleLines !== null && saleLines.length > 0 && (
+            <>
+              <p className="sal-muted sal-small">
+                {saleLines[0].time.slice(0, 16).replace(' ', ' · ')} · Recorded by {saleLines[0].recordedBy || '—'}
+                {saleLines.some((line) => line.status === 'VOIDED') && ' · Undone'}
+              </p>
+              <div className="sal-table-wrap">
+                <table className="sal-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th className="num">Qty</th>
+                      <th className="num">Unit price</th>
+                      <th className="num">Unit cost</th>
+                      <th className="num">Total sales</th>
+                      <th className="num">Gross profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {saleLines.map((line) => (
+                      <tr key={line.id}>
+                        <td><span className="sal-strong">{line.itemName}</span><span className="sal-muted sal-small">{line.itemId}</span></td>
+                        <td className="num">{line.quantity.toLocaleString()}</td>
+                        <td className="num">{peso(line.unitPrice)}</td>
+                        <td className="num">{peso(line.unitCost)}</td>
+                        <td className="num">{peso(line.totalSales)}</td>
+                        <td className={`num ${line.grossProfit < 0 ? 'sal-loss' : ''}`}>{peso(line.grossProfit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th>Total</th>
+                      <th className="num">{saleLines.reduce((sum, line) => sum + line.quantity, 0).toLocaleString()}</th>
+                      <th />
+                      <th />
+                      <th className="num">{peso(saleLines.reduce((sum, line) => sum + line.totalSales, 0))}</th>
+                      <th className="num">{peso(saleLines.reduce((sum, line) => sum + line.grossProfit, 0))}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          )}
+        </Modal>
         {historyInfo && <div className="sal-note" role="status">{historyInfo}</div>}
         <div className="sal-table-wrap">
           <table className="sal-table sal-history stack-phone">
@@ -361,7 +439,16 @@ export const Sales: React.FC<SalesProps> = ({ userRole }) => {
               {history.map((r) => (
                 <tr key={r.id} className={r.status === 'VOIDED' ? 'is-void' : undefined}>
                   <td className="sal-nowrap" data-label="When">{r.time.slice(0, 16).replace(' ', ' · ')}</td>
-                  <td data-label="Reference"><span className="sal-code">{r.reference}</span></td>
+                                        <td data-label="Reference">
+                        <button
+                          type="button"
+                          className="sal-code"
+                          style={{ border: 0, background: 'none', padding: 0, font: 'inherit', color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+                          onClick={() => setOpenSale(r.reference)}
+                        >
+                          {r.reference}
+                        </button>
+                      </td>
                   <td data-label="Item"><span className="sal-strong">{r.itemName}</span><span className="sal-muted sal-small">{r.itemId}</span></td>
                   <td className="num" data-label="Qty">{r.quantity.toLocaleString()}</td>
                   <td className="num" data-label="Unit price">{peso(r.unitPrice)}</td>
