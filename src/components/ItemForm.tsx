@@ -76,14 +76,6 @@ const parseDiscount = (text: string): number | null => {
 
 const formatDiscountText = (value?: number) => (value ? `${Number(value)}%` : '');
 
-// "net 150" or "net150": the net price after discount. Returns the amount, or null when the text is not a net entry.
-const parseNetEntry = (text: string): number | null => {
-  const match = text.trim().match(/^net\s*([\d.,]+)$/i);
-  if (!match) return null;
-  const value = Number(match[1].replace(/,/g, ''));
-  return Number.isFinite(value) ? value : null;
-};
-
 const isEmptyValue = (value: unknown) =>
   value === undefined || value === null || (typeof value === "string" && value.trim() === "") || (typeof value === "number" && Number.isNaN(value));
 
@@ -833,31 +825,16 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             inputMode="decimal"
             id="edit-discount"
             className="form-input font-mono"
-            placeholder="0% or net 150"
+            placeholder="0%"
             value={discountText}
             onChange={(event) => {
               const text = event.target.value;
               setDiscountText(text);
               setError(null);
-              // "net 150" means the price after discount is 150: the discount is worked out from the price.
-              const netAmount = parseNetEntry(text);
-              if (netAmount !== null) {
-                const price = Number(formData.price) || 0;
-                if (price > 0) {
-                  const worked = Math.min(100, Math.max(0, Math.round((1 - netAmount / price) * 10000) / 100));
-                  setFormData((prev) => ({ ...prev, discount: worked }));
-                }
-                return;
-              }
               const parsed = parseDiscount(text);
               if (parsed !== null) setFormData((prev) => ({ ...prev, discount: parsed }));
             }}
             onBlur={() => {
-              // A net entry turns into the percentage it worked out to.
-              if (parseNetEntry(discountText) !== null) {
-                setDiscountText(formatDiscountText(formData.discount));
-                return;
-              }
               const parsed = parseDiscount(discountText) ?? 0;
               setDiscountText(formatDiscountText(parsed));
               setFormData((prev) => ({ ...prev, discount: parsed }));
