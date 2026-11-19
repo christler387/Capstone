@@ -746,6 +746,8 @@ async function initializeDatabase() {
   await addColumnIfMissing("sales", "part_number", "VARCHAR(100) NULL");
   await addIndexIfMissing("movements", "idx_movements_type_item", "type, item_id, movement_date, qty");
   await addIndexIfMissing("movements", "idx_movements_recent", "movement_date, created_at");
+  // Lets the invoice number checks find a reference without reading every row.
+  await addIndexIfMissing("movements", "idx_movements_type_reference", "type, reference");
   await loadLoginThrottle();
   await pool.query(`CREATE TABLE IF NOT EXISTS change_requests (
     id VARCHAR(64) PRIMARY KEY,
@@ -3994,6 +3996,125 @@ app.post(
 );
 
 
+
+// The next invoice number to suggest: one more than the highest all-digit invoice, with the same width.
+// Numbers already used are skipped, so the suggestion is never a duplicate.
+async function suggestStockInInvoice(db) {
+  // Reads only the invoice numbers that start with a digit, from the newest end of the index.
+  const [rows] = await db.query(
+    "SELECT reference FROM movements WHERE type='IN' AND reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200",
+  );
+  let last = null;
+  for (const row of rows) {
+    if (!/^[0-9]+$/.test(row.reference)) continue;
+    if (!last || Number(row.reference) > Number(last)) last = row.reference;
+  }
+  if (last === null) return "00001";
+  const width = last.length;
+  let next = Number(last) + 1;
+  for (;;) {
+    const candidate = String(next).padStart(width, "0");
+    const [[used]] = await db.query("SELECT 1 AS found FROM movements WHERE type='IN' AND reference=? LIMIT 1", [candidate]);
+    if (!used) return candidate;
+    next += 1;
+  }
+}
+
+app.get(
+  "/api/stock-in/next-invoice",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    res.json({ invoice: await suggestStockInInvoice(pool) });
+  }),
+);
+
+// Records every line of one stock-in invoice in one transaction: all of them are saved, or none.
+// A new invoice number that is already used is refused. Adding lines to an existing invoice skips that check.
+app.post(
+  "/api/movements/batch",
+  ah(async (req, res) => {
+    const actor = await requireSignedIn(req, res);
+    if (!actor) return;
+    const body = req.body || {};
+    const reference = cleanText(body.reference, 64);
+    if (!reference) return res.status(400).json({ error: "Enter the supplier invoice number." });
+    const supplierId = body.supplierId ? toPositiveInt(body.supplierId) : null;
+    if (body.supplierId && !supplierId) return res.status(400).json({ error: "Invalid supplier." });
+    const addToExisting = body.addToExisting === true;
+    const lines = Array.isArray(body.lines) ? body.lines : [];
+    if (lines.length === 0) return res.status(400).json({ error: "Add at least one item to the sheet." });
+    if (lines.length > 500) return res.status(400).json({ error: "Record at most 500 items on one invoice at a time." });
+    const parsed = [];
+    for (const line of lines) {
+      const itemId = normalizeItemId(line?.itemId);
+      const qty = Number(line?.qty);
+      if (!itemId || !Number.isInteger(qty) || qty < 1) {
+        return res.status(400).json({ error: "Every item needs a quantity of at least 1." });
+      }
+      parsed.push({ itemId, qty, id: `MOV-${crypto.randomUUID()}` });
+    }
+    if (supplierId) {
+      const [[supplier]] = await pool.query("SELECT id FROM suppliers WHERE id=?", [supplierId]);
+      if (!supplier) return res.status(400).json({ error: "Supplier not found." });
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+    const connection = await pool.getConnection();
+    let locked = false;
+    try {
+      // One invoice is recorded at a time, so two people cannot take the same new number.
+      const [[lock]] = await connection.query("SELECT GET_LOCK('autosupply-stock-in-invoice', 10) AS locked");
+      if (!lock.locked) {
+        return res.status(503).json({ error: "Another invoice is being recorded. Try again in a moment." });
+      }
+      locked = true;
+      await connection.beginTransaction();
+      if (!addToExisting) {
+        const [[clash]] = await connection.query("SELECT 1 AS found FROM movements WHERE type='IN' AND reference=? LIMIT 1", [reference]);
+        if (clash) {
+          await connection.rollback();
+          const next = await suggestStockInInvoice(connection);
+          return res.status(409).json({ error: `Invoice ${reference} is already used. The next free number is ${next}.` });
+        }
+      }
+      for (const line of parsed) {
+        const [[item]] = await connection.query("SELECT quantity FROM inventory WHERE id=? FOR UPDATE", [line.itemId]);
+        if (!item) {
+          await connection.rollback();
+          return res.status(404).json({ error: "Item not found." });
+        }
+        await connection.query(
+          "INSERT INTO movements (id, item_id, type, qty, movement_date, reference, supplier_id, created_by) VALUES (?, ?, 'IN', ?, ?, ?, ?, ?)",
+          [line.id, line.itemId, line.qty, date, reference, supplierId, actor.username],
+        );
+        await connection.query(
+          "UPDATE inventory SET quantity = GREATEST(0, quantity + ?), version = version + 1 WHERE id=?",
+          [line.qty, line.itemId],
+        );
+        await recordStockLedger(connection, {
+          sourceId: line.id,
+          itemId: line.itemId,
+          type: "STOCK_IN",
+          reference,
+          supplierId,
+          qtyIn: line.qty,
+          qtyOut: 0,
+          balanceAfter: await currentItemQuantity(connection, line.itemId),
+          recordedBy: actor.username,
+        });
+      }
+      await connection.commit();
+      res.status(201).json({ invoice: reference, lines: parsed.length });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      if (locked) await connection.query("SELECT RELEASE_LOCK('autosupply-stock-in-invoice')").catch(() => undefined);
+      connection.release();
+    }
+  }),
+);
 
 /* ------------------------- Warehouse layout ------------------------- */
 

@@ -57,12 +57,32 @@ export const Stock: React.FC<StockProps> = ({
     if (!stockInPrefill) return;
     setTab('in');
     setStockInInvoice(stockInPrefill.invoice);
+    setAddToExisting(true);
     setStockInSupplierId(stockInPrefill.supplierId);
     onPrefillUsed?.();
   }, [stockInPrefill]);
+
+  const loadSuggestedInvoice = async () => {
+    try {
+      const { invoice } = await apiRequest<{ invoice: string }>('/stock-in/next-invoice');
+      setSuggestedInvoice(invoice);
+      return invoice;
+    } catch {
+      return '';
+    }
+  };
+
+  // Fill the invoice number with the next free one when the screen opens, unless one is already there.
+  useEffect(() => {
+    void loadSuggestedInvoice().then((invoice) => setStockInInvoice((current) => current || invoice));
+  }, []);
   // Stock-out details: the invoice number, the customer, and each item's selling price.
   const [saleReference, setSaleReference] = useState('');
   const [stockInInvoice, setStockInInvoice] = useState('');
+  // True when the sheet adds lines to an invoice from the history; a typed number is always a new invoice.
+  const [addToExisting, setAddToExisting] = useState(false);
+  // The next free invoice number, from the server.
+  const [suggestedInvoice, setSuggestedInvoice] = useState('');
   const [stockInSupplierId, setStockInSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<{ id: number; name: string; supplierId: string; isActive: boolean }[]>([]);
   useEffect(() => {
@@ -280,6 +300,32 @@ export const Stock: React.FC<StockProps> = ({
     const recordingTab = tab;
     const activeUserName = userName || sessionStorage.getItem('skyrun_session_user') || 'Warehouse Staff';
     const pending = [...sheets[recordingTab]];
+    // Stock in is recorded as one invoice, in one request: every line is saved, or none is.
+    if (recordingTab === 'in') {
+      try {
+        await apiRequest('/movements/batch', {
+          method: 'POST',
+          body: JSON.stringify({
+            reference: stockInInvoice.trim(),
+            supplierId: stockInSupplierId ? Number(stockInSupplierId) : null,
+            addToExisting,
+            lines: pending.map((line) => ({ itemId: line.itemId, qty: line.qty })),
+          }),
+        });
+        setSheets((prev) => ({ ...prev, in: [] }));
+        setStockInSupplierId('');
+        setAddToExisting(false);
+        setIsConfirmOpen(false);
+        window.dispatchEvent(new CustomEvent('inventory-changed'));
+        setStockInInvoice(await loadSuggestedInvoice());
+      } catch (recordError) {
+        setError(recordError instanceof Error ? recordError.message : 'Could not record the stock in.');
+        setIsConfirmOpen(false);
+      } finally {
+        setIsRecording(false);
+      }
+      return;
+    }
     let done = 0;
     try {
       for (const line of pending) {
@@ -287,13 +333,13 @@ export const Stock: React.FC<StockProps> = ({
           // Unique per record, so two people recording at the same moment never share an ID.
           id: `MOV-${crypto.randomUUID()}`,
           itemId: line.itemId,
-          type: recordingTab === 'in' ? 'IN' : 'OUT',
+          type: 'OUT',
           qty: line.qty,
           date: new Date().toISOString().split('T')[0],
           timestamp: Date.now(),
           createdBy: activeUserName,
-          reference: recordingTab === 'in' ? stockInInvoice.trim() : saleReference.trim(),
-          supplierId: recordingTab === 'in' && stockInSupplierId ? Number(stockInSupplierId) : null,
+          reference: saleReference.trim(),
+          supplierId: null,
         };
         await onAddMovement(movement);
         done += 1;
@@ -302,10 +348,6 @@ export const Stock: React.FC<StockProps> = ({
           ...prev,
           [recordingTab]: prev[recordingTab].filter((item) => item.itemId !== line.itemId),
         }));
-      }
-      if (recordingTab === 'in') {
-        setStockInInvoice('');
-        setStockInSupplierId('');
       }
       setIsConfirmOpen(false);
     } catch (recordError) {
@@ -424,7 +466,20 @@ export const Stock: React.FC<StockProps> = ({
           <div className="stk-sale-fields">
             <label className="stk-sale-field">
               <span>Supplier invoice no. <em>*</em></span>
-              <input value={stockInInvoice} onChange={(e) => setStockInInvoice(e.target.value)} placeholder="e.g. VIS-INV-0001" maxLength={64} />
+              <input
+                value={stockInInvoice}
+                onChange={(e) => {
+                  setStockInInvoice(e.target.value);
+                  setAddToExisting(false);
+                }}
+                placeholder="e.g. VIS-INV-0001"
+                maxLength={64}
+              />
+              {suggestedInvoice && (
+                <span style={{ display: 'block', marginTop: 4, fontSize: '0.75rem', color: 'var(--ink-faint)' }}>
+                  Next free number: {suggestedInvoice}
+                </span>
+              )}
             </label>
             <label className="stk-sale-field">
               <span>Supplier <em>optional</em></span>
