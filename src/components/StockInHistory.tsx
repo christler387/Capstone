@@ -1,4 +1,4 @@
-import { askChoice, askConfirm, askText } from './AppDialog';
+import { askConfirm, askText, askTypeAndReason } from './AppDialog';
 import { askReason } from '../reasonPrompt';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -334,7 +334,7 @@ const InvoiceModal: React.FC<{
   // Admins only: removes the line and takes its stock back out.
   const deleteLine = async (line: InvoiceLine) => {
     if (!(await askConfirm(`Delete ${line.qty} ${line.itemName} from this invoice? The stock is taken back out.`))) return;
-    const reason = iAmAdmin ? '' : await askReason(`delete ${line.qty} ${line.itemName} from this invoice`);
+    const reason = await askReason(`delete ${line.qty} ${line.itemName} from this invoice`, iAmAdmin);
     if (reason === null) return;
     setError(null);
     try {
@@ -357,13 +357,16 @@ const InvoiceModal: React.FC<{
   // Undo reverses part or all of a line's stock and keeps it on the stock card, under the type chosen here.
   // Staff send it for approval.
   const undoLine = async (line: InvoiceLine) => {
-    const type = await askChoice(`Why is ${line.itemName} being undone?`, {
-      title: 'Undo type',
+    const picked = await askTypeAndReason(`Why is ${line.itemName} being undone?`, {
+      title: 'Undo',
       label: 'Type',
       confirmLabel: 'Next',
       choices: UNDO_TYPE_CHOICES,
+      note: { label: 'Reason', placeholder: 'For example: customer sent it back, damaged in the warehouse', minLength: 3 },
     });
-    if (type === null) return;
+    if (picked === null) return;
+    const type = picked.value;
+    const reason = picked.note;
     const answer = (await askText(`Units of ${line.itemName} to undo (1 to ${line.qty}):`, String(line.qty)));
     if (answer === null) return;
     const qty = Number(answer);
@@ -371,8 +374,6 @@ const InvoiceModal: React.FC<{
       setError(`Enter a whole number from 1 to ${line.qty}.`);
       return;
     }
-    const reason = await askReason(`undo ${qty} ${line.itemName}`, iAmAdmin);
-    if (reason === null) return;
     setError(null);
     setInfo(null);
     try {
@@ -426,7 +427,7 @@ const InvoiceModal: React.FC<{
   // Admins only: removes every line on the invoice.
   const deleteInvoice = async () => {
     if (!(await askConfirm(`Delete the whole invoice ${invoiceLabel(reference)} and take all its stock back out?`))) return;
-    const reason = iAmAdmin ? '' : await askReason(`delete invoice ${invoiceLabel(reference)}`);
+    const reason = await askReason(`delete invoice ${invoiceLabel(reference)}`, iAmAdmin);
     if (reason === null) return;
     setError(null);
     try {

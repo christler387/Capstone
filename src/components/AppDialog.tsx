@@ -15,6 +15,8 @@ export interface DialogOptions {
   cancelLabel?: string;
   danger?: boolean;
   choices?: Array<{ value: string; label: string }>;
+  // A note box shown under the choice. The dialog then resolves to { value, note }.
+  note?: { label: string; placeholder?: string; minLength?: number };
 }
 
 interface Pending {
@@ -56,6 +58,12 @@ export const askConfirm = (message: string, options: DialogOptions = {}) =>
 export const askChoice = (message: string, options: DialogOptions & { choices: Array<{ value: string; label: string }> }) =>
   open('choice', message, options.choices[0]?.value ?? '', options) as Promise<string | null>;
 
+// Asks for a type and a note together. Resolves to { value, note }, or null when cancelled.
+export const askTypeAndReason = (
+  message: string,
+  options: DialogOptions & { choices: Array<{ value: string; label: string }>; note: { label: string; placeholder?: string; minLength?: number } },
+) => open('choice', message, options.choices[0]?.value ?? '', options) as Promise<{ value: string; note: string } | null>;
+
 export const askNotice = (message: string, options: DialogOptions = {}) =>
   open('notice', message, '', options) as Promise<void>;
 
@@ -63,6 +71,7 @@ export const AppDialog: React.FC = () => {
   const [current, setCurrent] = useState<Pending | null>(pending);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -76,6 +85,7 @@ export const AppDialog: React.FC = () => {
   useEffect(() => {
     if (!current) return;
     setValue(current.initial);
+    setNote('');
     setError(null);
     const focus = window.setTimeout(() => (inputRef.current ?? textareaRef.current)?.focus(), 0);
     return () => window.clearTimeout(focus);
@@ -100,6 +110,15 @@ export const AppDialog: React.FC = () => {
       return;
     }
     if (kind === 'choice') {
+      if (options.note) {
+        const trimmedNote = note.trim();
+        if (options.note.minLength && trimmedNote.length < options.note.minLength) {
+          setError(`Please enter at least ${options.note.minLength} characters in the reason.`);
+          return;
+        }
+        close({ value, note: trimmedNote });
+        return;
+      }
       close(value);
       return;
     }
@@ -114,7 +133,7 @@ export const AppDialog: React.FC = () => {
     }
     if (event.key !== 'Enter') return;
     // In a note box, Enter adds a new line; Ctrl+Enter sends.
-    if (kind === 'text' && options.multiline && !(event.ctrlKey || event.metaKey)) return;
+    if ((kind === 'text' && options.multiline || kind === 'choice' && options.note) && !(event.ctrlKey || event.metaKey)) return;
     event.preventDefault();
     submit();
   };
@@ -124,6 +143,18 @@ export const AppDialog: React.FC = () => {
       <div className="ask-card" role="dialog" aria-modal="true" aria-labelledby="ask-title" onKeyDown={onKeyDown}>
         <h2 id="ask-title" className="ask-title">{title}</h2>
         <p className="ask-message">{message}</p>
+        {kind === 'choice' && options.note && (
+          <label className="ask-field">
+            <span className="ask-label">{options.note.label}</span>
+            <textarea
+              rows={3}
+              value={note}
+              placeholder={options.note.placeholder}
+              onChange={(event) => setNote(event.target.value)}
+            />
+            {error && <span className="ask-error" role="alert">{error}</span>}
+          </label>
+        )}
         {kind === 'choice' && (
           <label className="ask-field">
             {options.label && <span className="ask-label">{options.label}</span>}

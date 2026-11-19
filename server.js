@@ -2101,7 +2101,7 @@ app.put(
 
 
 // Deletes a stock movement and takes its stock back out. The stock card keeps the record.
-async function applyMovementDelete(connection, movementId, actorName) {
+async function applyMovementDelete(connection, movementId, actorName, reason = "") {
   const [[movement]] = await connection.query("SELECT * FROM movements WHERE id=? FOR UPDATE", [movementId]);
   if (!movement) return { status: 404, error: "Movement not found" };
   const delta = movement.type === "IN" ? -movement.qty : movement.qty;
@@ -2115,7 +2115,7 @@ async function applyMovementDelete(connection, movementId, actorName) {
     itemId: movement.item_id,
     type: "INVENTORY_CORRECTION",
     reference: movement.id,
-    description: "Stock movement deleted",
+    description: (reason ? `Stock movement deleted: ${reason}` : "Stock movement deleted").slice(0, 255),
     qtyIn: movement.type === "OUT" ? movement.qty : 0,
     qtyOut: movement.type === "IN" ? movement.qty : 0,
     balanceAfter: await currentItemQuantity(connection, movement.item_id),
@@ -2220,11 +2220,14 @@ app.delete(
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const id = cleanText(req.params.id, 64);
-    if (!isAdmin(actor)) return sendForApproval(res, actor, "MOVEMENT_DELETE", id, cleanText(req.body?.reason, 255));
+    // Every delete needs a reason: it is kept on the stock card, and the approver reads it.
+    const reason = cleanText(req.body?.reason, 200);
+    if (reason.length < 3) return res.status(400).json({ error: "Enter a reason for this delete (at least 3 characters)." });
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "MOVEMENT_DELETE", id, reason);
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      const result = await applyMovementDelete(connection, id, actor.username);
+      const result = await applyMovementDelete(connection, id, actor.username, reason);
       if (result.status !== 204) {
         await connection.rollback();
         return res.status(result.status).json({ error: result.error });
@@ -3425,7 +3428,7 @@ async function setStockInLineQty(connection, lineId, newQty, actorName) {
 }
 
 // Removes a stock-in line and takes its stock back out. The stock card keeps the removal.
-async function removeStockInLine(connection, lineId, actorName) {
+async function removeStockInLine(connection, lineId, actorName, reason = "") {
   const [[line]] = await connection.query(
     "SELECT id, item_id, qty, reference FROM movements WHERE id=? AND type='IN' FOR UPDATE",
     [lineId],
@@ -3444,7 +3447,7 @@ async function removeStockInLine(connection, lineId, actorName) {
     itemId: line.item_id,
     type: "INVENTORY_CORRECTION",
     reference: line.reference || line.id,
-    description: `Stock-in line of ${qty} removed`,
+    description: (reason ? `Stock-in line of ${qty} removed: ${reason}` : `Stock-in line of ${qty} removed`).slice(0, 255),
     qtyOut: qty,
     balanceAfter: Number(inv.quantity) - qty,
     recordedBy: actorName,
@@ -3532,7 +3535,10 @@ app.delete(
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const lineId = cleanText(req.params.id, 64);
-    if (!isAdmin(actor)) return sendForApproval(res, actor, "STOCK_IN_DELETE", lineId, cleanText(req.body?.reason, 255));
+    // Every delete needs a reason: it is kept on the stock card, and the approver reads it.
+    const reason = cleanText(req.body?.reason, 200);
+    if (reason.length < 3) return res.status(400).json({ error: "Enter a reason for this delete (at least 3 characters)." });
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "STOCK_IN_DELETE", lineId, reason);
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3542,7 +3548,7 @@ app.delete(
       const [[item]] = line
         ? await connection.query("SELECT name FROM inventory WHERE id=?", [line.item_id])
         : [[null]];
-      const result = await removeStockInLine(connection, lineId, actor.username);
+      const result = await removeStockInLine(connection, lineId, actor.username, reason);
       if (result.status !== 200) {
         await connection.rollback();
         return res.status(result.status).json({ error: result.error });
@@ -3640,7 +3646,10 @@ app.delete(
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
     const reference = cleanText(req.query.ref, 64);
-    if (!isAdmin(actor)) return sendForApproval(res, actor, "INVOICE_DELETE", reference, cleanText(req.body?.reason, 255));
+    // Every delete needs a reason: it is kept on the stock card, and the approver reads it.
+    const reason = cleanText(req.body?.reason, 200);
+    if (reason.length < 3) return res.status(400).json({ error: "Enter a reason for this delete (at least 3 characters)." });
+    if (!isAdmin(actor)) return sendForApproval(res, actor, "INVOICE_DELETE", reference, reason);
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -3655,7 +3664,7 @@ app.delete(
         return res.status(404).json({ error: "No stock-in lines on this invoice." });
       }
       for (const line of lines) {
-        const result = await removeStockInLine(connection, line.id, actor.username);
+        const result = await removeStockInLine(connection, line.id, actor.username, reason);
         if (result.status !== 200) {
           await connection.rollback();
           return res.status(result.status).json({ error: result.error });
@@ -3742,7 +3751,7 @@ app.post(
           result = await setStockInLineQty(connection, request.target_id, Number(request.new_value), actor.username);
           break;
         case "STOCK_IN_DELETE":
-          result = await removeStockInLine(connection, request.target_id, actor.username);
+          result = await removeStockInLine(connection, request.target_id, actor.username, request.reason || "");
           break;
         case "INVOICE_DELETE": {
           const [lines] = await connection.query(
@@ -3751,7 +3760,7 @@ app.post(
           );
           result = { status: 200 };
           for (const line of lines) {
-            const removed = await removeStockInLine(connection, line.id, actor.username);
+            const removed = await removeStockInLine(connection, line.id, actor.username, request.reason || "");
             if (removed.status !== 200) {
               result = removed;
               break;
@@ -3760,7 +3769,7 @@ app.post(
           break;
         }
         case "MOVEMENT_DELETE":
-          result = await applyMovementDelete(connection, request.target_id, actor.username);
+          result = await applyMovementDelete(connection, request.target_id, actor.username, request.reason || "");
           break;
         case "MOVEMENT_UNDO":
           result = await applyMovementUndo(connection, request.target_id, Number(request.new_value), actor.username, request.new_text || undefined, request.reason || "");
