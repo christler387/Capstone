@@ -239,15 +239,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     if (!netFocused) setNetText(formatNet(getLocalCost(formData)));
   }, [formData.price, formData.discount, netFocused]);
 
-  // Discount entered as a percentage, or as the net price after discount.
-  const [discountMode, setDiscountMode] = useState<"percent" | "net">("percent");
-  const switchDiscountMode = (mode: "percent" | "net") => {
-    setError(null);
-    setDiscountMode(mode);
-    if (mode === "net") setNetText(formatNet(getLocalCost(formData)));
-    else setDiscountText(formatDiscountText(formData.discount));
-  };
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -842,26 +833,13 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             inputMode="decimal"
             id="edit-discount"
             className="form-input font-mono"
-            placeholder={discountMode === "net" ? "Net price, e.g. 150" : "0%"}
-            value={discountMode === "net" ? netText : discountText}
-            onFocus={() => {
-              if (discountMode === "net") setNetFocused(true);
-            }}
+            placeholder="0% or net 150"
+            value={discountText}
             onChange={(event) => {
               const text = event.target.value;
-              setError(null);
-              if (discountMode === "net") {
-                // NET mode: the box takes the net price, and the discount is worked out from it.
-                setNetText(text);
-                const net = Number(text.replace(/,/g, "").trim());
-                const price = Number(formData.price) || 0;
-                if (text.trim() === "" || !Number.isFinite(net) || price <= 0) return;
-                const worked = Math.min(100, Math.max(0, Math.round((1 - net / price) * 10000) / 100));
-                setFormData((prev) => ({ ...prev, discount: worked }));
-                return;
-              }
               setDiscountText(text);
-              // "net 150" typed in percent mode works the same way.
+              setError(null);
+              // "net 150" means the price after discount is 150: the discount is worked out from the price.
               const netAmount = parseNetEntry(text);
               if (netAmount !== null) {
                 const price = Number(formData.price) || 0;
@@ -875,11 +853,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
               if (parsed !== null) setFormData((prev) => ({ ...prev, discount: parsed }));
             }}
             onBlur={() => {
-              if (discountMode === "net") {
-                setNetFocused(false);
-                setNetText(formatNet(getLocalCost(formData)));
-                return;
-              }
               // A net entry turns into the percentage it worked out to.
               if (parseNetEntry(discountText) !== null) {
                 setDiscountText(formatDiscountText(formData.discount));
@@ -891,25 +864,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             }}
             disabled={readOnly}
           />
-          <div className="discount-mode" role="group" aria-label="Enter the discount as">
-            <button
-              type="button"
-              className={discountMode === "percent" ? "is-active" : ""}
-              onClick={() => switchDiscountMode("percent")}
-              disabled={readOnly}
-            >
-              %
-            </button>
-            <button
-              type="button"
-              className={discountMode === "net" ? "is-active" : ""}
-              onClick={() => switchDiscountMode("net")}
-              disabled={readOnly || !(Number(formData.price) > 0)}
-              title={Number(formData.price) > 0 ? "Type the net price after discount" : "Enter the price first"}
-            >
-              NET
-            </button>
-          </div>
         </div>
         <div className="form-group">
           <label className="label-micro" htmlFor="edit-net">
