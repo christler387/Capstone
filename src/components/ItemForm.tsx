@@ -223,6 +223,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     </>
   );
 
+  // The net is the price after the supplier discount. Typing a net works out the discount, and a discount works out the net.
+  const [netText, setNetText] = useState('');
+  const [netFocused, setNetFocused] = useState(false);
+  const formatNet = (value: number) => (Number.isFinite(value) ? String(Math.round(value * 100) / 100) : '');
+  useEffect(() => {
+    if (!netFocused) setNetText(formatNet(getLocalCost(formData)));
+  }, [formData.price, formData.discount, netFocused]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -835,14 +843,34 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           />
         </div>
         <div className="form-group">
-          <label className="label-micro">Local cost (₱)</label>
+          <label className="label-micro" htmlFor="edit-net">
+            Net after discount (₱)
+          </label>
           <input
             type="text"
+            inputMode="decimal"
+            id="edit-net"
             className="form-input font-mono"
-            value={`₱${getLocalCost(formData).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-            readOnly
-            tabIndex={-1}
-            aria-readonly="true"
+            value={netText}
+            placeholder={Number(formData.price) > 0 ? "Type the net to work out the discount" : "Enter the price first"}
+            disabled={readOnly || !(Number(formData.price) > 0)}
+            onFocus={() => setNetFocused(true)}
+            onBlur={() => {
+              setNetFocused(false);
+              setNetText(formatNet(getLocalCost(formData)));
+            }}
+            onChange={(event) => {
+              const text = event.target.value;
+              setNetText(text);
+              setError(null);
+              const net = Number(text.replace(/,/g, "").trim());
+              const price = Number(formData.price) || 0;
+              if (text.trim() === "" || !Number.isFinite(net) || price <= 0) return;
+              // Two decimals, the same precision the discount is stored with. A net above the price means no discount.
+              const discount = Math.min(100, Math.max(0, Math.round((1 - net / price) * 10000) / 100));
+              setDiscountText(formatDiscountText(discount));
+              setFormData((prev) => ({ ...prev, discount }));
+            }}
           />
         </div>
       </div>
