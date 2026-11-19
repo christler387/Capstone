@@ -76,7 +76,7 @@ const parseDiscount = (text: string): number | null => {
   return Math.min(100, Math.max(0, value));
 };
 
-const formatDiscountText = (value?: number) => (value ? `${Number(value)}%` : '');
+const formatDiscountText = (value?: number) => (value ? `${Number(value)}%` : 'NET');
 
 const isEmptyValue = (value: unknown) =>
   value === undefined || value === null || (typeof value === "string" && value.trim() === "") || (typeof value === "number" && Number.isNaN(value));
