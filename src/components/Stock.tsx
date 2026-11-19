@@ -93,6 +93,8 @@ export const Stock: React.FC<StockProps> = ({
   const [invoiceLines, setInvoiceLines] = useState<Array<{ id: string; itemId: string; itemName: string; qty: number; unit: string }>>([]);
   // The line being dragged to a new position.
   const [dragItemId, setDragItemId] = useState<string | null>(null);
+  // The order of the rows the user has dragged into. Rows not in it keep their place at the end.
+  const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: number; name: string; supplierId: string; isActive: boolean }[]>([]);
   useEffect(() => {
     apiRequest<{ id: number; name: string; supplierId: string; isActive: boolean }[]>('/suppliers')
@@ -203,18 +205,17 @@ export const Stock: React.FC<StockProps> = ({
     updateSheet((current) => current.map((line) => (line.itemId === itemId ? { ...line, qty: parsed } : line)));
   };
 
-  // Moves a dragged line to the position of the line it is dropped on.
-  const moveLine = (fromId: string, toId: string) => {
-    if (fromId === toId) return;
-    updateSheet((current) => {
-      const from = current.findIndex((line) => line.itemId === fromId);
-      const to = current.findIndex((line) => line.itemId === toId);
-      if (from < 0 || to < 0) return current;
-      const next = [...current];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  // Moves a dragged row to the position of the row it is dropped on. Works for new and recorded rows.
+  const moveRow = (fromKey: string, toKey: string) => {
+    if (fromKey === toKey) return;
+    const keys = orderedRows.map((entry) => entry.key);
+    const from = keys.indexOf(fromKey);
+    const to = keys.indexOf(toKey);
+    if (from < 0 || to < 0) return;
+    const next = [...keys];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setRowOrder(next);
   };
 
   const removeLine = (itemId: string) => {
@@ -272,6 +273,14 @@ export const Stock: React.FC<StockProps> = ({
     const saleProfit = saleTotal - lineTotal;
     return { line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit };
   });
+  const naturalRows = [
+    ...invoiceLines.map((line) => ({ key: `rec:${line.id}`, kind: 'recorded' as const, line })),
+    ...rows.map((row) => ({ key: `new:${row.line.itemId}`, kind: 'new' as const, row })),
+  ];
+  const orderIndex = new Map(rowOrder.map((key, index) => [key, index]));
+  const orderedRows = [...naturalRows].sort(
+    (a, b) => (orderIndex.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.key) ?? Number.MAX_SAFE_INTEGER),
+  );
   const saleSalesTotal = rows.reduce((sum, row) => sum + row.saleTotal, 0);
   const saleProfitTotal = rows.reduce((sum, row) => sum + row.saleProfit, 0);
 
@@ -561,15 +570,6 @@ export const Stock: React.FC<StockProps> = ({
               Already on invoice {stockInInvoice.trim()}: {invoiceLines.length} line{invoiceLines.length === 1 ? '' : 's'}, 
               {invoiceLines.reduce((sum, line) => sum + line.qty, 0).toLocaleString()} units
             </p>
-            <ul className="stk-invoice-list">
-              {invoiceLines.map((line) => (
-                <li key={line.id}>
-                  <span className="stk-item-name">{line.itemName}</span>
-                  <span className="stk-code">{line.itemId}</span>
-                  <span className="num">{line.qty.toLocaleString()} {line.unit}</span>
-                </li>
-              ))}
-            </ul>
             {!addToExisting && (
               <p className="stk-hint">This number is already used. Choose another number, or add to this invoice from Stock in history.</p>
             )}
@@ -597,23 +597,66 @@ export const Stock: React.FC<StockProps> = ({
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && (
+              {orderedRows.length === 0 && (
                 <tr>
                   <td colSpan={isIn ? 7 : 9} className="stk-empty">
                     No items yet. Search for an item above or scan its barcode.
                   </td>
                 </tr>
               )}
-              {rows.map(({ line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit }) => {
+              {orderedRows.map((entry) => {
+                if (entry.kind === 'recorded') {
+                  const { line } = entry;
+                  return (
+                    <tr
+                      key={entry.key}
+                      className={`is-recorded ${dragItemId === entry.key ? 'is-dragging' : ''}`}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (dragItemId) moveRow(dragItemId, entry.key);
+                        setDragItemId(null);
+                      }}
+                    >
+                      <td data-label="Item">
+                        <span
+                          className="stk-grip"
+                          draggable
+                          title="Drag to change the order"
+                          aria-label="Drag to change the order"
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData('text/plain', entry.key);
+                            setDragItemId(entry.key);
+                          }}
+                          onDragEnd={() => setDragItemId(null)}
+                        >
+                          <i className="bx bx-move-vertical" aria-hidden="true"></i>
+                        </span>
+                        <span className="stk-item-name">{line.itemName}</span>
+                        <span className="stk-item-meta">
+                          <span className="stk-code">{line.itemId}</span>
+                          <span> · already recorded on this invoice</span>
+                        </span>
+                      </td>
+                      <td className="num" data-label="On hand">—</td>
+                      <td className="num" data-label="Add">{line.qty.toLocaleString()} {line.unit}</td>
+                      <td className="num" data-label="Cost">—</td>
+                      <td className="num" data-label="Total">—</td>
+                      <td className="num" data-label="After">—</td>
+                      <td />
+                    </tr>
+                  );
+                }
+                const { line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit } = entry.row;
                 const discount = Number(item?.discount) || 0;
                 return (
                   <tr
-                    key={line.itemId}
-                    className={`${short ? 'is-short' : ''} ${dragItemId === line.itemId ? 'is-dragging' : ''}`}
+                    key={entry.key}
+                    className={`${short ? 'is-short' : ''} ${dragItemId === entry.key ? 'is-dragging' : ''}`}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => {
                       event.preventDefault();
-                      if (dragItemId) moveLine(dragItemId, line.itemId);
+                      if (dragItemId) moveRow(dragItemId, entry.key);
                       setDragItemId(null);
                     }}
                   >
@@ -624,8 +667,8 @@ export const Stock: React.FC<StockProps> = ({
                         title="Drag to change the order"
                         aria-label="Drag to change the order"
                         onDragStart={(event) => {
-                          event.dataTransfer.setData('text/plain', line.itemId);
-                          setDragItemId(line.itemId);
+                          event.dataTransfer.setData('text/plain', entry.key);
+                          setDragItemId(entry.key);
                         }}
                         onDragEnd={() => setDragItemId(null)}
                       >
