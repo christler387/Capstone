@@ -69,6 +69,8 @@ const REQUIRED_FIELD_LABELS: Partial<Record<keyof ItemFormData, string>> = {
 const parseDiscount = (text: string): number | null => {
   const cleaned = text.replace('%', '').trim();
   if (cleaned === '') return 0;
+  // NET means the item has no discount.
+  if (cleaned.toUpperCase() === 'NET') return 0;
   const value = Number(cleaned);
   if (!Number.isFinite(value)) return null;
   return Math.min(100, Math.max(0, value));
@@ -820,7 +822,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             placeholder="0%"
             value={discountText}
             onChange={(event) => {
-              const text = event.target.value;
+              // Letters are capitalised as they are typed, so NET is written in capitals.
+              const text = event.target.value.toUpperCase();
               setDiscountText(text);
               setError(null);
               const parsed = parseDiscount(text);
@@ -828,7 +831,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
             }}
             onBlur={() => {
               const parsed = parseDiscount(discountText) ?? 0;
-              setDiscountText(formatDiscountText(parsed));
+              // NET stays on the box so it is clear the item has no discount.
+              setDiscountText(discountText.trim().toUpperCase() === 'NET' ? 'NET' : formatDiscountText(parsed));
               setFormData((prev) => ({ ...prev, discount: parsed }));
             }}
             disabled={readOnly}
