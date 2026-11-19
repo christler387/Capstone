@@ -744,6 +744,7 @@ async function initializeDatabase() {
   await createLoginThrottleTable();
   // Sales keep the part number of the item sold. Older databases were missing this column.
   await addColumnIfMissing("sales", "part_number", "VARCHAR(100) NULL");
+  await addIndexIfMissing("sales", "idx_sales_reference", "reference");
   await addIndexIfMissing("movements", "idx_movements_type_item", "type, item_id, movement_date, qty");
   await addIndexIfMissing("movements", "idx_movements_recent", "movement_date, created_at");
   // Lets the invoice number checks find a reference without reading every row.
@@ -2996,6 +2997,12 @@ app.post(
           await connection.rollback();
           return { status: 200, duplicate: true };
         }
+        // A reference already used by a stock-in invoice or a sale is refused, with the next free number.
+        if (await invoiceNumberUsed(connection, reference)) {
+          await connection.rollback();
+          const next = await suggestStockInInvoice(connection);
+          return { status: 409, error: `Invoice ${reference} is already used. The next free number is ${next}.` };
+        }
         const now = new Date();
         const saved = [];
         for (let index = 0; index < lines.length; index += 1) {
@@ -3999,11 +4006,24 @@ app.post(
 
 // The next invoice number to suggest: one more than the highest all-digit invoice, with the same width.
 // Numbers already used are skipped, so the suggestion is never a duplicate.
+// True when a number is already used by a stock-in invoice or a sale. One shared list, so no number is used twice.
+async function invoiceNumberUsed(db, reference) {
+  const [[used]] = await db.query(
+    "SELECT (EXISTS(SELECT 1 FROM movements WHERE type='IN' AND reference=?) OR EXISTS(SELECT 1 FROM sales WHERE reference=?)) AS used",
+    [reference, reference],
+  );
+  return Boolean(used.used);
+}
+
 async function suggestStockInInvoice(db) {
-  // Reads only the invoice numbers that start with a digit, from the newest end of the index.
-  const [rows] = await db.query(
+  // Reads only the numbers that start with a digit, from the newest end of each index.
+  const [inRows] = await db.query(
     "SELECT reference FROM movements WHERE type='IN' AND reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200",
   );
+  const [saleRows] = await db.query(
+    "SELECT reference FROM sales WHERE reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200",
+  );
+  const rows = [...inRows, ...saleRows];
   let last = null;
   for (const row of rows) {
     if (!/^[0-9]+$/.test(row.reference)) continue;
@@ -4014,8 +4034,7 @@ async function suggestStockInInvoice(db) {
   let next = Number(last) + 1;
   for (;;) {
     const candidate = String(next).padStart(width, "0");
-    const [[used]] = await db.query("SELECT 1 AS found FROM movements WHERE type='IN' AND reference=? LIMIT 1", [candidate]);
-    if (!used) return candidate;
+    if (!(await invoiceNumberUsed(db, candidate))) return candidate;
     next += 1;
   }
 }
@@ -4071,8 +4090,7 @@ app.post(
       locked = true;
       await connection.beginTransaction();
       if (!addToExisting) {
-        const [[clash]] = await connection.query("SELECT 1 AS found FROM movements WHERE type='IN' AND reference=? LIMIT 1", [reference]);
-        if (clash) {
+        if (await invoiceNumberUsed(connection, reference)) {
           await connection.rollback();
           const next = await suggestStockInInvoice(connection);
           return res.status(409).json({ error: `Invoice ${reference} is already used. The next free number is ${next}.` });

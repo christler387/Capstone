@@ -74,7 +74,10 @@ export const Stock: React.FC<StockProps> = ({
 
   // Fill the invoice number with the next free one when the screen opens, unless one is already there.
   useEffect(() => {
-    void loadSuggestedInvoice().then((invoice) => setStockInInvoice((current) => current || invoice));
+    void loadSuggestedInvoice().then((invoice) => {
+      setStockInInvoice((current) => current || invoice);
+      setSaleReference((current) => current || invoice);
+    });
   }, []);
   // Stock-out details: the invoice number, the customer, and each item's selling price.
   const [saleReference, setSaleReference] = useState('');
@@ -282,7 +285,7 @@ export const Stock: React.FC<StockProps> = ({
       saleBatchId.current = null;
       setSheets((prev) => ({ ...prev, out: [] }));
       setSellPrices({});
-      setSaleReference('');
+      setSaleReference(await loadSuggestedInvoice());
       setIsConfirmOpen(false);
       window.dispatchEvent(new CustomEvent('inventory-changed'));
     } catch (err) {
@@ -498,6 +501,11 @@ export const Stock: React.FC<StockProps> = ({
             <label className="stk-sale-field">
               <span>Invoice no. <em>*</em></span>
               <input value={saleReference} onChange={(e) => setSaleReference(e.target.value)} placeholder="e.g. INV-0001" maxLength={64} />
+              {suggestedInvoice && (
+                <span style={{ display: 'block', marginTop: 4, fontSize: '0.75rem', color: 'var(--ink-faint)' }}>
+                  Next free number: {suggestedInvoice}
+                </span>
+              )}
             </label>
           </div>
         )}
