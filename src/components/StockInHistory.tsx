@@ -371,7 +371,7 @@ const InvoiceModal: React.FC<{
       setError(`Enter a whole number from 1 to ${line.qty}.`);
       return;
     }
-    const reason = iAmAdmin ? '' : await askReason(`undo ${qty} ${line.itemName}`);
+    const reason = await askReason(`undo ${qty} ${line.itemName}`, iAmAdmin);
     if (reason === null) return;
     setError(null);
     setInfo(null);

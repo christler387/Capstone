@@ -2084,7 +2084,7 @@ async function applyMovementDelete(connection, movementId, actorName) {
 const UNDO_TYPES = ["CUSTOMER_RETURN", "PURCHASE_RETURN", "DAMAGED_ITEMS", "STOCK_ADJUSTMENT", "INVENTORY_CORRECTION"];
 
 // Undoes part of a stock movement. The undone quantity is recorded on the stock card under the chosen type.
-async function applyMovementUndo(connection, movementId, requestedQty, actorName, undoType = "INVENTORY_CORRECTION") {
+async function applyMovementUndo(connection, movementId, requestedQty, actorName, undoType = "INVENTORY_CORRECTION", note = "") {
   if (!Number.isInteger(requestedQty) || requestedQty < 1) {
     return { status: 400, error: "Undo quantity must be a positive whole number." };
   }
@@ -2109,7 +2109,7 @@ async function applyMovementUndo(connection, movementId, requestedQty, actorName
     itemId: movement.item_id,
     type: undoType,
     reference: movement.id,
-    description: `Undo of ${requestedQty} unit(s)`,
+    description: (note ? `Undo of ${requestedQty} unit(s): ${note}` : `Undo of ${requestedQty} unit(s)`).slice(0, 255),
     qtyIn: movement.type === "OUT" ? requestedQty : 0,
     qtyOut: movement.type === "IN" ? requestedQty : 0,
     balanceAfter: await currentItemQuantity(connection, movement.item_id),
@@ -2209,13 +2209,18 @@ app.patch(
     if (!UNDO_TYPES.includes(undoType)) {
       return res.status(400).json({ error: "Choose a valid type for this undo." });
     }
+    // Every undo needs a note: it is kept on the stock card, and the approver reads it.
+    const reason = cleanText(req.body?.reason, 200);
+    if (reason.length < 3) {
+      return res.status(400).json({ error: "Enter a reason for this undo (at least 3 characters)." });
+    }
     if (!isAdmin(actor)) {
-      return sendForApproval(res, actor, "MOVEMENT_UNDO", id, cleanText(req.body?.reason, 255), requestedQty, undoType);
+      return sendForApproval(res, actor, "MOVEMENT_UNDO", id, reason, requestedQty, undoType);
     }
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      const result = await applyMovementUndo(connection, id, requestedQty, actor.username, undoType);
+      const result = await applyMovementUndo(connection, id, requestedQty, actor.username, undoType, reason);
       if (result.status !== 200) {
         await connection.rollback();
         return res.status(result.status).json({ error: result.error });
@@ -3705,7 +3710,7 @@ app.post(
           result = await applyMovementDelete(connection, request.target_id, actor.username);
           break;
         case "MOVEMENT_UNDO":
-          result = await applyMovementUndo(connection, request.target_id, Number(request.new_value), actor.username, request.new_text || undefined);
+          result = await applyMovementUndo(connection, request.target_id, Number(request.new_value), actor.username, request.new_text || undefined, request.reason || "");
           break;
         case "ITEM_DELETE":
           result = await applyItemDelete(connection, request.target_id, actor.username);
