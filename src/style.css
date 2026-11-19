@@ -10067,3 +10067,46 @@ input[type='date']:focus, select:focus, textarea:focus {
   background: rgba(0, 0, 0, 0.06);
   color: var(--ink-faint, #6b6b6b);
 }
+
+/* ---- Stock sheet: drag to reorder, and the lines already on the invoice ---- */
+.stk-grip {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  color: var(--ink-faint, #8a8a8a);
+  cursor: grab;
+  touch-action: none;
+}
+
+.stk-grip:active {
+  cursor: grabbing;
+}
+
+.stk-table tr.is-dragging {
+  opacity: 0.45;
+}
+
+.stk-invoice-lines {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line, #e6e0d4);
+}
+
+.stk-invoice-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stk-invoice-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.stk-invoice-list .num {
+  margin-left: auto;
+}

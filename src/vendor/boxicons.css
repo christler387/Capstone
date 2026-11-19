@@ -510,6 +510,10 @@
     content: "\eb97";
   }
 
+.bx-move-vertical:before {
+    content: "\eb99";
+  }
+
 .bx-package:before {
     content: "\eba6";
   }

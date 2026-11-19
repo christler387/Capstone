@@ -89,6 +89,10 @@ export const Stock: React.FC<StockProps> = ({
   // The next free sale reference, from its own number series.
   const [suggestedSale, setSuggestedSale] = useState('');
   const [stockInSupplierId, setStockInSupplierId] = useState('');
+  // Lines already recorded on the invoice number typed above, so the sheet reads as the whole invoice.
+  const [invoiceLines, setInvoiceLines] = useState<Array<{ id: string; itemId: string; itemName: string; qty: number; unit: string }>>([]);
+  // The line being dragged to a new position.
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [suppliers, setSuppliers] = useState<{ id: number; name: string; supplierId: string; isActive: boolean }[]>([]);
   useEffect(() => {
     apiRequest<{ id: number; name: string; supplierId: string; isActive: boolean }[]>('/suppliers')
@@ -131,6 +135,31 @@ export const Stock: React.FC<StockProps> = ({
   const lines = sheets[tab];
   const itemById = useMemo(() => new Map(inventory.map((item) => [item.id, item])), [inventory]);
 
+  // Looks up the invoice number typed: the lines already on it are shown above the sheet.
+  useEffect(() => {
+    const invoice = stockInInvoice.trim();
+    if (!isIn || !invoice) {
+      setInvoiceLines([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      apiRequest<{ lines: Array<{ id: string; itemId: string; itemName: string; qty: number; unit: string }> }>(
+        `/stock-in/invoice?ref=${encodeURIComponent(invoice)}`,
+      )
+        .then((data) => {
+          if (!cancelled) setInvoiceLines(data.lines ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setInvoiceLines([]);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [stockInInvoice, isIn]);
+
   // Opened from the inventory list with an item: put it on the sheet.
   useEffect(() => {
     if (!selectedItemId || !itemById.has(selectedItemId)) return;
@@ -172,6 +201,20 @@ export const Stock: React.FC<StockProps> = ({
   const setQty = (itemId: string, value: string) => {
     const parsed = value === '' ? 0 : Math.max(0, parseInt(value, 10) || 0);
     updateSheet((current) => current.map((line) => (line.itemId === itemId ? { ...line, qty: parsed } : line)));
+  };
+
+  // Moves a dragged line to the position of the line it is dropped on.
+  const moveLine = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    updateSheet((current) => {
+      const from = current.findIndex((line) => line.itemId === fromId);
+      const to = current.findIndex((line) => line.itemId === toId);
+      if (from < 0 || to < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const removeLine = (itemId: string) => {
@@ -512,6 +555,26 @@ export const Stock: React.FC<StockProps> = ({
           </div>
         )}
 
+        {isIn && invoiceLines.length > 0 && (
+          <div className="stk-invoice-lines">
+            <p className="stk-hint">
+              Already on invoice {stockInInvoice.trim()}: {invoiceLines.length} line{invoiceLines.length === 1 ? '' : 's'}, 
+              {invoiceLines.reduce((sum, line) => sum + line.qty, 0).toLocaleString()} units
+            </p>
+            <ul className="stk-invoice-list">
+              {invoiceLines.map((line) => (
+                <li key={line.id}>
+                  <span className="stk-item-name">{line.itemName}</span>
+                  <span className="stk-code">{line.itemId}</span>
+                  <span className="num">{line.qty.toLocaleString()} {line.unit}</span>
+                </li>
+              ))}
+            </ul>
+            {!addToExisting && (
+              <p className="stk-hint">This number is already used. Choose another number, or add to this invoice from Stock in history.</p>
+            )}
+          </div>
+        )}
         <div className="stk-table-wrap">
           <table className="stk-table stack-phone">
             <thead>
@@ -544,8 +607,30 @@ export const Stock: React.FC<StockProps> = ({
               {rows.map(({ line, item, onHand, after, short, localCost, lineTotal, sellPrice, saleTotal, saleProfit }) => {
                 const discount = Number(item?.discount) || 0;
                 return (
-                  <tr key={line.itemId} className={short ? 'is-short' : ''}>
+                  <tr
+                    key={line.itemId}
+                    className={`${short ? 'is-short' : ''} ${dragItemId === line.itemId ? 'is-dragging' : ''}`}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (dragItemId) moveLine(dragItemId, line.itemId);
+                      setDragItemId(null);
+                    }}
+                  >
                     <td data-label="Item">
+                      <span
+                        className="stk-grip"
+                        draggable
+                        title="Drag to change the order"
+                        aria-label="Drag to change the order"
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('text/plain', line.itemId);
+                          setDragItemId(line.itemId);
+                        }}
+                        onDragEnd={() => setDragItemId(null)}
+                      >
+                        <i className="bx bx-move-vertical" aria-hidden="true"></i>
+                      </span>
                       <span className="stk-item-name">{item?.name ?? 'Unknown item'}</span>
                       <span className="stk-item-meta">
                         <span className="stk-code">{line.itemId}</span>
