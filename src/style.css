@@ -10055,3 +10055,9 @@ input[type='date']:focus, select:focus, textarea:focus {
   flex-direction: column;
   gap: 0.3rem;
 }
+
+
+/* The main column may shrink below the map width, so the map scrolls inside its own box, not the page. */
+.content-wrapper {
+  min-width: 0;
+}
