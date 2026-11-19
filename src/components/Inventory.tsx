@@ -409,7 +409,7 @@ export const Inventory: React.FC<InventoryProps> = ({
 
                 <div className="inv-local" role="cell">
                   <span className="inv-local-value">{formatPeso(getLocalCost(i))}</span>
-                  {discount > 0 && <span className="inv-discount">−{discount}%</span>}
+                  {discount > 0 ? <span className="inv-discount">−{discount}%</span> : <span className="inv-discount is-net">NET</span>}
                 </div>
 
                 <span className="inv-actions" role="cell">

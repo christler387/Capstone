@@ -589,7 +589,7 @@ export const Stock: React.FC<StockProps> = ({
                           )}
                           <span className="inv-cost-sub">
                             Local {formatPeso(localCost)}
-                            {discount > 0 && <span className="inv-discount">−{discount}%</span>}
+                            {discount > 0 ? <span className="inv-discount">−{discount}%</span> : <span className="inv-discount is-net">NET</span>}
                           </span>
                         </div>
                       ) : (

@@ -10061,3 +10061,9 @@ input[type='date']:focus, select:focus, textarea:focus {
 .content-wrapper {
   min-width: 0;
 }
+
+/* A price with no discount shows NET in a neutral chip. */
+.inv-discount.is-net {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink-faint, #6b6b6b);
+}
