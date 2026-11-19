@@ -94,10 +94,21 @@ export const ChangeRequestsPage: React.FC = () => {
     }
   };
 
+  const UNDO_TYPE_LABELS: Record<string, string> = {
+    INVENTORY_CORRECTION: 'Other reason',
+    CUSTOMER_RETURN: 'Return from customer',
+    PURCHASE_RETURN: 'Return to supplier',
+    DAMAGED_ITEMS: 'Damaged',
+    STOCK_ADJUSTMENT: 'Stock adjustment',
+  };
+
   const change = (r: ChangeRequest) => {
     if (r.type === 'STOCK_IN_EDIT') return `${r.oldValue ?? '—'} → ${r.newValue ?? '—'}`;
     if (r.type === 'INVOICE_RENAME') return `${r.invoice || 'no invoice'} → ${r.newText}`;
-    if (r.type === 'MOVEMENT_UNDO') return `Undo ${r.newValue ?? '—'} of ${r.oldValue ?? '—'}`;
+    if (r.type === 'MOVEMENT_UNDO') {
+      const type = r.newText ? ` as ${UNDO_TYPE_LABELS[r.newText] ?? r.newText}` : '';
+      return `Undo ${r.newValue ?? '—'} of ${r.oldValue ?? '—'}${type}`;
+    }
     if (r.type === 'SALE_UNDO') return `${r.oldValue ?? '—'} sold, then undone`;
     if (r.type === 'PRICE_CHANGE') return `${r.oldValue?.toFixed(2) ?? '—'} → ${r.newValue?.toFixed(2) ?? '—'}`;
     return `${r.oldValue ?? '—'} removed`;

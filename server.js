@@ -2080,8 +2080,11 @@ async function applyMovementDelete(connection, movementId, actorName) {
   return { status: 204 };
 }
 
-// Undoes part of a stock movement. The undone quantity is recorded on the stock card.
-async function applyMovementUndo(connection, movementId, requestedQty, actorName) {
+// The types an undo can be recorded as. Other reason keeps the old behaviour.
+const UNDO_TYPES = ["CUSTOMER_RETURN", "PURCHASE_RETURN", "DAMAGED_ITEMS", "STOCK_ADJUSTMENT", "INVENTORY_CORRECTION"];
+
+// Undoes part of a stock movement. The undone quantity is recorded on the stock card under the chosen type.
+async function applyMovementUndo(connection, movementId, requestedQty, actorName, undoType = "INVENTORY_CORRECTION") {
   if (!Number.isInteger(requestedQty) || requestedQty < 1) {
     return { status: 400, error: "Undo quantity must be a positive whole number." };
   }
@@ -2104,7 +2107,7 @@ async function applyMovementUndo(connection, movementId, requestedQty, actorName
   await recordStockLedger(connection, {
     sourceId: `UNDO-${crypto.randomUUID()}`,
     itemId: movement.item_id,
-    type: "INVENTORY_CORRECTION",
+    type: undoType,
     reference: movement.id,
     description: `Undo of ${requestedQty} unit(s)`,
     qtyIn: movement.type === "OUT" ? requestedQty : 0,
@@ -2202,13 +2205,17 @@ app.patch(
     if (!Number.isInteger(requestedQty) || requestedQty < 1) {
       return res.status(400).json({ error: "Undo quantity must be a positive whole number." });
     }
+    const undoType = req.body?.type ?? "INVENTORY_CORRECTION";
+    if (!UNDO_TYPES.includes(undoType)) {
+      return res.status(400).json({ error: "Choose a valid type for this undo." });
+    }
     if (!isAdmin(actor)) {
-      return sendForApproval(res, actor, "MOVEMENT_UNDO", id, cleanText(req.body?.reason, 255), requestedQty);
+      return sendForApproval(res, actor, "MOVEMENT_UNDO", id, cleanText(req.body?.reason, 255), requestedQty, undoType);
     }
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      const result = await applyMovementUndo(connection, id, requestedQty, actor.username);
+      const result = await applyMovementUndo(connection, id, requestedQty, actor.username, undoType);
       if (result.status !== 200) {
         await connection.rollback();
         return res.status(result.status).json({ error: result.error });
@@ -3698,7 +3705,7 @@ app.post(
           result = await applyMovementDelete(connection, request.target_id, actor.username);
           break;
         case "MOVEMENT_UNDO":
-          result = await applyMovementUndo(connection, request.target_id, Number(request.new_value), actor.username);
+          result = await applyMovementUndo(connection, request.target_id, Number(request.new_value), actor.username, request.new_text || undefined);
           break;
         case "ITEM_DELETE":
           result = await applyItemDelete(connection, request.target_id, actor.username);
@@ -4120,7 +4127,7 @@ async function requireSignedIn(req, res) {
 
 // Creates a pending request for a change a staff member cannot make directly.
 // The details shown on the request are read from the record it is about.
-async function sendForApproval(res, actor, type, targetId, reason, newValue = null) {
+async function sendForApproval(res, actor, type, targetId, reason, newValue = null, newText = null) {
   if (!reason || reason.length < 3) {
     return res.status(400).json({ error: "Enter a note explaining why this change is needed (at least 3 characters)." });
   }
@@ -4188,7 +4195,7 @@ async function sendForApproval(res, actor, type, targetId, reason, newValue = nu
     }
     await recordChangeRequest(connection, {
       type, targetId, invoice: info.invoice, itemId: info.itemId, itemName: info.itemName,
-      oldValue: info.oldValue, newValue: info.newValue, reason, requestedBy: actor.username, status: "PENDING",
+      oldValue: info.oldValue, newValue: info.newValue, newText, reason, requestedBy: actor.username, status: "PENDING",
     });
     await connection.commit();
     res.status(202).json({ requested: true });

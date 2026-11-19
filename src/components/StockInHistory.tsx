@@ -1,4 +1,4 @@
-import { askConfirm, askText } from './AppDialog';
+import { askChoice, askConfirm, askText } from './AppDialog';
 import { askReason } from '../reasonPrompt';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -69,6 +69,15 @@ function rangeFor(preset: string): { from: string; to: string } {
 }
 
 const invoiceLabel = (reference: string) => reference || 'No invoice';
+
+// The types an undo can be recorded as on the stock card. The server accepts the same values.
+const UNDO_TYPE_CHOICES = [
+  { value: 'INVENTORY_CORRECTION', label: 'Other reason (correction)' },
+  { value: 'CUSTOMER_RETURN', label: 'Return from customer' },
+  { value: 'PURCHASE_RETURN', label: 'Return to supplier' },
+  { value: 'DAMAGED_ITEMS', label: 'Damaged or broken' },
+  { value: 'STOCK_ADJUSTMENT', label: 'Stock adjustment (count difference)' },
+];
 
 export const StockInHistoryPage: React.FC<StockInHistoryPageProps> = ({ onAddItemsToInvoice }) => {
   // Staff have the same features as admins; edits and deletes are sent for approval.
@@ -345,8 +354,16 @@ const InvoiceModal: React.FC<{
     }
   };
 
-  // Undo reverses part or all of a line's stock and keeps it on the stock card. Staff send it for approval.
+  // Undo reverses part or all of a line's stock and keeps it on the stock card, under the type chosen here.
+  // Staff send it for approval.
   const undoLine = async (line: InvoiceLine) => {
+    const type = await askChoice(`Why is ${line.itemName} being undone?`, {
+      title: 'Undo type',
+      label: 'Type',
+      confirmLabel: 'Next',
+      choices: UNDO_TYPE_CHOICES,
+    });
+    if (type === null) return;
     const answer = (await askText(`Units of ${line.itemName} to undo (1 to ${line.qty}):`, String(line.qty)));
     if (answer === null) return;
     const qty = Number(answer);
@@ -361,7 +378,7 @@ const InvoiceModal: React.FC<{
     try {
       const result = await apiRequest<{ requested?: boolean }>(`/movements/${encodeURIComponent(line.id)}/undo`, {
         method: 'PATCH',
-        body: JSON.stringify({ qty, reason }),
+        body: JSON.stringify({ qty, reason, type }),
       });
       if (result?.requested) {
         setInfo(`Sent for approval: undo ${qty} ${line.itemName}. Nothing changes until an admin approves it.`);

@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // In-app dialogs that replace the browser's own prompt, confirm and alert boxes.
 // Call askText / askConfirm / askNotice with await; AppDialog (mounted once in App) shows them.
 
-type Kind = 'text' | 'confirm' | 'notice';
+type Kind = 'text' | 'confirm' | 'notice' | 'choice';
 
 export interface DialogOptions {
   title?: string;
@@ -14,6 +14,7 @@ export interface DialogOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  choices?: Array<{ value: string; label: string }>;
 }
 
 interface Pending {
@@ -28,7 +29,7 @@ let pending: Pending | null = null;
 const listeners = new Set<(value: Pending | null) => void>();
 const publish = () => listeners.forEach((listener) => listener(pending));
 
-const cancelValue = (kind: Kind) => (kind === 'text' ? null : kind === 'confirm' ? false : undefined);
+const cancelValue = (kind: Kind) => (kind === 'confirm' ? false : kind === 'notice' ? undefined : null);
 
 const open = (kind: Kind, message: string, initial: string, options: DialogOptions) =>
   new Promise<unknown>((resolve) => {
@@ -50,6 +51,10 @@ export const askText = (message: string, initial = '', options: DialogOptions = 
 
 export const askConfirm = (message: string, options: DialogOptions = {}) =>
   open('confirm', message, '', options) as Promise<boolean>;
+
+// Asks the user to pick one of options.choices; resolves to its value, or null when cancelled.
+export const askChoice = (message: string, options: DialogOptions & { choices: Array<{ value: string; label: string }> }) =>
+  open('choice', message, options.choices[0]?.value ?? '', options) as Promise<string | null>;
 
 export const askNotice = (message: string, options: DialogOptions = {}) =>
   open('notice', message, '', options) as Promise<void>;
@@ -79,7 +84,7 @@ export const AppDialog: React.FC = () => {
   if (!current) return null;
 
   const { kind, message, options } = current;
-  const title = options.title ?? (kind === 'text' ? 'Add a note' : kind === 'confirm' ? 'Please confirm' : 'Notice');
+  const title = options.title ?? (kind === 'text' ? 'Add a note' : kind === 'confirm' ? 'Please confirm' : kind === 'choice' ? 'Choose one' : 'Notice');
   const confirmLabel = options.confirmLabel ?? (kind === 'notice' ? 'OK' : 'Confirm');
 
   const cancel = () => close(cancelValue(kind));
@@ -92,6 +97,10 @@ export const AppDialog: React.FC = () => {
         return;
       }
       close(trimmed);
+      return;
+    }
+    if (kind === 'choice') {
+      close(value);
       return;
     }
     close(kind === 'confirm' ? true : undefined);
@@ -115,6 +124,16 @@ export const AppDialog: React.FC = () => {
       <div className="ask-card" role="dialog" aria-modal="true" aria-labelledby="ask-title" onKeyDown={onKeyDown}>
         <h2 id="ask-title" className="ask-title">{title}</h2>
         <p className="ask-message">{message}</p>
+        {kind === 'choice' && (
+          <label className="ask-field">
+            {options.label && <span className="ask-label">{options.label}</span>}
+            <select value={value} onChange={(event) => setValue(event.target.value)}>
+              {(options.choices ?? []).map((choice) => (
+                <option key={choice.value} value={choice.value}>{choice.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {kind === 'text' && (
           <label className="ask-field">
             {options.label && <span className="ask-label">{options.label}</span>}
