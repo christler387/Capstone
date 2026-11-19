@@ -10,7 +10,10 @@ interface UserProfileProps {
   onChangePassword?: (
     currentPassword: string,
     newPassword: string,
+    code: string,
   ) => Promise<void>;
+  // Checks the current password and emails a code. Resolves to the masked address it was sent to.
+  onRequestPasswordCode?: (currentPassword: string) => Promise<string>;
   onChangeUsername?: (
     currentPassword: string,
     newUsername: string,
@@ -73,6 +76,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   role = "staff",
   onLogout,
   onChangePassword,
+  onRequestPasswordCode,
   onChangeUsername,
   onCreateUser,
   onOpenRequests,
@@ -85,6 +89,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // The email code: asked for after the passwords are checked, then needed to save.
+  const [passwordCode, setPasswordCode] = useState("");
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
   const [newUsername, setNewUsername] = useState(user);
   const [usernamePassword, setUsernamePassword] = useState("");
   const [createUserName, setCreateUserName] = useState("");
@@ -126,6 +133,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+    setPasswordCode("");
+    setCodeSentTo(null);
     setPasswordFeedback(null);
   };
 
@@ -247,8 +256,27 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       return;
     }
 
+    // First press: check the passwords and send the code. Second press: save with the code.
+    if (!codeSentTo) {
+      if (!onRequestPasswordCode) {
+        setPasswordFeedback({ type: "error", message: "Password change is unavailable." });
+        return;
+      }
+      try {
+        const sentTo = await onRequestPasswordCode(currentPassword);
+        setCodeSentTo(sentTo);
+        setPasswordFeedback({ type: "success", message: `We sent a 6-digit code to ${sentTo}. Enter it to save.` });
+      } catch (error) {
+        setPasswordFeedback({ type: "error", message: error instanceof Error ? error.message : "Unable to send the code." });
+      }
+      return;
+    }
+    if (!/^\d{6}$/.test(passwordCode.trim())) {
+      setPasswordFeedback({ type: "error", message: "Enter the 6-digit code from the email." });
+      return;
+    }
     try {
-      await onChangePassword(currentPassword, newPassword);
+      await onChangePassword(currentPassword, newPassword, passwordCode.trim());
       setPasswordFeedback({
         type: "success",
         message: "Password updated successfully.",
@@ -847,6 +875,21 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               />
             </div>
 
+            {codeSentTo && (
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="passwordCode">Email code</label>
+                <input
+                  id="passwordCode"
+                  className="form-input font-mono"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={passwordCode}
+                  onChange={(e) => setPasswordCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="6-digit code"
+                />
+              </div>
+            )}
+
             {passwordFeedback && (
               <p
                 className={`label-micro ${passwordFeedback.type === "error" ? "text-accent" : "text-success"}`}
@@ -873,7 +916,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 className="olive-button"
                 style={{ flex: 1 }}
               >
-                Save
+                {codeSentTo ? "Save" : "Send code"}
               </button>
             </div>
           </form>

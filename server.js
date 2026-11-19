@@ -741,11 +741,9 @@ async function initializeDatabase() {
   await createLoginThrottleTable();
   // Sales keep the part number of the item sold. Older databases were missing this column.
   await addColumnIfMissing("sales", "part_number", "VARCHAR(100) NULL");
-  await addIndexIfMissing("sales", "idx_sales_reference", "reference");
   await addIndexIfMissing("movements", "idx_movements_type_item", "type, item_id, movement_date, qty");
   await addIndexIfMissing("movements", "idx_movements_recent", "movement_date, created_at");
   // Lets the invoice number checks find a reference without reading every row.
-  await addIndexIfMissing("movements", "idx_movements_type_reference", "type, reference");
   await loadLoginThrottle();
   await pool.query(`CREATE TABLE IF NOT EXISTS change_requests (
     id VARCHAR(64) PRIMARY KEY,
@@ -770,6 +768,7 @@ async function initializeDatabase() {
   await addColumnIfMissing("change_requests", "new_text", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "reference", "VARCHAR(64) NULL");
   await addColumnIfMissing("movements", "supplier_id", "INT NULL");
+  await addIndexIfMissing("movements", "idx_movements_type_reference", "type, reference");
   await backfillStockLedger();
 }
 
@@ -922,10 +921,14 @@ async function issueCode(userId, purpose, email) {
     [userId, purpose, email, hashCode(code), CODE_TTL_MINUTES],
   );
 
-  const subject = purpose === "verify_email" ? "Verify your AutoSupply recovery email" : "Your AutoSupply password reset code";
-  const intro = purpose === "verify_email"
-    ? "Use this code to confirm this recovery email address:"
-    : "Use this code to reset your AutoSupply password:";
+  const subject = {
+    verify_email: "Verify your AutoSupply recovery email",
+    change_password: "Your AutoSupply password change code",
+  }[purpose] ?? "Your AutoSupply password reset code";
+  const intro = {
+    verify_email: "Use this code to confirm this recovery email address:",
+    change_password: "Use this code to change your AutoSupply password:",
+  }[purpose] ?? "Use this code to reset your AutoSupply password:";
   await sendMail({
     to: email,
     subject,
@@ -1078,12 +1081,43 @@ app.post(
   }),
 );
 
+// Sends an email code for a password change. The current password must be right and the recovery email verified.
+app.post(
+  "/api/users/password-code",
+  ah(async (req, res) => {
+    const actor = await getAuthenticatedUser(req);
+    if (!actor) return res.status(401).json({ error: "Sign in to change your password." });
+    const currentPassword = String(req.body?.currentPassword || "");
+    if (!currentPassword) return res.status(400).json({ error: "Enter your current password." });
+
+    const [[user]] = await pool.query("SELECT id, password_hash, email, email_verified_at FROM users WHERE id=? LIMIT 1", [actor.id]);
+    if (!user) return res.status(404).json({ error: "User not found." });
+    const attemptsKey = `change-password:${user.id}`;
+    if (blockedByLimit(res, [attemptsKey], "Too many failed password attempts.")) return;
+    if (!verifyPassword(user.password_hash, currentPassword)) {
+      recordLoginFailure(attemptsKey, 5);
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+    if (!user.email || !user.email_verified_at) {
+      return res.status(400).json({ error: "Verify a recovery email first (profile menu, Recovery email)." });
+    }
+    try {
+      await issueCode(user.id, "change_password", user.email);
+    } catch (error) {
+      if (error?.status === 429) return res.status(429).json({ error: error.message });
+      throw error;
+    }
+    const [name, domain] = user.email.split("@");
+    res.json({ sent: true, sentTo: `${name.slice(0, 2)}***@${domain}` });
+  }),
+);
+
 // NOTE: these two fixed-path routes MUST be declared before "/api/users/:id",
 // otherwise Express matches ":id" = "change-password" and returns a 400.
 app.put(
   "/api/users/change-password",
   ah(async (req, res) => {
-    const { currentPassword, newPassword } = req.body || {};
+    const { currentPassword, newPassword, code } = req.body || {};
     const actor = await getAuthenticatedUser(req);
 
     if (!actor) {
@@ -1094,6 +1128,7 @@ app.put(
         error: "Current password and new password are required.",
       });
     }
+    if (!code) return res.status(400).json({ error: "Enter the code sent to your recovery email." });
 
     const newPasswordString = String(newPassword).trim();
 
@@ -1104,7 +1139,7 @@ app.put(
     }
 
     const [rows] = await pool.query(
-      "SELECT id, username, password_hash FROM users WHERE id=? LIMIT 1",
+      "SELECT id, username, password_hash, email, email_verified_at FROM users WHERE id=? LIMIT 1",
       [actor.id],
     );
     if (rows.length === 0) {
@@ -1118,6 +1153,15 @@ app.put(
     if (!verifyPassword(user.password_hash, String(currentPassword))) {
       recordLoginFailure(attemptsKey, 5);
       return res.status(401).json({ error: "Current password is incorrect." });
+    }
+    if (!user.email || !user.email_verified_at) {
+      return res.status(400).json({ error: "Verify a recovery email first (profile menu, Recovery email)." });
+    }
+    // The emailed code is checked as well: a wrong code counts toward the same attempt limit.
+    const codeCheck = await checkCode(user.id, "change_password", user.email, code);
+    if (!codeCheck.ok) {
+      recordLoginFailure(attemptsKey, 5);
+      return res.status(400).json({ error: codeCheck.message });
     }
     clearThrottle(attemptsKey);
 
@@ -2948,6 +2992,8 @@ async function createSalesTable() {
     KEY idx_sales_reference (reference),
     KEY idx_sales_movement (movement_id)
   ) ${tableOptions}`);
+  // Older databases may lack the reference index; the sale number checks use it.
+  await addIndexIfMissing("sales", "idx_sales_reference", "reference");
 }
 
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;

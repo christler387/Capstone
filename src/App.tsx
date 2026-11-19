@@ -194,14 +194,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+  // Asks for the email code. The current password is checked first.
+  const handleRequestPasswordCode = async (currentPassword: string): Promise<string> => {
+    const result = await requestJson<{ sent: boolean; sentTo: string }>('/users/password-code', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword }),
+    });
+    return result.sentTo;
+  };
+  const handleChangePassword = async (currentPassword: string, newPassword: string, code: string) => {
     const activeUsername = sessionStorage.getItem('skyrun_session_user') || user;
     if (!activeUsername) {
       throw new Error('No active user is logged in.');
     }
     await requestJson<{ ok: boolean; username: string }>('/users/change-password', {
       method: 'PUT',
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ currentPassword, newPassword, code }),
     });
   };
   const handleChangeUsername = async (currentPassword: string, newUsername: string) => {
@@ -831,6 +839,7 @@ Use **Log out** at the bottom of the profile menu when you finish, especially on
             role={userRole}
             onLogout={handleLogout} 
             onChangePassword={handleChangePassword}
+            onRequestPasswordCode={handleRequestPasswordCode}
             onChangeUsername={handleChangeUsername}
             onCreateUser={handleCreateUser}
             onOpenRequests={() => setIsRequestsOpen(true)}
