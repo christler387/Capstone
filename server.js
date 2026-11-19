@@ -481,11 +481,6 @@ const inventorySeed = [
   ],
 ];
 
-const defaultUsers = [
-  { username: "admin", password: "admin123", role: "admin" },
-  { username: "staff", password: "staff123", role: "staff" },
-];
-
 const movementSeed = [
   ["MOV-1001", "004", "OUT", 45, "2026-08-10", "Warehouse Staff"],
   ["MOV-1002", "003", "OUT", 35, "2026-08-11", "Warehouse Staff"],
@@ -702,17 +697,19 @@ async function initializeDatabase() {
   await repairOldSeedPositions();
 
   // ---- Seed data ----
+  // No passwords are kept in the code. On an empty database, the first admin is created from
+  // INITIAL_ADMIN_PASSWORD (at least 8 characters); INITIAL_ADMIN_USERNAME sets the name (default "admin").
   const [[userCount]] = await pool.query("SELECT COUNT(*) AS count FROM users");
   if (userCount.count === 0) {
-    const userEntries = defaultUsers.map(({ username, password, role }) => [
-      username,
-      hashPassword(password),
-      role,
-    ]);
-    await pool.query(
-      "INSERT INTO users (username, password_hash, role) VALUES ?",
-      [userEntries],
-    );
+    const initialPassword = process.env.INITIAL_ADMIN_PASSWORD || "";
+    if (initialPassword.length >= 8) {
+      await pool.query(
+        "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')",
+        [(process.env.INITIAL_ADMIN_USERNAME || "admin").slice(0, 64), hashPassword(initialPassword)],
+      );
+    } else {
+      console.warn("No users exist. Set INITIAL_ADMIN_PASSWORD (at least 8 characters) and restart to create the first admin.");
+    }
   }
 
   // Quantity changes are recorded in the audit log as QTY entries.
@@ -2138,7 +2135,8 @@ async function applySaleVoid(connection, saleId, actorName) {
   const [[sale]] = await connection.query("SELECT * FROM sales WHERE id=? FOR UPDATE", [saleId]);
   if (!sale) return { status: 404, error: "Sale not found." };
   if (sale.status === "VOIDED") return { status: 409, error: "This sale is already undone." };
-  const undo = await applyMovementUndo(connection, sale.movement_id, Number(sale.quantity), actorName);
+  // Goods from an undone sale come back to the shelf, so the stock card records them as a customer return.
+  const undo = await applyMovementUndo(connection, sale.movement_id, Number(sale.quantity), actorName, "CUSTOMER_RETURN", "Sale undone");
   if (undo.status !== 200) {
     return { status: 409, error: "The stock movement for this sale was already changed. Check the stock card." };
   }
