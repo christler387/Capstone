@@ -62,22 +62,22 @@ export const Stock: React.FC<StockProps> = ({
     onPrefillUsed?.();
   }, [stockInPrefill]);
 
-  const loadSuggestedInvoice = async () => {
+  // kind 'in' is the next stock-in invoice; kind 'sale' is the next stock-out reference. Two separate series.
+  const loadSuggestedInvoice = async (kind: 'in' | 'sale') => {
     try {
-      const { invoice } = await apiRequest<{ invoice: string }>('/stock-in/next-invoice');
-      setSuggestedInvoice(invoice);
+      const { invoice } = await apiRequest<{ invoice: string }>(`/stock-in/next-invoice${kind === 'sale' ? '?kind=sale' : ''}`);
+      if (kind === 'sale') setSuggestedSale(invoice);
+      else setSuggestedInvoice(invoice);
       return invoice;
     } catch {
       return '';
     }
   };
 
-  // Fill the invoice number with the next free one when the screen opens, unless one is already there.
+  // Fill each number with its next free one when the screen opens, unless one is already there.
   useEffect(() => {
-    void loadSuggestedInvoice().then((invoice) => {
-      setStockInInvoice((current) => current || invoice);
-      setSaleReference((current) => current || invoice);
-    });
+    void loadSuggestedInvoice('in').then((invoice) => setStockInInvoice((current) => current || invoice));
+    void loadSuggestedInvoice('sale').then((invoice) => setSaleReference((current) => current || invoice));
   }, []);
   // Stock-out details: the invoice number, the customer, and each item's selling price.
   const [saleReference, setSaleReference] = useState('');
@@ -86,6 +86,8 @@ export const Stock: React.FC<StockProps> = ({
   const [addToExisting, setAddToExisting] = useState(false);
   // The next free invoice number, from the server.
   const [suggestedInvoice, setSuggestedInvoice] = useState('');
+  // The next free sale reference, from its own number series.
+  const [suggestedSale, setSuggestedSale] = useState('');
   const [stockInSupplierId, setStockInSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<{ id: number; name: string; supplierId: string; isActive: boolean }[]>([]);
   useEffect(() => {
@@ -285,7 +287,7 @@ export const Stock: React.FC<StockProps> = ({
       saleBatchId.current = null;
       setSheets((prev) => ({ ...prev, out: [] }));
       setSellPrices({});
-      setSaleReference(await loadSuggestedInvoice());
+      setSaleReference(await loadSuggestedInvoice('sale'));
       setIsConfirmOpen(false);
       window.dispatchEvent(new CustomEvent('inventory-changed'));
     } catch (err) {
@@ -320,7 +322,7 @@ export const Stock: React.FC<StockProps> = ({
         setAddToExisting(false);
         setIsConfirmOpen(false);
         window.dispatchEvent(new CustomEvent('inventory-changed'));
-        setStockInInvoice(await loadSuggestedInvoice());
+        setStockInInvoice(await loadSuggestedInvoice('in'));
       } catch (recordError) {
         setError(recordError instanceof Error ? recordError.message : 'Could not record the stock in.');
         setIsConfirmOpen(false);
@@ -501,9 +503,9 @@ export const Stock: React.FC<StockProps> = ({
             <label className="stk-sale-field">
               <span>Invoice no. <em>*</em></span>
               <input value={saleReference} onChange={(e) => setSaleReference(e.target.value)} placeholder="e.g. INV-0001" maxLength={64} />
-              {suggestedInvoice && (
+              {suggestedSale && (
                 <span style={{ display: 'block', marginTop: 4, fontSize: '0.75rem', color: 'var(--ink-faint)' }}>
-                  Next free number: {suggestedInvoice}
+                  Next free number: {suggestedSale}
                 </span>
               )}
             </label>

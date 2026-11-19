@@ -2997,10 +2997,10 @@ app.post(
           await connection.rollback();
           return { status: 200, duplicate: true };
         }
-        // A reference already used by a stock-in invoice or a sale is refused, with the next free number.
-        if (await invoiceNumberUsed(connection, reference)) {
+        // A sale reference already used by another sale is refused, with the next free number.
+        if (await saleNumberUsed(connection, reference)) {
           await connection.rollback();
-          const next = await suggestStockInInvoice(connection);
+          const next = await suggestInvoiceNumber(connection, "sale");
           return { status: 409, error: `Invoice ${reference} is already used. The next free number is ${next}.` };
         }
         const now = new Date();
@@ -4006,24 +4006,25 @@ app.post(
 
 // The next invoice number to suggest: one more than the highest all-digit invoice, with the same width.
 // Numbers already used are skipped, so the suggestion is never a duplicate.
-// True when a number is already used by a stock-in invoice or a sale. One shared list, so no number is used twice.
-async function invoiceNumberUsed(db, reference) {
-  const [[used]] = await db.query(
-    "SELECT (EXISTS(SELECT 1 FROM movements WHERE type='IN' AND reference=?) OR EXISTS(SELECT 1 FROM sales WHERE reference=?)) AS used",
-    [reference, reference],
-  );
+// Stock in invoices and sale references are two separate number series. Each one checks only its own records.
+async function stockInNumberUsed(db, reference) {
+  const [[used]] = await db.query("SELECT EXISTS(SELECT 1 FROM movements WHERE type='IN' AND reference=?) AS used", [reference]);
   return Boolean(used.used);
 }
 
-async function suggestStockInInvoice(db) {
-  // Reads only the numbers that start with a digit, from the newest end of each index.
-  const [inRows] = await db.query(
-    "SELECT reference FROM movements WHERE type='IN' AND reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200",
+async function saleNumberUsed(db, reference) {
+  const [[used]] = await db.query("SELECT EXISTS(SELECT 1 FROM sales WHERE reference=?) AS used", [reference]);
+  return Boolean(used.used);
+}
+
+// The next free number of one series: stock in invoices ("in") or sale references ("sale").
+async function suggestInvoiceNumber(db, kind) {
+  const isSale = kind === "sale";
+  const [rows] = await db.query(
+    isSale
+      ? "SELECT reference FROM sales WHERE reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200"
+      : "SELECT reference FROM movements WHERE type='IN' AND reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200",
   );
-  const [saleRows] = await db.query(
-    "SELECT reference FROM sales WHERE reference >= '0' AND reference < ':' ORDER BY reference DESC LIMIT 200",
-  );
-  const rows = [...inRows, ...saleRows];
   let last = null;
   for (const row of rows) {
     if (!/^[0-9]+$/.test(row.reference)) continue;
@@ -4034,7 +4035,8 @@ async function suggestStockInInvoice(db) {
   let next = Number(last) + 1;
   for (;;) {
     const candidate = String(next).padStart(width, "0");
-    if (!(await invoiceNumberUsed(db, candidate))) return candidate;
+    const used = isSale ? await saleNumberUsed(db, candidate) : await stockInNumberUsed(db, candidate);
+    if (!used) return candidate;
     next += 1;
   }
 }
@@ -4044,7 +4046,8 @@ app.get(
   ah(async (req, res) => {
     const actor = await requireSignedIn(req, res);
     if (!actor) return;
-    res.json({ invoice: await suggestStockInInvoice(pool) });
+    const kind = req.query.kind === "sale" ? "sale" : "in";
+    res.json({ invoice: await suggestInvoiceNumber(pool, kind) });
   }),
 );
 
@@ -4090,9 +4093,9 @@ app.post(
       locked = true;
       await connection.beginTransaction();
       if (!addToExisting) {
-        if (await invoiceNumberUsed(connection, reference)) {
+        if (await stockInNumberUsed(connection, reference)) {
           await connection.rollback();
-          const next = await suggestStockInInvoice(connection);
+          const next = await suggestInvoiceNumber(connection, "in");
           return res.status(409).json({ error: `Invoice ${reference} is already used. The next free number is ${next}.` });
         }
       }
